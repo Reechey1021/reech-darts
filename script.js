@@ -20,8 +20,8 @@ const firebaseConfig = {
 // Create the game if it doesn't exist
 gameRef.set(
   {
-    message: "Hello from Reech Darts",
-    lastUpdated: new Date()
+   // message: "Hello from Reech Darts",
+   // lastUpdated: new Date()
   },
   { merge: true }
 );
