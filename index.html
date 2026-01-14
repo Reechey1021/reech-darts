@@ -6,16 +6,48 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="style.css" />
 </head>
+
 <body>
+  <h1>Reech Darts 🎯</h1>
 
-    <h1>Reech Darts 🎯</h1>
-    <p id="status">Connecting...</p>
-  
-    <!-- Firebase SDKs -->
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-  
-    <script src="script.js"></script>
+  <div class="card">
+    <div class="row">
+      <label for="mode">Game:</label>
+      <select id="mode">
+        <option value="301">301</option>
+        <option value="501" selected>501</option>
+      </select>
+
+      <button id="newGameBtn">New Game</button>
+      <button id="resetBtn">Reset</button>
+    </div>
+
+    <p id="status">Connecting…</p>
+
+    <div class="scores">
+      <div class="player">
+        <h2 id="p1Name">Player 1</h2>
+        <div class="score" id="p1Score">—</div>
+      </div>
+
+      <div class="player">
+        <h2 id="p2Name">Player 2</h2>
+        <div class="score" id="p2Score">—</div>
+      </div>
+    </div>
+
+    <div class="row">
+      <input id="scoreInput" type="number" inputmode="numeric" min="0" max="180" placeholder="Enter score (0–180)" />
+      <button id="submitBtn">Submit Score</button>
+    </div>
+
+    <p class="hint">Tip: You can open this page on two devices. When you submit a score on one, the other updates instantly.</p>
+  </div>
+
+  <!-- Firebase SDKs (compat) -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
+  <script src="script.js"></script>
 </body>
-
 </html>
