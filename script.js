@@ -19,6 +19,112 @@ const gameRef = db.collection("games").doc("test-game");
 const BOGEY_NUMBERS = new Set([169, 168, 166, 165, 163, 162, 159]);
 const IMPOSSIBLE_TURN_SCORES = new Set([179, 178, 176, 175, 173, 172, 169, 166, 163]);
 
+// ---------- Audio (Firestore-synced) ----------
+let lastAudioId = null;
+let audioUnlocked = false;
+let currentAudio = null;
+
+function pad3(n) {
+  return String(n).padStart(3, "0");
+}
+
+function stopAudio() {
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio.currentTime = 0;
+    currentAudio = null;
+  }
+}
+
+function playClipsSequential(clips) {
+  stopAudio();
+  if (!Array.isArray(clips) || clips.length === 0) return;
+
+  const playNext = (i) => {
+    if (i >= clips.length) return;
+
+    const src = clips[i];
+    const a = new Audio(src);
+    currentAudio = a;
+    a.volume = 1;
+
+    a.onended = () => playNext(i + 1);
+    a.onerror = () => playNext(i + 1);
+
+    a.play().catch(() => {
+      // audio blocked until user gesture on some devices
+    });
+  };
+
+  playNext(0);
+}
+
+function unlockAudioOnce() {
+  if (audioUnlocked) return;
+  audioUnlocked = true;
+
+  // Prime audio on iOS/Safari (must happen after a user gesture)
+  const a = new Audio("audio/phrases/no_score.mp3");
+  a.volume = 0; // silent prime
+  a.play()
+    .then(() => {
+      a.pause();
+      a.currentTime = 0;
+      a.volume = 1;
+    })
+    .catch(() => {
+      // still fine; user can tap again later
+    });
+}
+
+function requireClipForName(name) {
+  const cleaned = (name || "").trim();
+  if (cleaned === "Richard") return "audio/phrases/require_richard.mp3";
+  if (cleaned === "Kameron") return "audio/phrases/require_kameron.mp3";
+  return "audio/phrases/require.mp3";
+}
+
+// Whether someone is "on a possible checkout" (your current rules)
+function isPossibleCheckout(remaining) {
+  const r = Number(remaining);
+  if (!Number.isFinite(r)) return false;
+  if (r <= 1) return false;
+  if (r > 170) return false;
+  if (r >= 171 && r <= 180) return false;
+  if (BOGEY_NUMBERS.has(r)) return false;
+  return Boolean(CHECKOUTS[r]);
+}
+
+// Build “Score. (Optional) Require + remaining.”
+function buildVisitClips({ scoreCallType, entered, nextPlayerName, nextRemaining }) {
+  const clips = [];
+
+  // score call
+  if (scoreCallType === "no_score") {
+    clips.push("audio/phrases/no_score.mp3");
+  } else {
+    clips.push(`audio/numbers/${pad3(entered)}.mp3`);
+  }
+
+  // require call if next player is on a checkout
+  if (isPossibleCheckout(nextRemaining)) {
+    clips.push(requireClipForName(nextPlayerName));
+    clips.push(`audio/numbers/${pad3(nextRemaining)}.mp3`);
+  }
+
+  return clips;
+}
+
+function setAudioEvent(state, clips) {
+  // unique id so all clients play exactly once
+  state.audio = {
+    id: Date.now() + Math.floor(Math.random() * 1000),
+    clips,
+    at: new Date(),
+  };
+}
+
+
 // ---------- UI helpers ----------
 
 function isTouchDevice() {
@@ -438,14 +544,18 @@ async function startMatchFromSetup() {
   const mode = Number(document.getElementById("setupMode")?.value || 501);
   const bestOf = Number(document.getElementById("setupBestOf")?.value || 3);
 
-  const state = makeNewMatch({ mode, bestOf, p1Name: p1, p2Name: p2 });
-  await gameRef.set(state);
+  await db.runTransaction(async (tx) => {
+    const state = makeNewMatch({ mode, bestOf, p1Name: p1, p2Name: p2 });
+    setAudioEvent(state, ["audio/phrases/match_start.mp3"]);
+    tx.set(gameRef, state);
+  });
+
   setSetupModalVisible(false);
 
-  // clear input
   const inputEl = document.getElementById("scoreInput");
   if (inputEl) inputEl.value = "";
 }
+
 
 async function submitScore() {
   const inputEl = document.getElementById("scoreInput");
@@ -521,9 +631,31 @@ async function submitScore() {
     }
 
     // Advance turn
-    state.leg.currentPlayer = (state.leg.currentPlayer + 1) % 2;
-    state.updatedAt = new Date();
-    tx.set(gameRef, state);
+// Advance turn
+state.leg.currentPlayer = (state.leg.currentPlayer + 1) % 2;
+
+// Decide what to call as the score
+// You said: no_score for bust OR 0
+const scoreCallType = (bust || entered === 0) ? "no_score" : "number";
+
+// Next player status for "require"
+const nextP = state.leg.currentPlayer;
+const nextName = state.match.players[nextP].name;
+const nextRemaining = state.leg.players[nextP].score;
+
+// Build and attach the full spoken sentence
+const clips = buildVisitClips({
+  scoreCallType,
+  entered,
+  nextPlayerName: nextName,
+  nextRemaining,
+});
+
+setAudioEvent(state, clips);
+
+state.updatedAt = new Date();
+tx.set(gameRef, state);
+
   });
 
   inputEl.value = "";
@@ -588,6 +720,15 @@ async function confirmCheckout(dartsUsed) {
       match.status = "finished";
       match.winner = p;
     }
+
+// Audio: leg end vs match end
+if (match.status === "finished") {
+  setAudioEvent(state, ["audio/phrases/match_end.mp3"]);
+} else {
+  setAudioEvent(state, ["audio/phrases/game_end.mp3"]);
+}
+
+
 
     state.pendingCheckout = null;
     state.updatedAt = new Date();
@@ -710,6 +851,10 @@ function wireUI() {
   const submitBtn = document.getElementById("submitBtn");
   const undoBtn = document.getElementById("undoBtn");
   const scoreInputEl = document.getElementById("scoreInput");
+
+  document.addEventListener("click", unlockAudioOnce, { once: true });
+  document.addEventListener("touchstart", unlockAudioOnce, { once: true });
+
 
   // Setup modal
   const setupCancelBtn = document.getElementById("setupCancelBtn");
@@ -892,10 +1037,20 @@ wireGlobalKeyboard();
 
 // ---------- Real-time updates ----------
 gameRef.onSnapshot(
-  (doc) => render(doc.data()),
+  (doc) => {
+    const state = doc.data();
+    render(state);
+
+    // Firestore-synced audio: every device plays the same event once
+    if (state?.audio?.id && state.audio.id !== lastAudioId) {
+      lastAudioId = state.audio.id;
+      playClipsSequential(state.audio.clips);
+    }
+  },
   (err) => {
     console.error(err);
     const statusEl = document.getElementById("status");
     if (statusEl) statusEl.innerText = "Firestore error: " + err.message;
   }
 );
+
