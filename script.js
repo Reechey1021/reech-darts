@@ -17,20 +17,19 @@ const firebaseConfig = {
   
   const gameRef = db.collection("games").doc("test-game");
 
-// Create the game if it doesn't exist
-gameRef.set(
-  {
-   // message: "Hello from Reech Darts",
-   // lastUpdated: new Date()
-  },
-  { merge: true }
-);
-
-gameRef.onSnapshot((doc) => {
-    const data = doc.data();
-    console.log("Game updated:", data);
+  // Create ONLY if missing (so you don't overwrite every refresh)
+  gameRef.get().then((doc) => {
+    if (!doc.exists) {
+      gameRef.set({
+        message: "Hello from Firebase",
+        lastUpdated: new Date()
+      });
+    }
+  });
   
-    document.getElementById("status").innerText =
-      data?.message || "No data yet";
+  // Listen for real-time updates
+  gameRef.onSnapshot((doc) => {
+    const data = doc.data();
+    document.getElementById("status").innerText = data?.message || "No data yet";
   });
   
