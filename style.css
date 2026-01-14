@@ -169,7 +169,7 @@ body {
     text-align: center;
     border: 1px solid transparent;
     background: transparent;
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 700;
     border-radius: 10px;
   }
@@ -181,8 +181,8 @@ body {
   
   .name:focus {
     outline: none;
-    border-color: #ddd;
-    background: #fafafa;
+    border-color: #ffffff;
+    background: #ffffff
   }
 
   .player {
@@ -331,7 +331,7 @@ body {
 
     .key {
         padding: 14px 0;
-        min-height: 100px;
+        min-height: 70px;
         font-size: 26px;
         border-radius: 30px;
         border: 1px solid #e7e7e7;
@@ -342,8 +342,9 @@ body {
     }
 
     #scoreInput {
-        font-size: 32px !important;
-        max-width: 120px;
+        font-size: 26px !important;
+        font-weight: 800;
+        max-width: 50px;
         caret-color: transparent;
       }
     
@@ -362,8 +363,46 @@ body {
     }
 
     .stats {
-      font-size: 10px;
+      font-size: 6px;
       gap: 2px;
     }
+
+    .stats .pill {
+      font-size: 10px;
+      padding: 2px 4px;
+      border-color: transparent;
+    }
+
+    #undoBtn {
+      padding: 8px 18px;
+    }
+
+    #submitBtn {
+      padding: 8px 18px;
+    }
+
+    .checkout .pill {
+      font-size: 16px;
+    }
+
+    .formRow {
+      display: grid;
+      grid-template-columns: 140px 200px;
+      gap: 10px;
+      align-items: center;
+      margin: 10px 0;
+    }
+    
+    input {
+      font-size: 20px !important;
+    }
+    
+      .matchStats {
+    margin-top: 14px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    text-align: center;
+    padding-bottom: 20px;
   }
-  
+  }
