@@ -1,3 +1,12 @@
+:root {
+  --font: "Poppins", system-ui, -apple-system, "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, Arial, sans-serif;
+}
+
+body, button, input, select, textarea {
+  font-family: var(--font);
+}
+
+
 body {
     font-family: poppins;
     margin: 0;
@@ -29,7 +38,7 @@ body {
   }
 
   #submitBtn, #undoBtn {
-    padding: 20px 30px;
+    padding: 12px 30px;
     font-size: 20px;
   }
 
@@ -113,7 +122,7 @@ body {
   }
   
   .score {
-    font-size: 50px;
+    font-size: 62px;
     font-weight: 700;
     margin-top: 6px;
   }
@@ -133,13 +142,13 @@ body {
   .keypad {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 14px;
+    gap: 10px;
     margin-top: 10px;
   }
   
   .key {
     padding: 14px 0;
-    min-height: 120px;
+    min-height: 70px;
     font-size: 32px;
     border-radius: 30px;
     border: 1px solid #e7e7e7;
@@ -271,7 +280,7 @@ body {
     opacity: 0.9;
     display: flex;
     justify-content: center;
-    gap: px;
+    gap: 5px;
     flex-wrap: wrap;
   }
   
@@ -314,8 +323,12 @@ body {
   .hidden { display: none !important; }
   
 
-  @media (max-width: 600px) {
+  @media (max-width: 700px) {
     /* mobile-only styles go here */
+    body {
+      padding: 0px;
+    }
+
     .key {
         padding: 14px 0;
         min-height: 100px;
@@ -331,14 +344,26 @@ body {
     #scoreInput {
         font-size: 32px !important;
         max-width: 120px;
+        caret-color: transparent;
       }
     
     .row {
-        padding: 16px 4px;
+        padding: 0px 4px;
     }
     
     .score {
         font-size: 58px;
+        margin-top: -10px;
+    }
+
+    .name {
+      margin-left: -10px;
+      font-size: 10px;
+    }
+
+    .stats {
+      font-size: 10px;
+      gap: 2px;
     }
   }
   

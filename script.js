@@ -20,6 +20,18 @@ const BOGEY_NUMBERS = new Set([169, 168, 166, 165, 163, 162, 159]);
 const IMPOSSIBLE_TURN_SCORES = new Set([179, 178, 176, 175, 173, 172, 169, 166, 163]);
 
 // ---------- UI helpers ----------
+
+function isTouchDevice() {
+  return window.matchMedia("(pointer: coarse)").matches;
+}
+
+function safeFocusScoreInput() {
+  const el = document.getElementById("scoreInput");
+  if (!el) return;
+  if (isTouchDevice()) return; // prevent iOS keyboard popping up
+  el.focus();
+}
+
 function showError(msg) {
   const el = document.getElementById("error");
   if (!el) return;
@@ -515,7 +527,7 @@ async function submitScore() {
   });
 
   inputEl.value = "";
-  inputEl.focus();
+  safeFocusScoreInput();
 }
 
 async function confirmCheckout(dartsUsed) {
@@ -588,7 +600,7 @@ async function confirmCheckout(dartsUsed) {
   if (btn) btn.disabled = true;
 
   const inputEl = document.getElementById("scoreInput");
-  if (inputEl) inputEl.focus();
+  if (inputEl) safeFocusScoreInput();
 }
 
 async function cancelCheckout() {
@@ -606,7 +618,7 @@ async function cancelCheckout() {
   if (btn) btn.disabled = true;
 
   const inputEl = document.getElementById("scoreInput");
-  if (inputEl) inputEl.focus();
+  if (inputEl) safeFocusScoreInput();
 }
 
 async function continueOrNewMatch() {
@@ -738,7 +750,7 @@ function wireUI() {
       const digit = btn.getAttribute("data-digit");
       if (digit !== null) {
         scoreInputEl.value = (scoreInputEl.value + digit).slice(0, 3);
-        scoreInputEl.focus();
+        safeFocusScoreInput();
       }
     });
   }
@@ -746,14 +758,14 @@ function wireUI() {
   if (clearBtn && scoreInputEl) {
     clearBtn.addEventListener("click", () => {
       scoreInputEl.value = "";
-      scoreInputEl.focus();
+      safeFocusScoreInput();
     });
   }
 
   if (backBtn && scoreInputEl) {
     backBtn.addEventListener("click", () => {
       scoreInputEl.value = scoreInputEl.value.slice(0, -1);
-      scoreInputEl.focus();
+      safeFocusScoreInput();
     });
   }
 
@@ -849,7 +861,7 @@ function isAnyModalOpen() {
       if (e.key >= "0" && e.key <= "9") {
         e.preventDefault();
         scoreInputEl.value = (scoreInputEl.value + e.key).slice(0, 3);
-        scoreInputEl.focus();
+        safeFocusScoreInput();
         return;
       }
   
@@ -857,7 +869,7 @@ function isAnyModalOpen() {
       if (e.key === "Backspace") {
         e.preventDefault();
         scoreInputEl.value = scoreInputEl.value.slice(0, -1);
-        scoreInputEl.focus();
+        safeFocusScoreInput();
         return;
       }
   
