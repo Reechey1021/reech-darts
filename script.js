@@ -1079,6 +1079,36 @@ if (confirmNewMatchOkBtn) {
   });
 }
 
+function applyTheme(theme) {
+  document.body.setAttribute("data-theme", theme);
+  localStorage.setItem("theme", theme);
+
+  const btn = document.getElementById("themeToggleBtn");
+  if (btn) btn.textContent = theme === "dark" ? "☀️" : "🌙";
+}
+
+function initThemeToggle() {
+  const saved = localStorage.getItem("theme");
+  const preferred =
+    saved ||
+    (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light");
+
+  applyTheme(preferred);
+
+  const btn = document.getElementById("themeToggleBtn");
+  if (!btn) return;
+
+  btn.addEventListener("click", () => {
+    const current = document.body.getAttribute("data-theme") || "light";
+    applyTheme(current === "dark" ? "light" : "dark");
+  });
+}
+
+initThemeToggle();
+
+
 }
 
 function isAnyModalOpen() {

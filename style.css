@@ -1,408 +1,447 @@
 :root {
-  --font: "Poppins", system-ui, -apple-system, "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, Arial, sans-serif;
+  --font: "Poppins", system-ui, -apple-system, "SF Pro Text", "SF Pro Display",
+    "Segoe UI", Roboto, Arial, sans-serif;
+
+  /* LIGHT THEME (default) */
+  --bg: #f6f6f7;
+  --text: #111;
+  --card: #ffffff;
+
+  --btn-bg: #fafafa;
+  --btn-text: #111;
+
+  --key-bg: #fafafa;
+  --key-border: #e7e7e7;
+
+  --border: #eee;
+
+  --pill-bg: #fafafa;
+  --pill-border: #e7e7e7;
+  --pill-text: #111;
+
+  --stats-pill-bg: #fff;
+  --stats-pill-border: #e7e7e7;
+
+  --modal-overlay: rgba(0, 0, 0, 0.55);
+  --modal-card: #ffffff;
+
+  --active-border: #3b82f6;
+  --active-glow: rgba(59, 130, 246, 0.18);
+
+  --shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+
+  --submit-bg: #80ef80;
+
+  --error-bg: #fff1f2;
+  --error-border: #fecdd3;
+}
+
+/* DARK THEME OVERRIDES */
+body[data-theme="dark"] {
+  --bg: #0b0f14;
+  --text: #e7eaf0;
+  --card: #121a24;
+
+  --btn-bg: #1b2532;
+  --btn-text: #e7eaf0;
+
+  --key-bg: #1b2532;
+  --key-border: #2a3a4f;
+
+  --border: #223043;
+
+  --pill-bg: #1b2532;
+  --pill-border: #2a3a4f;
+  --pill-text: #e7eaf0;
+
+  --stats-pill-bg: #1b2532;
+  --stats-pill-border: #2a3a4f;
+
+  --modal-overlay: rgba(0, 0, 0, 0.7);
+  --modal-card: #121a24;
+
+  --shadow: 0 12px 35px rgba(0, 0, 0, 0.45);
+
+  --error-bg: rgba(255, 90, 120, 0.12);
+  --error-border: rgba(255, 90, 120, 0.35);
+
+  /* Optional: slightly different submit color in dark */
+  --submit-bg: #57d957;
 }
 
 body, button, input, select, textarea {
   font-family: var(--font);
 }
 
-
 body {
-    font-family: poppins;
-    margin: 0;
-    padding: 24px;
-    background: #f6f6f7;
-    color: #111;
-  }
+  margin: 0;
+  padding: 24px;
+  background: var(--bg);
+  color: var(--text);
+}
 
-  button, input, select, textarea {
-    font-family: 'Poppins', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-  }
+button, input, select, textarea {
+  font-family: var(--font);
+}
 
-  input {
-    border-color: transparent;
-    font-size: 28px !important;
-    text-align: center;
-    border-radius: 200px;
-  }
-  
-  button {
-    border-radius: 24px;
-    border-color: transparent;
-    background-color: #fafafa;
-    cursor: pointer;
-  }
+input {
+  border-color: transparent;
+  font-size: 28px !important;
+  text-align: center;
+  border-radius: 200px;
+  background: var(--btn-bg);
+  color: var(--text);
+}
 
-  #submitBtn {
-    background-color: #80EF80;
-  }
+button {
+  border-radius: 24px;
+  border-color: transparent;
+  background-color: var(--btn-bg);
+  color: var(--btn-text);
+  cursor: pointer;
+}
 
-  #submitBtn, #undoBtn {
-    padding: 12px 30px;
-    font-size: 20px;
-  }
+#submitBtn {
+  background-color: var(--submit-bg);
+  color: #0b0f14;
+}
 
-  #scoreInput {
-    padding-left: 35px;
-  }
+#submitBtn, #undoBtn {
+  padding: 12px 30px;
+  font-size: 20px;
+}
 
-  select, input, button {
-    font-size: 16px;
-    padding: 12px 18px;
-  }
+#scoreInput {
+  padding-left: 35px;
+}
 
+select, input, button {
+  font-size: 16px;
+  padding: 12px 18px;
+}
 
-  h1 {
-    text-align: center;
-    margin: 0 0 16px 0;
-  }
+h1 {
+  text-align: center;
+  margin: 0 0 16px 0;
+}
 
-  .titleparagraph {
-    text-align: center;
-  }
+.titleparagraph {
+  text-align: center;
+}
 
-  .gameMeta {
-    font-weight: 800;
-    opacity: 0.8;
-    text-align: center;
-  }
-  
-  
-  .card {
-    max-width: 720px;
-    margin: 0 auto;
-    background: white;
-    border-radius: 12px;
-    padding: 16px;
-    box-shadow: 0 6px 20px rgba(0,0,0,0.08);
-  }
-  
-  .row {
-    justify-content: center;
-    padding-bottom: 20px;
-    padding-top: 20px;
-    display: flex;
-    gap: 10px;
-    align-items: center;
-    flex-wrap: wrap;
-    margin-bottom: 12px;
-  }
+.gameMeta {
+  font-weight: 800;
+  opacity: 0.8;
+  text-align: center;
+}
 
-  .toprow {
-    justify-content: space-between;
-    padding: 0px 8px;
-    display: flex;
-    gap: 10px;
-    align-items: center;
-    flex-wrap: wrap;
-    margin-bottom: 12px;
-  }
-  
-  #status {
-    text-align:center;
-    padding-bottom: 10px;
-    font-weight: 600;
-    font-size: 20px;
-    margin: 8px 0 16px 0;
-    opacity: 0.85;
-  }
-  
-  .scores {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-    margin-bottom: 14px;
-  }
-  
-  .player {
-    border: 1px solid #eee;
-    border-radius: 12px;
-    padding: 12px;
-    text-align: center;
-  }
-  
-  .score {
-    font-size: 62px;
-    font-weight: 700;
-    margin-top: 6px;
-  }
-  
-  .hint {
-    font-size: 13px;
-    opacity: 0.75;
-    margin-top: 10px;
-  }
-  
-  .player.active {
-    border: 2px solid #3b82f6;
-    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.18);
-    transform: translateY(-1px);
-  }
+.card {
+  max-width: 720px;
+  margin: 0 auto;
+  background: var(--card);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: var(--shadow);
+}
 
-  .keypad {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
-    margin-top: 10px;
-  }
-  
+.row {
+  justify-content: center;
+  padding-bottom: 20px;
+  padding-top: 20px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.toprow {
+  justify-content: space-between;
+  padding: 0px 8px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+#status {
+  text-align: center;
+  padding-bottom: 10px;
+  font-weight: 600;
+  font-size: 20px;
+  margin: 8px 0 16px 0;
+  opacity: 0.85;
+}
+
+.scores {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.player {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  text-align: center;
+  position: relative; /* badge positioning */
+  background: transparent;
+}
+
+.score {
+  font-size: 62px;
+  font-weight: 700;
+  margin-top: 6px;
+}
+
+.hint {
+  font-size: 13px;
+  opacity: 0.75;
+  margin-top: 10px;
+}
+
+.player.active {
+  border: 2px solid var(--active-border);
+  box-shadow: 0 0 0 4px var(--active-glow);
+  transform: translateY(-1px);
+}
+
+.keypad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.key {
+  padding: 14px 0;
+  min-height: 70px;
+  font-size: 32px;
+  border-radius: 30px;
+  border: 1px solid var(--key-border);
+  background: var(--key-bg);
+  color: var(--text);
+}
+
+.key:active {
+  transform: translateY(1px);
+}
+
+.key-wide {
+  font-size: 26px;
+}
+
+/* Editable names */
+.name {
+  width: 88%;
+  text-align: center;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 700;
+  border-radius: 10px;
+}
+
+.name[readonly] {
+  cursor: default;
+}
+
+.name:focus {
+  outline: none;
+  border-color: transparent;
+  background: transparent;
+}
+
+.legsBadge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  min-width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  border: 1px solid var(--pill-border);
+  background: var(--pill-bg);
+  color: var(--pill-text);
+  font-weight: 800;
+  font-size: 20px;
+}
+
+/* Error message (replaces alert) */
+.error {
+  margin: 8px 0 0 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--error-bg);
+  border: 1px solid var(--error-border);
+}
+
+/* Modals */
+.modal {
+  position: fixed;
+  inset: 0;
+  background: var(--modal-overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  z-index: 9999;
+}
+
+.modal-card {
+  width: min(520px, 100%);
+  background: var(--modal-card);
+  color: var(--text);
+  border-radius: 16px;
+  padding: 18px;
+  text-align: center;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.2);
+}
+
+.modal-card h2 {
+  margin: 0 0 14px 0;
+}
+
+/* Setup form rows */
+.formRow {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 10px;
+  align-items: center;
+  margin: 10px 0;
+}
+
+/* Checkout pill */
+.checkout {
+  margin-top: 10px;
+  min-height: 28px;
+  display: flex;
+  justify-content: center;
+}
+
+.checkout .pill {
+  display: inline-block;
+  padding: 6px 10px;
+  border: 1px solid var(--pill-border);
+  background: var(--pill-bg);
+  color: var(--pill-text);
+  border-radius: 10px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  font-size: 20px;
+}
+
+/* Stats pills */
+.stats {
+  margin-top: 8px;
+  min-height: 20px;
+  font-size: 13px;
+  opacity: 0.9;
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.stats .pill {
+  padding: 5px 8px;
+  border: 1px solid var(--stats-pill-border);
+  background: var(--stats-pill-bg);
+  color: var(--pill-text);
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+/* Match stats grid in winner modal */
+.matchStats {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  text-align: left;
+  padding-bottom: 20px;
+}
+
+.matchStats .col {
+  border: 1px solid var(--pill-border);
+  border-radius: 14px;
+  padding: 10px;
+  background: var(--pill-bg);
+}
+
+.matchStats .col h3 {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+}
+
+.matchStats .line {
+  font-size: 13px;
+  margin: 4px 0;
+}
+
+/* Utility */
+.hidden { display: none !important; }
+
+/* Mobile */
+@media (max-width: 700px) {
+  body { padding: 0px; }
+
   .key {
     padding: 14px 0;
     min-height: 70px;
-    font-size: 32px;
-    border-radius: 30px;
-    border: 1px solid #e7e7e7;
-    background: #fafafa;
-  }
-  
-  .key:active {
-    transform: translateY(1px);
-  }
-  
-  .key-wide {
     font-size: 26px;
+    border-radius: 30px;
+    border: 1px solid var(--key-border);
+    background: var(--key-bg);
   }
 
-  /* Editable names */
-.name {
-    width: 88%;
-    text-align: center;
-    border: 1px solid transparent;
-    background: transparent;
-    font-size: 16px;
-    font-weight: 700;
-    border-radius: 10px;
-  }
+  .key-wide { font-size: 22px; }
 
-.name[readonly] {
-    cursor: default;
-  }
-  
-  
-  .name:focus {
-    outline: none;
-    border-color: #ffffff;
-    background: #ffffff
-  }
-
-  .player {
-    position: relative; /* needed for badge positioning */
-  }
-  
-  .legsBadge {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    min-width: 26px;
-    height: 26px;
-    display: grid;
-    place-items: center;
-    border-radius: 999px;
-    border: 1px solid #e7e7e7;
-    background: #fafafa;
+  #scoreInput {
+    font-size: 26px !important;
     font-weight: 800;
-    font-size: 20px;
+    max-width: 50px;
+    caret-color: transparent;
   }
-  
-  
-  /* Error message (replaces alert) */
-  .error {
-    margin: 8px 0 0 0;
-    padding: 10px 12px;
-    border-radius: 12px;
-    background: #fff1f2;
-    border: 1px solid #fecdd3;
+
+  .row { padding: 0px 4px; }
+
+  .score {
+    font-size: 58px;
+    margin-top: -10px;
   }
-  
-  .hidden {
-    display: none;
+
+  .name {
+    margin-left: -10px;
+    font-size: 10px;
   }
-  
-  /* Winner modal */
- /* Modals (winner / setup / checkout) */
-.modal {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.55);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 18px;
-    z-index: 9999;
-  }
-  
-  .modal-card {
-    width: min(520px, 100%);
-    background: white;
-    border-radius: 16px;
-    padding: 18px;
-    text-align: center;
-    box-shadow: 0 12px 40px rgba(0,0,0,0.2);
-  }
-  
-  .modal-card h2 {
-    margin: 0 0 14px 0;
-  }
-  
-  /* Setup form rows */
-  .formRow {
-    display: grid;
-    grid-template-columns: 140px 1fr;
-    gap: 10px;
-    align-items: center;
-    margin: 10px 0;
-  }
-  
-  /* Checkout pill */
-  .checkout {
-    margin-top: 10px;
-    min-height: 28px;
-    display: flex;
-    justify-content: center;
-  }
-  
-  .checkout .pill {
-    display: inline-block;
-    padding: 6px 10px;
-    border: 1px solid #e7e7e7;
-    background: #fafafa;
-    border-radius: 10px;
-    font-weight: 700;
-    letter-spacing: 0.3px;
-    font-size: 20px;
-  }
-  
-  /* Stats pills */
-  .stats {
-    margin-top: 8px;
-    min-height: 20px;
-    font-size: 13px;
-    opacity: 0.9;
-    display: flex;
-    justify-content: center;
-    gap: 5px;
-    flex-wrap: wrap;
-  }
-  
+
+  .stats { font-size: 6px; gap: 2px; }
+
   .stats .pill {
-    padding: 5px 8px;
-    border: 1px solid #e7e7e7;
-    background: #fff;
-    border-radius: 10px;
-    font-weight: 700;
-    font-size: 12px;
+    font-size: 10px;
+    padding: 2px 4px;
+    border-color: transparent;
   }
-  
-  /* Match stats grid in winner modal */
+
+  #undoBtn { padding: 8px 18px; }
+  #submitBtn { padding: 8px 18px; }
+
+  .checkout .pill { font-size: 16px; }
+
+  .formRow {
+    grid-template-columns: 140px 200px;
+  }
+
+  input { font-size: 20px !important; }
+
   .matchStats {
-    margin-top: 14px;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-    text-align: left;
-  }
-  
-  .matchStats .col {
-    border: 1px solid #e7e7e7;
-    border-radius: 14px;
-    padding: 10px;
-    background: #fafafa;
-  }
-  
-  .matchStats .col h3 {
-    margin: 0 0 8px 0;
-    font-size: 14px;
-  }
-  
-  .matchStats .line {
-    font-size: 13px;
-    margin: 4px 0;
-  }
-  
-  /* Utility */
-  .hidden { display: none !important; }
-  
-
-  @media (max-width: 700px) {
-    /* mobile-only styles go here */
-    body {
-      padding: 0px;
-    }
-
-    .key {
-        padding: 14px 0;
-        min-height: 70px;
-        font-size: 26px;
-        border-radius: 30px;
-        border: 1px solid #e7e7e7;
-        background: #fafafa;
-    }
-    .key-wide {
-        font-size: 22px;
-    }
-
-    #scoreInput {
-        font-size: 26px !important;
-        font-weight: 800;
-        max-width: 50px;
-        caret-color: transparent;
-      }
-    
-    .row {
-        padding: 0px 4px;
-    }
-    
-    .score {
-        font-size: 58px;
-        margin-top: -10px;
-    }
-
-    .name {
-      margin-left: -10px;
-      font-size: 10px;
-    }
-
-    .stats {
-      font-size: 6px;
-      gap: 2px;
-    }
-
-    .stats .pill {
-      font-size: 10px;
-      padding: 2px 4px;
-      border-color: transparent;
-    }
-
-    #undoBtn {
-      padding: 8px 18px;
-    }
-
-    #submitBtn {
-      padding: 8px 18px;
-    }
-
-    .checkout .pill {
-      font-size: 16px;
-    }
-
-    .formRow {
-      display: grid;
-      grid-template-columns: 140px 200px;
-      gap: 10px;
-      align-items: center;
-      margin: 10px 0;
-    }
-    
-    input {
-      font-size: 20px !important;
-    }
-    
-      .matchStats {
-    margin-top: 14px;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
     text-align: center;
     padding-bottom: 20px;
   }
-  }
+}
