@@ -212,7 +212,7 @@ button {
   gap:15px;
 }
 
-#submitBtn, #undoBtn {
+#submitBtn, #undoBtn, #inputModeBtn {
   padding: 12px 30px;
   font-size: 20px;
 }
@@ -327,20 +327,30 @@ h1 {
   gap: 10px;
   align-items: center;
   margin: 14px 0 12px;
+    justify-content: space-between;
 }
 
 /* Each cell centers its content */
-.actionCell {
+.actionCell1 {
+  display: flex;
+  justify-content: flex-start;
+  gap: 15px;
+  
+}
+.actionCell2 {
   display: grid;
   place-items: center;
   grid-auto-flow: column;
   
 }
+.actionCell3 {
+  display: flex;
+  justify-content: stretch;
+}
 
 /* Make the buttons fill their column nicely */
 .actionBtn {
-  width: 80%;
-  max-width: 220px; /* optional, keeps them from looking huge on desktop */
+  width: 100%;
 }
 
 .inputArea {
@@ -470,13 +480,8 @@ h1 {
   transition: background-color 999999s ease-in-out 0s;
 }
 
-.iconBtn {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  border: 1px solid var(--border, #333);
-  background: transparent;
-  font-size: 18px;
+#inputModeBtn {
+  padding: 12px 12px !important;
 }
 
 .dartTableHeader {
@@ -544,8 +549,8 @@ h1 {
 }
 
 .dartPad button {
-  min-height: 64px;
-  font-size: 22px;
+  min-height: 30px;
+  font-size: 18px;
   border-radius: 22px;
   border: 1px solid var(--key-border);
   background: var(--key-bg);
@@ -791,8 +796,9 @@ h1 {
     border-color: transparent;
   }
 
-  #undoBtn { padding: 8px 18px; }
+  #undoBtn { padding: 8px 8px; font-size:12px !important; border-radius: 50px;}
   #submitBtn { padding: 8px 10px;}
+  #inputModeBtn { border-radius: 50px;}
 
   .checkout .pill { font-size: 16px; }
 
@@ -851,3 +857,38 @@ h1 {
   pointer-events: none;
 }
 
+.actionCell1 {
+  gap:5px;
+}
+
+.dartPad {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px
+}
+
+.dartMultBtn {
+  font-size: 14px !important;
+}
+
+.dartInstantBtn {
+  font-size: 14px !important;
+}
+
+.dartNumBtn {
+  font-size: 18px !important;
+}
+
+.dartSpecialBtn {
+  font-size: 16px !important;
+}
+
+.dartPad button {
+  min-height: 24px;
+  padding: 10px 4px;
+  min-height: 46px;
+  font-size: 14px;
+  border-radius: 22px;
+  border: 1px solid var(--key-border);
+  background: var(--key-bg);
+  color: var(--text);
+}

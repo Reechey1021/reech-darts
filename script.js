@@ -779,11 +779,10 @@ if (readOnly) {
   if (submitBtn) submitBtn.disabled = !scoreAllowed;
 
   // Table mode: only allow submit once 3 darts chosen
-  if (submitBtn && inputMode === "table" && !readOnly) {
-    const info = recomputeDartTableTotal();
-    const threeChosen = info.filled === 3;
-    submitBtn.disabled = submitBtn.disabled || !threeChosen;
-  }
+if (submitBtn && inputMode === "table" && !readOnly) {
+  submitBtn.disabled = submitBtn.disabled || (dartThrows.length !== 3);
+}
+
 
   // Main undo stays disabled when it's not your turn (you wanted separate UI)
   if (undoBtn) undoBtn.disabled = isOnline && !scoreAllowed;
@@ -1058,6 +1057,7 @@ async function submitScore() {
   await db.runTransaction(async (tx) => {
     const snap = await tx.get(gameRef);
     const state = snap.data();
+
     if (!state || !state.match || !state.leg) {
       showError("Press New Game to start.");
       return;
@@ -1073,18 +1073,14 @@ async function submitScore() {
       return;
     }
 
+    // Online turn enforcement
     if (state.match.gameType === "online") {
       const seat = mySeatIndex(state);
-    if (seat !== state.leg.currentPlayer) {
-      showError("Not your turn / not your player.");
-    return;
+      if (seat !== state.leg.currentPlayer) {
+        showError("Not your turn / not your player.");
+        return;
+      }
     }
-  }
-
-  if (inputMode === "table") {
-  clearDarts();
-}
-
 
     const p = state.leg.currentPlayer;
     const oldScore = state.leg.players[p].score;
@@ -1098,13 +1094,13 @@ async function submitScore() {
 
     // If this would finish exactly, do NOT apply yet — require confirmation + darts used
     if (newScore === 0) {
-        state.pendingCheckout = {
-            player: p,
-            entered,
-            before: oldScore,
-            minDarts: minDartsForCheckout(oldScore),
-            at: new Date(),
-          };          
+      state.pendingCheckout = {
+        player: p,
+        entered,
+        before: oldScore,
+        minDarts: minDartsForCheckout(oldScore),
+        at: new Date(),
+      };
       state.updatedAt = new Date();
       tx.set(gameRef, state);
       return;
@@ -1129,36 +1125,38 @@ async function submitScore() {
     }
 
     // Advance turn
-// Advance turn
-state.leg.currentPlayer = (state.leg.currentPlayer + 1) % 2;
+    state.leg.currentPlayer = (state.leg.currentPlayer + 1) % 2;
 
-// Decide what to call as the score
-// You said: no_score for bust OR 0
-const scoreCallType = (bust || entered === 0) ? "no_score" : "number";
+    // Decide what to call as the score
+    const scoreCallType = (bust || entered === 0) ? "no_score" : "number";
 
-// Next player status for "require"
-const nextP = state.leg.currentPlayer;
-const nextName = state.match.players[nextP].name;
-const nextRemaining = state.leg.players[nextP].score;
+    // Next player status for "require"
+    const nextP = state.leg.currentPlayer;
+    const nextName = state.match.players[nextP].name;
+    const nextRemaining = state.leg.players[nextP].score;
 
-// Build and attach the full spoken sentence
-const clips = buildVisitClips({
-  scoreCallType,
-  entered,
-  nextPlayerName: nextName,
-  nextRemaining,
-});
+    const clips = buildVisitClips({
+      scoreCallType,
+      entered,
+      nextPlayerName: nextName,
+      nextRemaining,
+    });
 
-setAudioEvent(state, clips);
+    setAudioEvent(state, clips);
 
-state.updatedAt = new Date();
-tx.set(gameRef, state);
-
+    state.updatedAt = new Date();
+    tx.set(gameRef, state);
   });
 
-  inputEl.value = "";
+  // ✅ UI-only cleanup AFTER the transaction
+  if (inputMode === "table") {
+    clearDarts();
+  }
+
+  if (inputEl) inputEl.value = "";
   safeFocusScoreInput();
 }
+
 
 async function confirmCheckout(dartsUsed) {
   await db.runTransaction(async (tx) => {
