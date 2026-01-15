@@ -513,6 +513,62 @@ h1 {
   border-radius: 10px;
 }
 
+.dartBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 10px 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--key-border);
+  background: var(--key-bg);
+  border-radius: 14px;
+}
+
+.dartBreakdown {
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  opacity: 0.95;
+}
+
+.dartTotal {
+  font-weight: 800;
+  opacity: 0.9;
+}
+
+/* 5-column pad */
+.dartPad {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+}
+
+.dartPad button {
+  min-height: 64px;
+  font-size: 22px;
+  border-radius: 22px;
+  border: 1px solid var(--key-border);
+  background: var(--key-bg);
+  color: var(--text);
+}
+
+/* Multiplier buttons (selected state) */
+.dartMultBtn.selected {
+  border: 2px solid var(--active-border);
+  box-shadow: 0 0 0 4px var(--active-glow);
+  transform: translateY(-1px);
+}
+
+/* Final row specials: make them span nicer */
+.dartSpecialBtn[data-action="back"] { grid-column: span 3; }
+.dartSpecialBtn[data-action="miss"] { grid-column: span 2; }
+
+/* Slightly smaller text for labels */
+.dartInstantBtn, .dartMultBtn {
+  font-size: 18px;
+}
+
+
 .keypad {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

@@ -61,6 +61,61 @@ let latestState = null;
 
 let inputMode = localStorage.getItem("inputMode") || "keypad"; // "keypad" | "table"
 
+let dartMult = localStorage.getItem("dartMult") || "S"; // "S" | "D" | "T"
+let dartThrows = []; // stores per-dart scores, max 3
+
+function multFactor(m) {
+  if (m === "D") return 2;
+  if (m === "T") return 3;
+  return 1;
+}
+
+function updateDartUI() {
+  const breakdownEl = document.getElementById("dartBreakdown");
+  const totalEl = document.getElementById("dartTotalVal");
+  const scoreInput = document.getElementById("scoreInput");
+  const submitBtn = document.getElementById("submitBtn");
+
+  const total = dartThrows.reduce((a, b) => a + b, 0);
+  const breakdown = dartThrows.length ? dartThrows.join("+") : "—";
+
+  if (breakdownEl) breakdownEl.textContent = breakdown;
+  if (totalEl) totalEl.textContent = String(total);
+
+  if (scoreInput) scoreInput.value = dartThrows.length ? String(total) : "";
+
+  // Only enable submit if (a) rules allow scoring AND (b) 3 darts entered (when in table mode)
+  if (submitBtn && inputMode === "table") {
+    submitBtn.disabled = submitBtn.disabled || (dartThrows.length !== 3);
+  }
+}
+
+function setMult(m) {
+  dartMult = m;
+  localStorage.setItem("dartMult", m);
+
+  document.querySelectorAll(".dartMultBtn").forEach(btn => {
+    btn.classList.toggle("selected", btn.getAttribute("data-mult") === m);
+  });
+}
+
+function pushDart(score) {
+  if (dartThrows.length >= 3) return;
+  dartThrows.push(score);
+  updateDartUI();
+}
+
+function popDart() {
+  dartThrows.pop();
+  updateDartUI();
+}
+
+function clearDarts() {
+  dartThrows = [];
+  updateDartUI();
+}
+
+
 function setInputMode(mode) {
   inputMode = mode;
   localStorage.setItem("inputMode", mode);
@@ -78,85 +133,16 @@ function setInputMode(mode) {
 
   // in table mode, prevent typing into the input (table drives it)
   if (scoreInput) scoreInput.readOnly = (mode === "table");
+
+  if (mode === "table") {
+  setMult(dartMult);  // restores selected mult
+  updateDartUI();     // refresh bar/total and submit lock
+} else {
+  clearDarts();       // optional: keeps things clean when leaving table mode
 }
 
-function populateDartValueSelects() {
-  const vals = [];
-  // 0–20 plus 25 (bull)
-  for (let i = 0; i <= 20; i++) vals.push(i);
-  vals.push(25);
-
-  document.querySelectorAll("#dartTableArea .dartVal").forEach((sel) => {
-    // only populate once
-    if (sel.__filled) return;
-    sel.__filled = true;
-
-    for (const v of vals) {
-      const opt = document.createElement("option");
-      opt.value = String(v);
-      opt.textContent = String(v);
-      sel.appendChild(opt);
-    }
-  });
 }
 
-function dartMultFactor(mult, val) {
-  const v = Number(val);
-  if (!Number.isFinite(v)) return 0;
-  if (v === 25) {
-    // bull: S=25, D=50, T is not valid -> treat as 0 unless you prefer forcing
-    if (mult === "D") return 2;
-    if (mult === "S") return 1;
-    return 0;
-  }
-  if (mult === "D") return 2;
-  if (mult === "T") return 3;
-  if (mult === "S") return 1;
-  return 0;
-}
-
-function recomputeDartTableTotal() {
-  const rows = Array.from(document.querySelectorAll("#dartTableArea tbody tr"));
-  let total = 0;
-  let filled = 0;
-
-  for (const r of rows) {
-    const mult = r.querySelector(".dartMult")?.value || "";
-    const val = r.querySelector(".dartVal")?.value || "";
-    const scoreCell = r.querySelector(".dartScore");
-
-    if (!mult || val === "") {
-      if (scoreCell) scoreCell.textContent = "0";
-      continue;
-    }
-
-    const factor = dartMultFactor(mult, val);
-    const dartScore = Number(val) * factor;
-    if (scoreCell) scoreCell.textContent = String(dartScore);
-
-    total += dartScore;
-    filled += 1;
-  }
-
-  const totalEl = document.getElementById("dartTotalVal");
-  if (totalEl) totalEl.textContent = String(total);
-
-  // Pipe into your existing input
-  const scoreInput = document.getElementById("scoreInput");
-  if (scoreInput) scoreInput.value = String(total);
-
-  return { total, filled };
-}
-
-function clearDartTable() {
-  document.querySelectorAll("#dartTableArea .dartMult").forEach(s => s.value = "");
-  document.querySelectorAll("#dartTableArea .dartVal").forEach(s => s.value = "");
-  document.querySelectorAll("#dartTableArea .dartScore").forEach(td => td.textContent = "0");
-  const totalEl = document.getElementById("dartTotalVal");
-  if (totalEl) totalEl.textContent = "0";
-  const scoreInput = document.getElementById("scoreInput");
-  if (scoreInput) scoreInput.value = "";
-}
 
 
 const bullBoard = document.getElementById("bullBoard");
@@ -1095,6 +1081,10 @@ async function submitScore() {
     }
   }
 
+  if (inputMode === "table") {
+  clearDarts();
+}
+
 
     const p = state.leg.currentPlayer;
     const oldScore = state.leg.players[p].score;
@@ -1426,7 +1416,6 @@ const dartTableArea = document.getElementById("dartTableArea");
 const dartTableClearBtn = document.getElementById("dartTableClearBtn");
 
 // init
-populateDartValueSelects();
 setInputMode(inputMode);
 
 // toggle button
@@ -1445,14 +1434,12 @@ if (dartTableArea) {
       // snap back: recompute from current selects (no-op) — or you can showError
       return;
     }
-    recomputeDartTableTotal();
   });
 }
 
 if (dartTableClearBtn) {
   dartTableClearBtn.addEventListener("click", () => {
     if (!canScoreNow(latestState)) return;
-    clearDartTable();
   });
 }
 
@@ -1535,6 +1522,51 @@ if (closeInviteBtn) closeInviteBtn.addEventListener("click", () => setInviteModa
       scoreInputEl.value = scoreInputEl.value.replace(/\D/g, "").slice(0, 3);
     });
   }
+
+  const dartPad = document.getElementById("dartPad");
+
+if (dartPad) {
+  dartPad.addEventListener("click", (e) => {
+    if (inputMode !== "table") return;
+    if (!canScoreNow(latestState)) return;
+
+    const btn = e.target.closest("button");
+    if (!btn) return;
+
+    // Mult select
+    const m = btn.getAttribute("data-mult");
+    if (m) {
+      setMult(m);
+      return;
+    }
+
+    // Instant adds (bull/outer)
+    const instant = btn.getAttribute("data-instant");
+    if (instant) {
+      pushDart(Number(instant));
+      return;
+    }
+
+    // Numbers (apply selected mult)
+    const num = btn.getAttribute("data-num");
+    if (num) {
+      const v = Number(num);
+      pushDart(v * multFactor(dartMult));
+      return;
+    }
+
+    // Specials
+    const action = btn.getAttribute("data-action");
+    if (action === "back") {
+      popDart();
+      return;
+    }
+    if (action === "miss") {
+      pushDart(0);
+      return;
+    }
+  });
+}
 
   // Keypad buttons
   const keypad = document.getElementById("keypad");

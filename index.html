@@ -115,84 +115,52 @@
         <button class="key key-wide" id="keyBack">⌫</button>
       </div>
 
-      <div id="dartTableArea" class="hidden">
-  <div class="dartTableHeader">
-    <div class="dartTotal">
-      Total: <span id="dartTotalVal">0</span>
-    </div>
-    <button id="dartTableClearBtn" class="smallBtn" type="button">Clear</button>
+<div id="dartTableArea" class="hidden">
+  <div class="dartBar">
+    <div id="dartBreakdown" class="dartBreakdown">—</div>
+    <div class="dartTotal">Total: <span id="dartTotalVal">0</span></div>
   </div>
 
-  <table class="dartTable">
-    <thead>
-      <tr>
-        <th>Dart</th>
-        <th>Mult</th>
-        <th>Value</th>
-        <th>Score</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr data-dart="1">
-        <td>1</td>
-        <td>
-          <select class="dartMult">
-            <option value="">—</option>
-            <option value="S">S</option>
-            <option value="D">D</option>
-            <option value="T">T</option>
-          </select>
-        </td>
-        <td>
-          <select class="dartVal">
-            <option value="">—</option>
-            <!-- filled by JS -->
-          </select>
-        </td>
-        <td class="dartScore">0</td>
-      </tr>
+  <div id="dartPad" class="dartPad">
+    <!-- Top row -->
+    <button class="dartMultBtn selected" data-mult="S">Single</button>
+    <button class="dartMultBtn" data-mult="D">Double</button>
+    <button class="dartMultBtn" data-mult="T">Treble</button>
+    <button class="dartInstantBtn" data-instant="50">Bull</button>
+    <button class="dartInstantBtn" data-instant="25">Outer</button>
 
-      <tr data-dart="2">
-        <td>2</td>
-        <td>
-          <select class="dartMult">
-            <option value="">—</option>
-            <option value="S">S</option>
-            <option value="D">D</option>
-            <option value="T">T</option>
-          </select>
-        </td>
-        <td>
-          <select class="dartVal">
-            <option value="">—</option>
-          </select>
-        </td>
-        <td class="dartScore">0</td>
-      </tr>
+    <!-- Numbers 1–20 (5 columns x 4 rows) -->
+    <button class="dartNumBtn" data-num="1">1</button>
+    <button class="dartNumBtn" data-num="2">2</button>
+    <button class="dartNumBtn" data-num="3">3</button>
+    <button class="dartNumBtn" data-num="4">4</button>
+    <button class="dartNumBtn" data-num="5">5</button>
 
-      <tr data-dart="3">
-        <td>3</td>
-        <td>
-          <select class="dartMult">
-            <option value="">—</option>
-            <option value="S">S</option>
-            <option value="D">D</option>
-            <option value="T">T</option>
-          </select>
-        </td>
-        <td>
-          <select class="dartVal">
-            <option value="">—</option>
-          </select>
-        </td>
-        <td class="dartScore">0</td>
-      </tr>
-    </tbody>
-  </table>
+    <button class="dartNumBtn" data-num="6">6</button>
+    <button class="dartNumBtn" data-num="7">7</button>
+    <button class="dartNumBtn" data-num="8">8</button>
+    <button class="dartNumBtn" data-num="9">9</button>
+    <button class="dartNumBtn" data-num="10">10</button>
+
+    <button class="dartNumBtn" data-num="11">11</button>
+    <button class="dartNumBtn" data-num="12">12</button>
+    <button class="dartNumBtn" data-num="13">13</button>
+    <button class="dartNumBtn" data-num="14">14</button>
+    <button class="dartNumBtn" data-num="15">15</button>
+
+    <button class="dartNumBtn" data-num="16">16</button>
+    <button class="dartNumBtn" data-num="17">17</button>
+    <button class="dartNumBtn" data-num="18">18</button>
+    <button class="dartNumBtn" data-num="19">19</button>
+    <button class="dartNumBtn" data-num="20">20</button>
+
+    <!-- Final row -->
+    <button class="dartSpecialBtn" data-action="back">⌫ Back</button>
+    <button class="dartSpecialBtn" data-action="miss">MISS</button>
+  </div>
 </div>
 
-      
-
+    
   </div>
 
   <div id="winnerModal" class="modal hidden">
