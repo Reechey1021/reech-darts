@@ -84,11 +84,12 @@ function updateDartUI() {
 
   if (scoreInput) scoreInput.value = dartThrows.length ? String(total) : "";
 
-  // Only enable submit if (a) rules allow scoring AND (b) 3 darts entered (when in table mode)
-  if (submitBtn && inputMode === "table") {
-    submitBtn.disabled = submitBtn.disabled || (dartThrows.length !== 3);
-  }
+// In table/dartpad mode: submit ONLY when 3 darts picked (other rules handled in render())
+if (submitBtn && inputMode === "table") {
+  submitBtn.disabled = (dartThrows.length !== 3);
 }
+
+  }
 
 function setMult(m) {
   dartMult = m;
@@ -134,12 +135,17 @@ function setInputMode(mode) {
   // in table mode, prevent typing into the input (table drives it)
   if (scoreInput) scoreInput.readOnly = (mode === "table");
 
-  if (mode === "table") {
-  setMult(dartMult);  // restores selected mult
-  updateDartUI();     // refresh bar/total and submit lock
+if (mode === "table") {
+  setMult(dartMult);
+  updateDartUI();
 } else {
-  clearDarts();       // optional: keeps things clean when leaving table mode
+  clearDarts();
+
+  // ✅ leaving table mode: make sure submit isn't stuck disabled
+  const submitBtn = document.getElementById("submitBtn");
+  if (submitBtn) submitBtn.disabled = false;
 }
+
 
 }
 
@@ -780,8 +786,9 @@ if (readOnly) {
 
   // Table mode: only allow submit once 3 darts chosen
 if (submitBtn && inputMode === "table" && !readOnly) {
-  submitBtn.disabled = submitBtn.disabled || (dartThrows.length !== 3);
+  submitBtn.disabled = (!scoreAllowed) || (dartThrows.length !== 3);
 }
+
 
 
   // Main undo stays disabled when it's not your turn (you wanted separate UI)
