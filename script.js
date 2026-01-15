@@ -59,6 +59,111 @@ console.log("Using gameId:", gameId);
 
 let latestState = null;
 
+let inputMode = localStorage.getItem("inputMode") || "keypad"; // "keypad" | "table"
+
+function setInputMode(mode) {
+  inputMode = mode;
+  localStorage.setItem("inputMode", mode);
+
+  const keypad = document.getElementById("keypad");
+  const table = document.getElementById("dartTableArea");
+  const btn = document.getElementById("inputModeBtn");
+  const scoreInput = document.getElementById("scoreInput");
+
+  if (keypad) keypad.classList.toggle("hidden", mode !== "keypad");
+  if (table) table.classList.toggle("hidden", mode !== "table");
+
+  // nice: change icon so you know what mode you’re in
+  if (btn) btn.textContent = mode === "keypad" ? "🎯" : "⌨️";
+
+  // in table mode, prevent typing into the input (table drives it)
+  if (scoreInput) scoreInput.readOnly = (mode === "table");
+}
+
+function populateDartValueSelects() {
+  const vals = [];
+  // 0–20 plus 25 (bull)
+  for (let i = 0; i <= 20; i++) vals.push(i);
+  vals.push(25);
+
+  document.querySelectorAll("#dartTableArea .dartVal").forEach((sel) => {
+    // only populate once
+    if (sel.__filled) return;
+    sel.__filled = true;
+
+    for (const v of vals) {
+      const opt = document.createElement("option");
+      opt.value = String(v);
+      opt.textContent = String(v);
+      sel.appendChild(opt);
+    }
+  });
+}
+
+function dartMultFactor(mult, val) {
+  const v = Number(val);
+  if (!Number.isFinite(v)) return 0;
+  if (v === 25) {
+    // bull: S=25, D=50, T is not valid -> treat as 0 unless you prefer forcing
+    if (mult === "D") return 2;
+    if (mult === "S") return 1;
+    return 0;
+  }
+  if (mult === "D") return 2;
+  if (mult === "T") return 3;
+  if (mult === "S") return 1;
+  return 0;
+}
+
+function recomputeDartTableTotal() {
+  const rows = Array.from(document.querySelectorAll("#dartTableArea tbody tr"));
+  let total = 0;
+  let filled = 0;
+
+  for (const r of rows) {
+    const mult = r.querySelector(".dartMult")?.value || "";
+    const val = r.querySelector(".dartVal")?.value || "";
+    const scoreCell = r.querySelector(".dartScore");
+
+    if (!mult || val === "") {
+      if (scoreCell) scoreCell.textContent = "0";
+      continue;
+    }
+
+    const factor = dartMultFactor(mult, val);
+    const dartScore = Number(val) * factor;
+    if (scoreCell) scoreCell.textContent = String(dartScore);
+
+    total += dartScore;
+    filled += 1;
+  }
+
+  const totalEl = document.getElementById("dartTotalVal");
+  if (totalEl) totalEl.textContent = String(total);
+
+  // Pipe into your existing input
+  const scoreInput = document.getElementById("scoreInput");
+  if (scoreInput) scoreInput.value = String(total);
+
+  return { total, filled };
+}
+
+function clearDartTable() {
+  document.querySelectorAll("#dartTableArea .dartMult").forEach(s => s.value = "");
+  document.querySelectorAll("#dartTableArea .dartVal").forEach(s => s.value = "");
+  document.querySelectorAll("#dartTableArea .dartScore").forEach(td => td.textContent = "0");
+  const totalEl = document.getElementById("dartTotalVal");
+  if (totalEl) totalEl.textContent = "0";
+  const scoreInput = document.getElementById("scoreInput");
+  if (scoreInput) scoreInput.value = "";
+}
+
+
+const bullBoard = document.getElementById("bullBoard");
+const bullConfirmBtn = document.getElementById("bullConfirmBtn");
+const bullResetBtn = document.getElementById("bullResetBtn");
+
+
 // ---------- Constants ----------
 const BOGEY_NUMBERS = new Set([169, 168, 166, 165, 163, 162, 159]);
 const IMPOSSIBLE_TURN_SCORES = new Set([179, 178, 176, 175, 173, 172, 169, 166, 163]);
@@ -193,6 +298,79 @@ function setAudioEvent(state, clips) {
 
 // ---------- UI helpers ----------
 
+function dist2(ax, ay, bx, by) {
+  const dx = ax - bx;
+  const dy = ay - by;
+  return dx * dx + dy * dy; // squared distance is fine (no sqrt needed)
+}
+
+function initBullState() {
+  return {
+    enabled: true,
+    resolved: false,
+    p1: null, // { x: 0..1, y: 0..1 }
+    p2: null,
+    winner: null, // 0 or 1
+    d1: null,
+    d2: null,
+  };
+}
+
+function tryResolveBull(state) {
+  const bull = state?.match?.bull;
+  if (!bull || bull.resolved) return;
+
+  if (!bull.p1 || !bull.p2) return;
+
+  // center is (0.5, 0.5)
+  const d1 = dist2(bull.p1.x, bull.p1.y, 0.5, 0.5);
+  const d2 = dist2(bull.p2.x, bull.p2.y, 0.5, 0.5);
+
+  bull.d1 = d1;
+  bull.d2 = d2;
+
+  // tie-break: if exactly equal, just reroll random
+  let winner = 0;
+  if (d2 < d1) winner = 1;
+  if (Math.abs(d1 - d2) < 1e-9) winner = Math.random() < 0.5 ? 0 : 1;
+
+  bull.winner = winner;
+  bull.resolved = true;
+
+  // Apply starter
+  state.match.starterLeg1 = winner;
+  if (state.leg) state.leg.currentPlayer = winner;
+
+  setAudioEvent(state, ["./audio/phrases/match_start.mp3"]);
+}
+
+
+function canUndoNow(state) {
+  if (!state?.match || !state?.leg) return false;
+  if (state.match.gameType !== "online") return true; // singleplayer
+  const seat = mySeatIndex(state);
+  if (seat === null) return false; // not seated
+  if (state.leg.status !== "in_progress") return false;
+  if (state.pendingCheckout) return false;
+  return true; // seated players can undo even when it's not their turn
+}
+
+function canScoreNow(state) {
+  if (!state?.match || !state?.leg) return false;
+  if (state.match.gameType !== "online") return true; // singleplayer
+  const seat = mySeatIndex(state);
+  if (seat === null) return false;
+  if (state.leg.status !== "in_progress") return false;
+  if (state.pendingCheckout) return false;
+  // If throw-for-bull is enabled, block scoring until resolved
+if (state.match?.starting === "bull" && state.match?.bull && !state.match.bull.resolved) {
+  return false;
+}
+
+  return seat === state.leg.currentPlayer; // only your turn
+}
+
+
 function canActNow(state) {
   if (!state?.match || !state?.leg) return false;
   if (state.match.gameType !== "online") return true; // singleplayer: always can
@@ -244,6 +422,12 @@ function showError(msg) {
 
   clearTimeout(window.__errTimer);
   window.__errTimer = setTimeout(() => el.classList.add("hidden"), 2500);
+}
+
+function setBullModalVisible(visible) {
+  const modal = document.getElementById("bullModal");
+  if (!modal) return;
+  modal.classList.toggle("hidden", !visible);
 }
 
 function setWinnerModalVisible(visible, winnerName = "") {
@@ -465,19 +649,80 @@ function calcMatchStats(match) {
 
 // ---------- Render ----------
 function render(state) {
+  const inputArea = document.getElementById("inputArea");
+  const overlay = document.getElementById("turnOverlay");
+  const overlayText = document.getElementById("turnOverlayText");
+  const overlayUndoBtn = document.getElementById("overlayUndoBtn");
+  const abortBullBtn = document.getElementById("abortBullBtn");
 
-const inputArea = document.getElementById("inputArea");
-const overlay = document.getElementById("turnOverlay");
-const overlayText = document.getElementById("turnOverlayText");
+  // --- Throw for bull UI ---
 
-if (state?.match && state?.leg) {
-  const allowed = canActNow(state);
-  const isOnline = state.match.gameType === "online";
+  const bullWaiting = document.getElementById("bullWaiting");
+  const bullResetBtn = document.getElementById("bullResetBtn");
+  const bullConfirmBtn = document.getElementById("bullConfirmBtn");
+  const bullBoard = document.getElementById("bullBoard");
 
-  if (inputArea) inputArea.classList.toggle("locked", isOnline && !allowed);
+const bullModalShouldShow =
+  state?.match?.starting === "bull" &&
+  state?.match?.bull &&
+  !state.match.bull.resolved;
+
+if (bullModalShouldShow) {
+  const promptEl = document.getElementById("bullPrompt");
+const bull = state.match.bull;
+
+// Who needs to throw next?
+let neededPlayer = 0;
+if (bull.p1 && !bull.p2) neededPlayer = 1;
+if (bull.p1 && bull.p2) neededPlayer = null;
+
+const whoName =
+  neededPlayer === null
+    ? "Calculating…"
+    : state.match.players?.[neededPlayer]?.name || (neededPlayer === 0 ? "Player 1" : "Player 2");
+
+const isOnline = state.match.gameType === "online";
+const mySeat = mySeatIndex(state);
+const iAmThrower = !isOnline ? true : (mySeat !== null && mySeat === neededPlayer);
+
+// Prompt text
+if (promptEl) {
+  if (neededPlayer === null) promptEl.textContent = "Calculating starter…";
+  else if (iAmThrower) promptEl.textContent = `You: tap where your dart landed, then confirm.`;
+  else promptEl.textContent = ""; // we’ll use waiting line instead
+}
+
+// Waiting text (only when it’s not your throw in online mode)
+if (bullWaiting) {
+  if (isOnline && neededPlayer !== null && !iAmThrower) {
+    bullWaiting.textContent = `${whoName} is throwing for bull…`;
+    bullWaiting.classList.remove("hidden");
+  } else {
+    bullWaiting.classList.add("hidden");
+  }
+}
+
+// Hide controls + board interaction if it's not your throw (online)
+const shouldHideControls = isOnline && neededPlayer !== null && !iAmThrower;
+
+if (bullResetBtn) bullResetBtn.classList.toggle("hidden", shouldHideControls);
+if (bullConfirmBtn) bullConfirmBtn.classList.toggle("hidden", shouldHideControls);
+if (bullBoard) bullBoard.style.pointerEvents = shouldHideControls ? "none" : "auto";
+
+
+  setBullModalVisible(true);
+} else {
+  setBullModalVisible(false);
+}
+if (abortBullBtn) abortBullBtn.classList.toggle("hidden", !bullModalShouldShow);
+
+
+  const isOnline = state?.match?.gameType === "online";
+  const scoreAllowed = canScoreNow(state);
+  const undoAllowed = canUndoNow(state);
 
   if (overlay && overlayText) {
-    if (isOnline && !allowed) {
+    if (isOnline && !scoreAllowed && state?.match && state?.leg) {
       const who = state.match.players[state.leg.currentPlayer]?.name || "the other player";
       overlayText.textContent = `It’s ${who}’s turn`;
       overlay.classList.remove("hidden");
@@ -485,36 +730,26 @@ if (state?.match && state?.leg) {
       overlay.classList.add("hidden");
     }
   }
-} else {
 
-  // no match yet — ensure unlocked + hidden overlay
-  if (inputArea) inputArea.classList.remove("locked");
-  if (overlay) overlay.classList.add("hidden");
-}
+  if (overlayUndoBtn) overlayUndoBtn.disabled = !undoAllowed;
 
-const gameMetaEl = document.getElementById("gameMeta");
-
+  const gameMetaEl = document.getElementById("gameMeta");
   const statusEl = document.getElementById("status");
-
   const p1Box = document.getElementById("p1Box");
   const p2Box = document.getElementById("p2Box");
-
   const p1NameEl = document.getElementById("p1Name");
   const p2NameEl = document.getElementById("p2Name");
-
   const p1ScoreEl = document.getElementById("p1Score");
   const p2ScoreEl = document.getElementById("p2Score");
-
   const p1CheckoutEl = document.getElementById("p1Checkout");
   const p2CheckoutEl = document.getElementById("p2Checkout");
-
   const p1StatsEl = document.getElementById("p1Stats");
   const p2StatsEl = document.getElementById("p2Stats");
-
   const matchStatsGrid = document.getElementById("matchStatsGrid");
   const winnerNewGameBtn = document.getElementById("winnerNewGameBtn");
 
-  
+  // Keep your existing "If no match yet" block here (the big one),
+  // but DO NOT close render() early.
 
   // If no match yet
 if (!state || !state.match || !state.leg) {
@@ -547,13 +782,37 @@ const scoreInput = document.getElementById("scoreInput");
 const submitBtn = document.getElementById("submitBtn");
 const undoBtn = document.getElementById("undoBtn");
 
-if (scoreInput) scoreInput.disabled = readOnly;
-if (submitBtn) submitBtn.disabled = readOnly;
-if (undoBtn) undoBtn.disabled = readOnly;
+if (readOnly) {
+  // Not seated: nothing editable, no overlay undo either
+  if (scoreInput) scoreInput.disabled = true;
+  if (submitBtn) submitBtn.disabled = true;
+  if (undoBtn) undoBtn.disabled = true;
+} else {
+  // Seated:
+  if (scoreInput) scoreInput.disabled = !scoreAllowed;
+  if (submitBtn) submitBtn.disabled = !scoreAllowed;
+
+  // Table mode: only allow submit once 3 darts chosen
+  if (submitBtn && inputMode === "table" && !readOnly) {
+    const info = recomputeDartTableTotal();
+    const threeChosen = info.filled === 3;
+    submitBtn.disabled = submitBtn.disabled || !threeChosen;
+  }
+
+  // Main undo stays disabled when it's not your turn (you wanted separate UI)
+  if (undoBtn) undoBtn.disabled = isOnline && !scoreAllowed;
+}
+
 
   const match = state.match;
   const leg = state.leg;
   if (gameMetaEl) gameMetaEl.innerText = `${match.mode} • BO${match.bestOf}`;
+
+  const showLegs = Number(match.bestOf) > 1;
+document.querySelectorAll(".legsBadge").forEach(b => {
+  b.classList.toggle("hidden", !showLegs);
+});
+
 
   const lobbyIndicator = document.getElementById("lobbyIndicator");
 
@@ -742,9 +1001,30 @@ async function startMatchFromSetup() {
   const p2 = (document.getElementById("setupP2")?.value || "Player 2").trim() || "Player 2";
   const mode = Number(document.getElementById("setupMode")?.value || 501);
   const bestOf = Number(document.getElementById("setupBestOf")?.value || 3);
+  const starterChoice = (document.getElementById("setupStarter")?.value || "random");
 
 await db.runTransaction(async (tx) => {
   const state = makeNewMatch({ mode, bestOf, p1Name: p1, p2Name: p2 });
+
+    // Starter selection
+    state.match.starting = starterChoice; // "bull" | "random" | "p1" | "p2"
+
+    if (starterChoice === "p1") {
+      state.match.starterLeg1 = 0;
+      state.leg.currentPlayer = 0;
+    } else if (starterChoice === "p2") {
+      state.match.starterLeg1 = 1;
+      state.leg.currentPlayer = 1;
+    } else if (starterChoice === "bull") {
+      state.match.bull = initBullState();
+      // Temporarily set to p1 until resolved (won’t matter — we will lock scoring)
+      state.match.starterLeg1 = 0;
+      state.leg.currentPlayer = 0;
+    } else {
+      // random (existing behaviour already did this, but make it explicit)
+      // keep whatever makeNewMatch picked
+    }
+
 
   state.expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
   state.status = "active";
@@ -761,7 +1041,10 @@ await db.runTransaction(async (tx) => {
   // Reset seat2 whenever a new match is created
   state.match.seat2Id = null;
 
+if (starterChoice !== "bull") {
   setAudioEvent(state, ["./audio/phrases/match_start.mp3"]);
+}
+
   tx.set(gameRef, state);
 });
 
@@ -1008,6 +1291,33 @@ async function continueOrNewMatch() {
   });
 }
 
+async function abortBullThrow() {
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(gameRef);
+    const state = snap.data();
+    if (!state) return;
+
+    // Only allow abort if we’re actually in bull-throw setup
+    // Adjust this condition to match your bull flow flag
+const bullActive =
+  state?.match?.starting === "bull" &&
+  state?.match?.bull &&
+  !state.match.bull.resolved;
+
+    if (!bullActive) return;
+
+    // Reset to a clean "no match" state
+    // (Keeps the game doc so the link still works)
+    tx.set(gameRef, {
+      createdAt: state.createdAt || new Date(),
+      updatedAt: new Date(),
+      status: "lobby",
+      expiresAt: new Date(Date.now() + 3 * 60 * 60 * 1000), // keep your lobby expiry if you want
+    });
+  });
+}
+
+
 async function undoLast() {
   await db.runTransaction(async (tx) => {
     const snap = await tx.get(gameRef);
@@ -1104,6 +1414,57 @@ function wireUI() {
   const submitBtn = document.getElementById("submitBtn");
   const undoBtn = document.getElementById("undoBtn");
   const scoreInputEl = document.getElementById("scoreInput");
+  const overlayUndoBtn = document.getElementById("overlayUndoBtn");
+  const bullBoard = document.getElementById("bullBoard");
+  const bullConfirmBtn = document.getElementById("bullConfirmBtn");
+  const bullResetBtn = document.getElementById("bullResetBtn");
+  const abortBullBtn = document.getElementById("abortBullBtn");
+if (abortBullBtn) abortBullBtn.addEventListener("click", abortBullThrow);
+
+  const inputModeBtn = document.getElementById("inputModeBtn");
+const dartTableArea = document.getElementById("dartTableArea");
+const dartTableClearBtn = document.getElementById("dartTableClearBtn");
+
+// init
+populateDartValueSelects();
+setInputMode(inputMode);
+
+// toggle button
+if (inputModeBtn) {
+  inputModeBtn.addEventListener("click", () => {
+    const next = (inputMode === "keypad") ? "table" : "keypad";
+    setInputMode(next);
+  });
+}
+
+// table change listeners
+if (dartTableArea) {
+  dartTableArea.addEventListener("change", () => {
+    // Online rules: don’t allow changes when you can’t score
+    if (!canScoreNow(latestState)) {
+      // snap back: recompute from current selects (no-op) — or you can showError
+      return;
+    }
+    recomputeDartTableTotal();
+  });
+}
+
+if (dartTableClearBtn) {
+  dartTableClearBtn.addEventListener("click", () => {
+    if (!canScoreNow(latestState)) return;
+    clearDartTable();
+  });
+}
+
+
+
+if (overlayUndoBtn) {
+  overlayUndoBtn.addEventListener("click", () => {
+    if (!canUndoNow(latestState)) return;
+    undoLast();
+  });
+}
+
 
   // Mobile menu buttons (reuse same flows)
 const mobileNewGameBtn = document.getElementById("mobileNewGameBtn");
@@ -1182,7 +1543,8 @@ if (closeInviteBtn) closeInviteBtn.addEventListener("click", () => setInviteModa
 
   if (keypad && scoreInputEl) {
     keypad.addEventListener("click", (e) => {
-      if (!canActNow(latestState)) return;
+      if (!canScoreNow(latestState)) return;
+      if (inputMode !== "keypad") return;
 
       const btn = e.target.closest("button");
       if (!btn) return;
@@ -1196,7 +1558,8 @@ if (closeInviteBtn) closeInviteBtn.addEventListener("click", () => setInviteModa
 
   if (clearBtn && scoreInputEl) {
     clearBtn.addEventListener("click", () => {
-      if (!canActNow(latestState)) return;
+      if (!canScoreNow(latestState)) return;
+      if (inputMode !== "keypad") return;
 
       scoreInputEl.value = "";
       safeFocusScoreInput();
@@ -1205,7 +1568,8 @@ if (closeInviteBtn) closeInviteBtn.addEventListener("click", () => setInviteModa
 
   if (backBtn && scoreInputEl) {
     backBtn.addEventListener("click", () => {
-      if (!canActNow(latestState)) return;
+      if (!canScoreNow(latestState)) return;
+      if (inputMode !== "keypad") return;
 
       scoreInputEl.value = scoreInputEl.value.slice(0, -1);
       safeFocusScoreInput();
@@ -1304,7 +1668,8 @@ function isAnyModalOpen() {
       // Only when tab is active and no modal is open
       if (document.hidden) return;
       if (isAnyModalOpen()) return;
-      if (!canActNow(latestState)) return;
+      if (!canScoreNow(latestState)) return;
+      if (inputMode !== "keypad") return;
   
       // Don't steal keys when user is typing in another input/select
       const tag = document.activeElement?.tagName?.toLowerCase();
@@ -1336,7 +1701,8 @@ function isAnyModalOpen() {
       }
     });
   }
-  
+
+  window.__bullPick = null; // { x: 0..1, y: 0..1 }
 
 wireUI();
 setWinnerModalVisible(false);
@@ -1412,6 +1778,100 @@ function bindGameListener() {
       if (statusEl) statusEl.innerText = "Firestore error: " + err.message;
     }
   );
+}
+
+function renderBullMarker(pick) {
+  if (!bullBoard) return;
+
+  // remove old marker
+  bullBoard.querySelectorAll(".bullMarker").forEach(n => n.remove());
+
+  if (!pick) return;
+
+  const m = document.createElement("div");
+  m.className = "bullMarker";
+  m.style.left = `${pick.x * 100}%`;
+  m.style.top = `${pick.y * 100}%`;
+  bullBoard.appendChild(m);
+}
+
+if (bullBoard) {
+  bullBoard.addEventListener("click", (e) => {
+    // Only if bull modal is active
+    const st = latestState;
+    if (!st?.match?.bull || st.match.bull.resolved) return;
+    if (st.match.starting !== "bull") return;
+
+    // Determine who is allowed to throw next
+    const bull = st.match.bull;
+    const neededPlayer = bull.p1 ? 1 : 0;
+
+    // Online: only the correct seat can place their dart (host places p1, seat2 places p2)
+    if (st.match.gameType === "online") {
+      const seat = mySeatIndex(st);
+      if (seat === null || seat !== neededPlayer) return;
+    }
+
+    const rect = bullBoard.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width;
+    const y = (e.clientY - rect.top) / rect.height;
+
+    const clamped = {
+      x: Math.min(1, Math.max(0, x)),
+      y: Math.min(1, Math.max(0, y)),
+    };
+
+    window.__bullPick = clamped;
+    renderBullMarker(clamped);
+    if (bullConfirmBtn) bullConfirmBtn.disabled = false;
+  });
+}
+
+if (bullResetBtn) {
+  bullResetBtn.addEventListener("click", () => {
+    window.__bullPick = null;
+    renderBullMarker(null);
+    if (bullConfirmBtn) bullConfirmBtn.disabled = true;
+  });
+}
+
+if (bullConfirmBtn) {
+  bullConfirmBtn.addEventListener("click", async () => {
+    const pick = window.__bullPick;
+    if (!pick) return;
+
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(gameRef);
+      const state = snap.data();
+      if (!state?.match?.bull) return;
+      if (state.match.starting !== "bull") return;
+
+      const bull = state.match.bull;
+      if (bull.resolved) return;
+
+      const neededPlayer = bull.p1 ? 1 : 0;
+
+      // Online seat enforcement
+      if (state.match.gameType === "online") {
+        const seat = mySeatIndex(state);
+        if (seat === null || seat !== neededPlayer) return;
+      }
+
+      if (neededPlayer === 0) bull.p1 = pick;
+      if (neededPlayer === 1) bull.p2 = pick;
+
+      // If both throws exist, resolve and set starter
+      tryResolveBull(state);
+
+      state.updatedAt = new Date();
+      tx.set(gameRef, state);
+    });
+
+    // clear local pick after submit
+    window.__bullPick = null;
+    renderBullMarker(null);
+    bullConfirmBtn.disabled = true;
+  });
 }
 
 

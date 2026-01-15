@@ -122,6 +122,8 @@ button:hover {
   background: rgba(34,197,94,0.8);
 }
 
+#inputArea { position: relative; }
+
 
 /* Mobile dropdown menu (hidden on desktop) */
 .mobileMenuWrap { display: none; }
@@ -171,7 +173,7 @@ button:hover {
 }
 
 
-#setupMode, #setupBestOf, #setupGameType {
+#setupMode, #setupBestOf, #setupGameType, #setupStarter {
   border-radius: 16px;
   border-color: transparent;
   background-color: var(--key-bg);
@@ -331,6 +333,8 @@ h1 {
 .actionCell {
   display: grid;
   place-items: center;
+  grid-auto-flow: column;
+  
 }
 
 /* Make the buttons fill their column nicely */
@@ -358,9 +362,10 @@ h1 {
   place-items: center;
   z-index: 5;
   border-radius: 14px;
-  background: rgba(0,0,0,0.0);
+  background: transparent;
   backdrop-filter: blur(3px);
   -webkit-backdrop-filter: blur(3px);
+  padding:100px 0px;
 }
 
 .turnOverlay > div {
@@ -373,6 +378,47 @@ h1 {
   border: 1px solid var(--border);
   box-shadow: var(--shadow);
 }
+
+/* Turn overlay covering just the input area */
+.turnOverlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  background: transparent;
+  backdrop-filter: blur(2px);
+  border-radius: 18px;
+  z-index: 10;
+}
+
+.turnOverlay.hidden { display: none !important; }
+
+.turnOverlayCard {
+  display: grid;
+  gap: 10px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  background: var(--card);
+  box-shadow: var(--shadow);
+  width: min(320px, 90%);
+  font-weight: 800;
+}
+
+.overlayUndoBtn {
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--key-border);
+  background:#ff746c;
+  color: var(--btn-bg);
+  font-weight: 800;
+  cursor: pointer;
+}
+.overlayUndoBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 
 /* Make the input sit nicely centered */
 #scoreInput {
@@ -424,6 +470,48 @@ h1 {
   transition: background-color 999999s ease-in-out 0s;
 }
 
+.iconBtn {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid var(--border, #333);
+  background: transparent;
+  font-size: 18px;
+}
+
+.dartTableHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 8px 0;
+}
+
+.dartTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.dartTable th, .dartTable td {
+  border: 1px solid rgba(255,255,255,0.12);
+  padding: 10px;
+  text-align: center;
+}
+
+.dartTable select {
+  width: 100%;
+  padding: 6px;
+  border-radius: 8px;
+}
+
+.dartTotal {
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.smallBtn {
+  padding: 8px 10px;
+  border-radius: 10px;
+}
 
 .keypad {
   display: grid;
@@ -678,3 +766,32 @@ h1 {
 #themeToggleBtn {order:3;}
 .mobileMenuPanel {padding-left: 50px !important;}
 }
+
+.bullBoard {
+  width: min(360px, 88vw);
+  aspect-ratio: 1 / 1;
+  margin: 12px auto 0;
+  border-radius: 999px;
+  border: 2px solid var(--border);
+  position: relative;
+  overflow: hidden;
+
+  background-image: url("./img/dartboard.png");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+
+.bullMarker {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  transform: translate(-50%, -50%);
+  border: 2px solid rgba(255,255,255,0.95);
+  background: rgba(59,130,246,0.9);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  pointer-events: none;
+}
+

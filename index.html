@@ -18,9 +18,6 @@
   <div class="card">
     <div class="toprow">
         <div id="gameMeta" class="gameMeta"></div>
-        <div id="lobbyIndicator" class="lobbyIndicator hidden" title="Lobby connection status">
-  <span id="lobbyDot" class="dot"></span>
-</div>
         <div id="masterbuttons" class="masterbuttons">
           <button id="newGameBtn">New Game</button>
           <button id="inviteBtn">Create Lobby</button>
@@ -74,10 +71,12 @@
     <div id="inputArea" class="inputArea">
   <div id="turnOverlay" class="turnOverlay hidden">
     <div id="turnOverlayText"></div>
+    <button id="overlayUndoBtn" class="overlayUndoBtn">Undo last score</button>
   </div>
     
     <div class="actionGrid">
   <div class="actionCell">
+    <button id="inputModeBtn" class="iconBtn" title="Switch input mode">🎯</button>
     <button id="undoBtn" class="actionBtn">Undo</button>
   </div>
 
@@ -115,6 +114,83 @@
         <button class="key" data-digit="0">0</button>
         <button class="key key-wide" id="keyBack">⌫</button>
       </div>
+
+      <div id="dartTableArea" class="hidden">
+  <div class="dartTableHeader">
+    <div class="dartTotal">
+      Total: <span id="dartTotalVal">0</span>
+    </div>
+    <button id="dartTableClearBtn" class="smallBtn" type="button">Clear</button>
+  </div>
+
+  <table class="dartTable">
+    <thead>
+      <tr>
+        <th>Dart</th>
+        <th>Mult</th>
+        <th>Value</th>
+        <th>Score</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr data-dart="1">
+        <td>1</td>
+        <td>
+          <select class="dartMult">
+            <option value="">—</option>
+            <option value="S">S</option>
+            <option value="D">D</option>
+            <option value="T">T</option>
+          </select>
+        </td>
+        <td>
+          <select class="dartVal">
+            <option value="">—</option>
+            <!-- filled by JS -->
+          </select>
+        </td>
+        <td class="dartScore">0</td>
+      </tr>
+
+      <tr data-dart="2">
+        <td>2</td>
+        <td>
+          <select class="dartMult">
+            <option value="">—</option>
+            <option value="S">S</option>
+            <option value="D">D</option>
+            <option value="T">T</option>
+          </select>
+        </td>
+        <td>
+          <select class="dartVal">
+            <option value="">—</option>
+          </select>
+        </td>
+        <td class="dartScore">0</td>
+      </tr>
+
+      <tr data-dart="3">
+        <td>3</td>
+        <td>
+          <select class="dartMult">
+            <option value="">—</option>
+            <option value="S">S</option>
+            <option value="D">D</option>
+            <option value="T">T</option>
+          </select>
+        </td>
+        <td>
+          <select class="dartVal">
+            <option value="">—</option>
+          </select>
+        </td>
+        <td class="dartScore">0</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
       
 
   </div>
@@ -153,13 +229,15 @@
       <div class="formRow">
         <label>Starting Score</label>
         <select id="setupMode">
+          <option value="121">121</option>
           <option value="301">301</option>
           <option value="501" selected>501</option>
+          <option value="701">701</option>
         </select>
       </div>
   
       <div class="formRow">
-        <label>Best of legs</label>
+        <label>Best of Legs</label>
         <select id="setupBestOf">
           <option value="1">1</option>
           <option value="3" selected>3</option>
@@ -168,6 +246,17 @@
           <option value="9">9</option>
         </select>
       </div>
+
+      <div class="formRow">
+        <label for="setupStarter">Starting Player</label>
+        <select id="setupStarter">
+          <option value="bull">Bull Throw</option>
+          <option value="random" selected>Random</option>
+          <option value="p1">Player 1</option>
+          <option value="p2">Player 2</option>
+        </select>
+      </div>
+
   
       <div class="row">
         <button id="setupCancelBtn">Cancel</button>
@@ -205,6 +294,23 @@
       </div>
     </div>
   </div>
+
+  <div id="bullModal" class="modal hidden">
+  <div class="modal-card">
+    <h2>Throw for Bull</h2>
+    <p id="bullPrompt" style="margin-top:0; opacity:.85;"></p>
+    <p id="bullWaiting" class="hidden" style="margin:6px 0 0; opacity:.85;"></p>
+
+    <div id="bullBoard" class="bullBoard" aria-label="Dartboard"></div>
+
+    <div class="row" style="margin-top:14px;">
+      <button id="bullResetBtn" class="actionBtn">Reset</button>
+      <button id="bullConfirmBtn" class="actionBtn" disabled>Confirm</button>
+    </div>
+    <button id="abortBullBtn" class="actionBtn danger">Abort Game</button>
+  </div>
+</div>
+
   
 
   <!-- Firebase SDKs (compat) -->
