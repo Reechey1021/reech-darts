@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <title>Reech Darts</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
@@ -18,7 +18,36 @@
   <div class="card">
     <div class="toprow">
         <div id="gameMeta" class="gameMeta"></div>
-        <button id="newGameBtn">New Game</button>
+        <div id="lobbyIndicator" class="lobbyIndicator hidden" title="Lobby connection status">
+  <span id="lobbyDot" class="dot"></span>
+</div>
+        <div id="masterbuttons" class="masterbuttons">
+          <button id="newGameBtn">New Game</button>
+          <button id="inviteBtn">Create Lobby</button>
+          <!-- Mobile-only settings menu -->
+<div class="mobileMenuWrap">
+  <details id="mobileMenu" class="mobileMenu">
+    <summary id="mobileMenuBtn" aria-label="Menu">⚙️</summary>
+    <div class="mobileMenuPanel">
+      <button type="button" id="mobileNewGameBtn" class="menuItem">New Game</button>
+      <button type="button" id="mobileInviteBtn" class="menuItem">Create Lobby</button>
+    </div>
+  </details>
+</div>
+
+        </div>
+
+<div id="inviteModal" class="modal hidden">
+  <div class="modal-card">
+    <h2>Invite link</h2>
+    <p id="inviteLinkText" style="word-break: break-all;"></p>
+    <div class="row">
+      <button id="copyInviteBtn">Copy</button>
+      <button id="closeInviteBtn">Close</button>
+    </div>
+  </div>
+</div>
+
         <button id="themeToggleBtn" type="button">🌙</button>
       </div>      
 
@@ -42,6 +71,11 @@
       </div>
     </div>
 
+    <div id="inputArea" class="inputArea">
+  <div id="turnOverlay" class="turnOverlay hidden">
+    <div id="turnOverlayText"></div>
+  </div>
+    
     <div class="actionGrid">
   <div class="actionCell">
     <button id="undoBtn" class="actionBtn">Undo</button>
@@ -96,6 +130,15 @@
   <div id="setupModal" class="modal hidden">
     <div class="modal-card">
       <h2>New Match</h2>
+
+      <div class="formRow">
+        <label for="setupGameType">Game type</label>
+        <select id="setupGameType">
+          <option value="single">Local</option>
+          <option value="online">Online</option>
+        </select>
+      </div>
+
   
       <div class="formRow">
         <label>Player 1 Name</label>

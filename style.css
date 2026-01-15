@@ -36,6 +36,19 @@
   --error-border: #fecdd3;
 }
 
+html {
+  touch-action: manipulation;
+}
+
+button,
+.key,
+.actionBtn,
+#keypad {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+
 /* DARK THEME OVERRIDES */
 body[data-theme="dark"] {
   --bg: #0b0f14;
@@ -88,7 +101,77 @@ button:hover {
   filter: brightness(1.02);
 }
 
-#setupMode, #setupBestOf {
+.lobbyIndicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lobbyIndicator .dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 2px solid var(--border);
+  background: transparent;
+  display: inline-block;
+}
+
+/* Connected state */
+.lobbyIndicator.connected .dot {
+  border-color: rgba(34,197,94,0.8);
+  background: rgba(34,197,94,0.8);
+}
+
+
+/* Mobile dropdown menu (hidden on desktop) */
+.mobileMenuWrap { display: none; }
+
+.mobileMenu summary {
+  list-style: none;
+  cursor: pointer;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background: var(--btn-bg);
+  color: var(--btn-text);
+  padding: 10px 14px;
+  font-size: 20px;
+  user-select: none;
+}
+
+/* Remove default marker */
+.mobileMenu summary::-webkit-details-marker { display: none; }
+
+.mobileMenuPanel {
+  position: absolute;
+  right: 0;
+  margin-top: 8px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  padding: 8px;
+  min-width: 180px;
+  z-index: 9999;
+}
+
+.mobileMenu { position: relative; }
+
+.menuItem {
+  width: 100%;
+  text-align: left;
+  border-radius: 12px;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--btn-text);
+}
+
+.menuItem:hover {
+  background: rgba(255,255,255,0.06); /* subtle - works in dark too */
+}
+
+
+#setupMode, #setupBestOf, #setupGameType {
   border-radius: 16px;
   border-color: transparent;
   background-color: var(--key-bg);
@@ -97,6 +180,8 @@ button:hover {
 
 #setupP1, #setupP2 {
   width: 89%;
+  font-size: 16px !important;
+  text-align: left;
 }
 
 input {
@@ -119,6 +204,10 @@ button {
 #submitBtn {
   background-color: var(--submit-bg);
   color: #0b0f14;
+}
+
+.masterbuttons {
+  gap:15px;
 }
 
 #submitBtn, #undoBtn {
@@ -248,6 +337,41 @@ h1 {
 .actionBtn {
   width: 80%;
   max-width: 220px; /* optional, keeps them from looking huge on desktop */
+}
+
+.inputArea {
+  position: relative;
+}
+
+/* When locked, prevent interaction */
+.inputArea.locked .actionGrid,
+.inputArea.locked .keypad {
+  pointer-events: none;
+  opacity: 0.45;
+  filter: grayscale(0.1);
+}
+
+.turnOverlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  z-index: 5;
+  border-radius: 14px;
+  background: rgba(0,0,0,0.0);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+
+.turnOverlay > div {
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-weight: 800;
+  text-align: center;
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
 }
 
 /* Make the input sit nicely centered */
@@ -514,16 +638,17 @@ h1 {
     font-size: 10px;
   }
 
-  .stats { font-size: 6px; gap: 2px; }
+  .stats { font-size: 6px; gap: 0px; }
 
   .stats .pill {
     font-size: 10px;
-    padding: 2px 4px;
+    padding: 2px 2px;
+    background-color: transparent;
     border-color: transparent;
   }
 
   #undoBtn { padding: 8px 18px; }
-  #submitBtn { padding: 8px 18px; }
+  #submitBtn { padding: 8px 10px;}
 
   .checkout .pill { font-size: 16px; }
 
@@ -537,4 +662,19 @@ h1 {
     text-align: center;
     padding-bottom: 20px;
   }
+
+  #setupP1, #setupP2 {
+  width: 80%;
+}
+
+  .toprow {
+      flex-direction: row-reverse;
+  }
+
+/* Mobile: hide the two top buttons and show the cog menu */
+#newGameBtn, #inviteBtn { display: none !important; }
+.mobileMenuWrap { display: block; order: 1;}
+#gameMeta {order:2;}
+#themeToggleBtn {order:3;}
+.mobileMenuPanel {padding-left: 50px !important;}
 }

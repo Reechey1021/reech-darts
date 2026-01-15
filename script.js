@@ -1,6 +1,7 @@
 import { CHECKOUTS } from "./checkouts.js";
 
 console.log("Reech Darts loaded");
+window.onerror = (m, s, l, c, e) => console.log("JS ERROR:", m, l, c, e);
 
 // Firebase configuration
 const firebaseConfig = {
@@ -13,7 +14,50 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 console.log("Firebase connected");
 
-const gameRef = db.collection("games").doc("test-game");
+// ---------- Game routing (URL -> Firestore doc) ----------
+function getGameIdFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get("game");
+  return id && id.trim() ? id.trim() : null;
+}
+
+function getDeviceId() {
+  let id = localStorage.getItem("deviceId");
+  if (!id) {
+    id = (crypto?.randomUUID?.() || (Date.now() + "-" + Math.random())).toString();
+    localStorage.setItem("deviceId", id);
+  }
+  return id;
+}
+
+
+function setGameIdInUrl(gameId) {
+  const url = new URL(window.location.href);
+  url.searchParams.set("game", gameId);
+  // keep it neat if you ever want: url.searchParams.delete("somethingElse");
+  window.history.replaceState({}, "", url.toString());
+}
+
+let gameId = getGameIdFromUrl() || "test-game";
+let gameRef = db.collection("games").doc(gameId);
+
+function switchToGame(newGameId) {
+  gameId = newGameId;
+  gameRef = db.collection("games").doc(gameId);
+  setGameIdInUrl(gameId);
+
+  // Important: reset audio event tracking so new game can play audio again
+  lastAudioId = null;
+  seatClaimed = false;
+
+  console.log("Switched to gameId:", gameId);
+  bindGameListener();
+}
+
+
+console.log("Using gameId:", gameId);
+
+let latestState = null;
 
 // ---------- Constants ----------
 const BOGEY_NUMBERS = new Set([169, 168, 166, 165, 163, 162, 159]);
@@ -149,6 +193,31 @@ function setAudioEvent(state, clips) {
 
 // ---------- UI helpers ----------
 
+function canActNow(state) {
+  if (!state?.match || !state?.leg) return false;
+  if (state.match.gameType !== "online") return true; // singleplayer: always can
+  const seat = mySeatIndex(state);
+  if (seat === null) return false; // not seated
+  if (state.leg.status !== "in_progress") return false;
+  if (state.pendingCheckout) return false;
+  return seat === state.leg.currentPlayer; // must be your turn
+}
+
+function mySeatIndex(state) {
+  const d = getDeviceId();
+  if (!state?.match) return null;
+  if (state.match.seat1Id === d) return 0;
+  if (state.match.seat2Id === d) return 1;
+  return null;
+}
+
+function canEditScores(state) {
+  if (!state?.match) return false;
+  if (state.match.gameType !== "online") return true; // singleplayer
+  return mySeatIndex(state) !== null;
+}
+
+
 function getRequireFile(playerName) {
   if (playerName === "Richard") return "require_richard.mp3";
   if (playerName === "Kameron") return "require_kameron.mp3";
@@ -192,6 +261,41 @@ function setWinnerModalVisible(visible, winnerName = "") {
     modal.classList.add("hidden");
   }
 }
+
+function setInviteModalVisible(visible) {
+  const modal = document.getElementById("inviteModal");
+  if (!modal) return;
+  modal.classList.toggle("hidden", !visible);
+}
+
+async function createNewGameAndShowInvite() {
+  const newRef = db.collection("games").doc(); // auto id
+  const newId = newRef.id;
+
+  // create empty doc so link is “real” immediately
+const now = new Date();
+const expiresAt = new Date(Date.now() + 3 * 60 * 60 * 1000); // 3 hours
+
+await newRef.set({
+  createdAt: now,
+  updatedAt: now,
+  expiresAt: expiresAt,
+  status: "lobby", // optional but nice: "lobby" | "active" | "finished"
+});
+
+
+  switchToGame(newId);
+
+  const url = new URL(window.location.href);
+  url.searchParams.set("game", newId);
+
+  const txt = url.toString();
+  const linkEl = document.getElementById("inviteLinkText");
+  if (linkEl) linkEl.textContent = txt;
+
+  setInviteModalVisible(true);
+}
+
 
 function setSetupModalVisible(visible) {
   const modal = document.getElementById("setupModal");
@@ -262,6 +366,11 @@ function makeNewMatch({ mode, bestOf, p1Name, p2Name }) {
       status: "in_progress", // "finished" when match done
       winner: null,
       createdAt: new Date(),
+      hostId: null,              // set when host starts match
+      gameType: "single",        // "single" | "online"
+      seat1Id: null,             // deviceId of Player 1
+      seat2Id: null,             // deviceId of Player 2
+
     },
     leg: makeFreshLeg(mode, starter),
     pendingCheckout: null, // { player, entered, before, at }
@@ -356,6 +465,33 @@ function calcMatchStats(match) {
 
 // ---------- Render ----------
 function render(state) {
+
+const inputArea = document.getElementById("inputArea");
+const overlay = document.getElementById("turnOverlay");
+const overlayText = document.getElementById("turnOverlayText");
+
+if (state?.match && state?.leg) {
+  const allowed = canActNow(state);
+  const isOnline = state.match.gameType === "online";
+
+  if (inputArea) inputArea.classList.toggle("locked", isOnline && !allowed);
+
+  if (overlay && overlayText) {
+    if (isOnline && !allowed) {
+      const who = state.match.players[state.leg.currentPlayer]?.name || "the other player";
+      overlayText.textContent = `It’s ${who}’s turn`;
+      overlay.classList.remove("hidden");
+    } else {
+      overlay.classList.add("hidden");
+    }
+  }
+} else {
+
+  // no match yet — ensure unlocked + hidden overlay
+  if (inputArea) inputArea.classList.remove("locked");
+  if (overlay) overlay.classList.add("hidden");
+}
+
 const gameMetaEl = document.getElementById("gameMeta");
 
   const statusEl = document.getElementById("status");
@@ -381,23 +517,58 @@ const gameMetaEl = document.getElementById("gameMeta");
   
 
   // If no match yet
-  if (!state || !state.match || !state.leg) {
-    statusEl.innerText = "Press New Game to start.";
-    p1ScoreEl.innerText = "—";
-    p2ScoreEl.innerText = "—";
-    if (p1CheckoutEl) p1CheckoutEl.innerHTML = "";
-    if (p2CheckoutEl) p2CheckoutEl.innerHTML = "";
-    if (p1StatsEl) p1StatsEl.innerHTML = "";
-    if (p2StatsEl) p2StatsEl.innerHTML = "";
-    if (gameMetaEl) gameMetaEl.innerText = "";
-    setWinnerModalVisible(false);
-    setCheckoutModalVisible(false);
-    return;
-  }
+if (!state || !state.match || !state.leg) {
+  statusEl.innerText = "Press New Game to start.";
+  p1ScoreEl.innerText = "—";
+  p2ScoreEl.innerText = "—";
+  if (p1CheckoutEl) p1CheckoutEl.innerHTML = "";
+  if (p2CheckoutEl) p2CheckoutEl.innerHTML = "";
+  if (p1StatsEl) p1StatsEl.innerHTML = "";
+  if (p2StatsEl) p2StatsEl.innerHTML = "";
+  if (gameMetaEl) gameMetaEl.innerText = "";
+  setWinnerModalVisible(false);
+  setCheckoutModalVisible(false);
+  return;
+}
+
+// ✅ readOnly logic MUST be here (after the early return)
+const readOnly = !canEditScores(state);
+
+if (readOnly && state.match?.gameType === "online") {
+  const seat2Taken = !!state.match.seat2Id;
+  showError(
+    seat2Taken
+      ? "This online game already has 2 devices connected (read-only)."
+      : "Waiting for Player 2 to join… (read-only)."
+  );
+}
+
+const scoreInput = document.getElementById("scoreInput");
+const submitBtn = document.getElementById("submitBtn");
+const undoBtn = document.getElementById("undoBtn");
+
+if (scoreInput) scoreInput.disabled = readOnly;
+if (submitBtn) submitBtn.disabled = readOnly;
+if (undoBtn) undoBtn.disabled = readOnly;
 
   const match = state.match;
   const leg = state.leg;
   if (gameMetaEl) gameMetaEl.innerText = `${match.mode} • BO${match.bestOf}`;
+
+  const lobbyIndicator = document.getElementById("lobbyIndicator");
+
+if (lobbyIndicator) {
+  // only show in online mode
+  const isOnline = state.match.gameType === "online";
+  lobbyIndicator.classList.toggle("hidden", !isOnline);
+
+  if (isOnline) {
+    const connected = !!state.match.seat1Id && !!state.match.seat2Id;
+    lobbyIndicator.classList.toggle("connected", connected);
+    lobbyIndicator.title = connected ? "Both devices connected" : "Waiting for Player 2…";
+  }
+}
+
 
   // Lock names in the main UI (setup controls names now)
   if (p1NameEl) {
@@ -572,11 +743,28 @@ async function startMatchFromSetup() {
   const mode = Number(document.getElementById("setupMode")?.value || 501);
   const bestOf = Number(document.getElementById("setupBestOf")?.value || 3);
 
-  await db.runTransaction(async (tx) => {
-    const state = makeNewMatch({ mode, bestOf, p1Name: p1, p2Name: p2 });
-    setAudioEvent(state, ["./audio/phrases/match_start.mp3"]);
-    tx.set(gameRef, state);
-  });
+await db.runTransaction(async (tx) => {
+  const state = makeNewMatch({ mode, bestOf, p1Name: p1, p2Name: p2 });
+
+  state.expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  state.status = "active";
+
+  const d = getDeviceId();
+  const gameType = (document.getElementById("setupGameType")?.value || "single");
+
+  state.match.hostId = d;
+  state.match.gameType = gameType;
+
+  // Host is always Player 1 (seat 0)
+  state.match.seat1Id = d;
+
+  // Reset seat2 whenever a new match is created
+  state.match.seat2Id = null;
+
+  setAudioEvent(state, ["./audio/phrases/match_start.mp3"]);
+  tx.set(gameRef, state);
+});
+
 
   setSetupModalVisible(false);
 
@@ -615,6 +803,15 @@ async function submitScore() {
       showError("Confirm or cancel the checkout first.");
       return;
     }
+
+    if (state.match.gameType === "online") {
+      const seat = mySeatIndex(state);
+    if (seat !== state.leg.currentPlayer) {
+      showError("Not your turn / not your player.");
+    return;
+    }
+  }
+
 
     const p = state.leg.currentPlayer;
     const oldScore = state.leg.players[p].score;
@@ -908,8 +1105,47 @@ function wireUI() {
   const undoBtn = document.getElementById("undoBtn");
   const scoreInputEl = document.getElementById("scoreInput");
 
+  // Mobile menu buttons (reuse same flows)
+const mobileNewGameBtn = document.getElementById("mobileNewGameBtn");
+const mobileInviteBtn = document.getElementById("mobileInviteBtn");
+const mobileMenu = document.getElementById("mobileMenu");
+
+if (mobileNewGameBtn) mobileNewGameBtn.addEventListener("click", () => {
+  if (mobileMenu) mobileMenu.removeAttribute("open");
+  openNewGameFlow();
+});
+
+if (mobileInviteBtn) mobileInviteBtn.addEventListener("click", () => {
+  if (mobileMenu) mobileMenu.removeAttribute("open");
+  createNewGameAndShowInvite();
+});
+
+document.addEventListener("click", (e) => {
+  const menu = document.getElementById("mobileMenu");
+  if (!menu) return;
+  if (!menu.hasAttribute("open")) return;
+  if (!menu.contains(e.target)) menu.removeAttribute("open");
+});
+
+
   document.addEventListener("click", unlockAudioOnce, { once: true });
   document.addEventListener("touchstart", unlockAudioOnce, { once: true });
+
+  const inviteBtn = document.getElementById("inviteBtn");
+const copyInviteBtn = document.getElementById("copyInviteBtn");
+const closeInviteBtn = document.getElementById("closeInviteBtn");
+
+if (inviteBtn) inviteBtn.addEventListener("click", createNewGameAndShowInvite);
+
+if (copyInviteBtn) {
+  copyInviteBtn.addEventListener("click", async () => {
+    const text = document.getElementById("inviteLinkText")?.textContent || "";
+    try { await navigator.clipboard.writeText(text); } catch {}
+  });
+}
+
+
+if (closeInviteBtn) closeInviteBtn.addEventListener("click", () => setInviteModalVisible(false));
 
 
   // Setup modal
@@ -946,6 +1182,8 @@ function wireUI() {
 
   if (keypad && scoreInputEl) {
     keypad.addEventListener("click", (e) => {
+      if (!canActNow(latestState)) return;
+
       const btn = e.target.closest("button");
       if (!btn) return;
       const digit = btn.getAttribute("data-digit");
@@ -958,6 +1196,8 @@ function wireUI() {
 
   if (clearBtn && scoreInputEl) {
     clearBtn.addEventListener("click", () => {
+      if (!canActNow(latestState)) return;
+
       scoreInputEl.value = "";
       safeFocusScoreInput();
     });
@@ -965,6 +1205,8 @@ function wireUI() {
 
   if (backBtn && scoreInputEl) {
     backBtn.addEventListener("click", () => {
+      if (!canActNow(latestState)) return;
+
       scoreInputEl.value = scoreInputEl.value.slice(0, -1);
       safeFocusScoreInput();
     });
@@ -1062,6 +1304,7 @@ function isAnyModalOpen() {
       // Only when tab is active and no modal is open
       if (document.hidden) return;
       if (isAnyModalOpen()) return;
+      if (!canActNow(latestState)) return;
   
       // Don't steal keys when user is typing in another input/select
       const tag = document.activeElement?.tagName?.toLowerCase();
@@ -1100,24 +1343,79 @@ setWinnerModalVisible(false);
 setSetupModalVisible(false);
 setCheckoutModalVisible(false);
 setConfirmNewMatchModalVisible(false);
+setInviteModalVisible(false);
 wireGlobalKeyboard();
 
 // ---------- Real-time updates ----------
-gameRef.onSnapshot(
-  (doc) => {
-    const state = doc.data();
-    render(state);
+let unsubscribeGame = null;
+let seatClaimed = false;
 
-    // Firestore-synced audio: every device plays the same event once
-    if (state?.audio?.id && state.audio.id !== lastAudioId) {
-      lastAudioId = state.audio.id;
-      playClipsWebAudio(state.audio.clips);
-    }
-  },
-  (err) => {
-    console.error(err);
-    const statusEl = document.getElementById("status");
-    if (statusEl) statusEl.innerText = "Firestore error: " + err.message;
+
+async function tryClaimSeat2(state) {
+  if (seatClaimed) return;
+  if (!state?.match) return;
+  if (state.match.gameType !== "online") return;
+
+  const exp = state.expiresAt?.toDate ? state.expiresAt.toDate() : state.expiresAt;
+  if (exp && Date.now() > new Date(exp).getTime()) return;
+
+
+  const d = getDeviceId();
+  if (!state.match.seat1Id) return;
+  if (state.match.seat1Id === d) return; // host
+  if (state.match.seat2Id) return; // already taken
+
+  seatClaimed = true;
+
+  try {
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(gameRef);
+      const fresh = snap.data();
+      if (!fresh?.match) return;
+      if (fresh.match.gameType !== "online") return;
+      if (fresh.match.seat2Id) return;
+      if (fresh.match.seat1Id === d) return;
+
+      fresh.match.seat2Id = d;
+      fresh.updatedAt = new Date();
+      tx.set(gameRef, fresh);
+    });
+  } catch {
+    seatClaimed = false;
   }
-);
+}
+
+
+function bindGameListener() {
+  if (typeof unsubscribeGame === "function") {
+    unsubscribeGame();
+    unsubscribeGame = null;
+  }
+
+  unsubscribeGame = gameRef.onSnapshot(
+    (doc) => {
+      const state = doc.data();
+
+      latestState = state;
+      render(state);
+      tryClaimSeat2(state);
+
+      // Firestore-synced audio: every device plays the same event once
+      if (state?.audio?.id && state.audio.id !== lastAudioId) {
+        lastAudioId = state.audio.id;
+        playClipsWebAudio(state.audio.clips);
+      }
+    },
+    (err) => {
+      console.error(err);
+      const statusEl = document.getElementById("status");
+      if (statusEl) statusEl.innerText = "Firestore error: " + err.message;
+    }
+  );
+}
+
+
+// start listening
+bindGameListener();
+
 
