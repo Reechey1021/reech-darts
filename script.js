@@ -19,6 +19,63 @@ const gameRef = db.collection("games").doc("test-game");
 const BOGEY_NUMBERS = new Set([169, 168, 166, 165, 163, 162, 159]);
 const IMPOSSIBLE_TURN_SCORES = new Set([179, 178, 176, 175, 173, 172, 169, 166, 163]);
 
+// ---------- Audio (WebAudio for require → number) ----------
+const AUDIO_BASE = "./audio"; // adjust if your folder is named differently
+
+let audioCtx;
+const bufferCache = new Map();
+
+function playSingleAudio(file) {
+  const a = new Audio(`${AUDIO_BASE}/${file}`);
+  a.play().catch(() => {});
+}
+
+
+function ensureAudioCtx() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  return audioCtx;
+}
+
+async function loadAudioBuffer(src) {
+  if (bufferCache.has(src)) return bufferCache.get(src);
+
+  const ctx = ensureAudioCtx();
+  const res = await fetch(src);
+  const arr = await res.arrayBuffer();
+  const buf = await ctx.decodeAudioData(arr);
+
+  bufferCache.set(src, buf);
+  return buf;
+}
+
+async function playRequireThenNumber(requireSrc, numberSrc) {
+  const ctx = ensureAudioCtx();
+
+  if (ctx.state === "suspended") {
+    try { await ctx.resume(); } catch {}
+  }
+
+  const [b1, b2] = await Promise.all([
+    loadAudioBuffer(requireSrc),
+    loadAudioBuffer(numberSrc),
+  ]);
+
+  const t0 = ctx.currentTime + 0.02;
+
+  const s1 = ctx.createBufferSource();
+  s1.buffer = b1;
+  s1.connect(ctx.destination);
+  s1.start(t0);
+
+  const s2 = ctx.createBufferSource();
+  s2.buffer = b2;
+  s2.connect(ctx.destination);
+  s2.start(t0 + b1.duration);
+}
+
+
 // ---------- Audio (Firestore-synced) ----------
 let lastAudioId = null;
 let audioUnlocked = false;
@@ -36,10 +93,45 @@ function stopAudio() {
   }
 }
 
+function isRequireClip(src) {
+  return (
+    typeof src === "string" &&
+    (src.includes("/require.mp3") ||
+      src.includes("/require_richard.mp3") ||
+      src.includes("/require_kameron.mp3"))
+  );
+}
+
 function playClipsSequential(clips) {
   stopAudio();
   if (!Array.isArray(clips) || clips.length === 0) return;
 
+  // Special fast-path: [score, require, number]
+  // We keep score as HTMLAudio (fine),
+  // but run require -> number via WebAudio to remove the gap.
+  if (clips.length === 3 && isRequireClip(clips[1])) {
+    const scoreSrc = clips[0];
+    const requireSrc = clips[1];
+    const numberSrc = clips[2];
+
+    const a = new Audio(scoreSrc);
+    currentAudio = a;
+    a.volume = 1;
+
+    a.onended = () => {
+      // Tight join between require -> number
+      playRequireThenNumber(requireSrc, numberSrc);
+    };
+    a.onerror = () => {
+      // If score file fails, still attempt require -> number
+      playRequireThenNumber(requireSrc, numberSrc);
+    };
+
+    a.play().catch(() => {});
+    return;
+  }
+
+  // Default: normal sequential HTMLAudio chain
   const playNext = (i) => {
     if (i >= clips.length) return;
 
@@ -51,31 +143,35 @@ function playClipsSequential(clips) {
     a.onended = () => playNext(i + 1);
     a.onerror = () => playNext(i + 1);
 
-    a.play().catch(() => {
-      // audio blocked until user gesture on some devices
-    });
+    a.play().catch(() => {});
   };
 
   playNext(0);
 }
 
+
 function unlockAudioOnce() {
   if (audioUnlocked) return;
   audioUnlocked = true;
 
-  // Prime audio on iOS/Safari (must happen after a user gesture)
+  // Prime HTMLAudio
   const a = new Audio("audio/phrases/no_score.mp3");
-  a.volume = 0; // silent prime
+  a.volume = 0;
   a.play()
     .then(() => {
       a.pause();
       a.currentTime = 0;
       a.volume = 1;
     })
-    .catch(() => {
-      // still fine; user can tap again later
-    });
+    .catch(() => {});
+
+  // Prime WebAudio (for require -> number)
+  try {
+    const ctx = ensureAudioCtx();
+    if (ctx.state === "suspended") ctx.resume().catch(() => {});
+  } catch {}
 }
+
 
 function requireClipForName(name) {
   const cleaned = (name || "").trim();
@@ -126,6 +222,12 @@ function setAudioEvent(state, clips) {
 
 
 // ---------- UI helpers ----------
+
+function getRequireFile(playerName) {
+  if (playerName === "Richard") return "require_richard.mp3";
+  if (playerName === "Kameron") return "require_kameron.mp3";
+  return "require.mp3";
+}
 
 function isTouchDevice() {
   return window.matchMedia("(pointer: coarse)").matches;
