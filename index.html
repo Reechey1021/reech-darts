@@ -42,17 +42,25 @@
       </div>
     </div>
 
-    <div class="row">
-        <button id="undoBtn">Undo</button>
-        <input
-          id="scoreInput"
-          type="text"
-          inputmode="none"
-          placeholder="Score"
-          autocomplete="off"
-        />
-        <button id="submitBtn">Submit</button>
-      </div>
+    <div class="actionGrid">
+  <div class="actionCell">
+    <button id="undoBtn" class="actionBtn">Undo</button>
+  </div>
+
+  <div class="actionCell">
+    <input
+      id="scoreInput"
+      type="text"
+      inputmode="numeric"
+      placeholder=""
+      autocomplete="off"
+    />
+  </div>
+
+  <div class="actionCell">
+    <button id="submitBtn" class="actionBtn">Submit</button>
+  </div>
+</div>
 
       <p id="error" class="error hidden"></p>
       
@@ -90,12 +98,12 @@
       <h2>New Match</h2>
   
       <div class="formRow">
-        <label>Player 1</label>
+        <label>Player 1 Name</label>
         <input id="setupP1" type="text" value="Player 1" />
       </div>
   
       <div class="formRow">
-        <label>Player 2</label>
+        <label>Player 2 Name</label>
         <input id="setupP2" type="text" value="Player 2" />
       </div>
   
@@ -131,9 +139,9 @@
       <p id="checkoutBody">How many darts did you use?</p>
   
       <div class="row">
-        <button class="dartsBtn" data-darts="1">1 dart</button>
-        <button class="dartsBtn" data-darts="2">2 darts</button>
-        <button class="dartsBtn" data-darts="3">3 darts</button>
+        <button class="dartsBtn" data-darts="1">1</button>
+        <button class="dartsBtn" data-darts="2">2</button>
+        <button class="dartsBtn" data-darts="3">3</button>
       </div>
   
       <div class="row">

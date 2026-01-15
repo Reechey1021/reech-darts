@@ -20,21 +20,16 @@ const BOGEY_NUMBERS = new Set([169, 168, 166, 165, 163, 162, 159]);
 const IMPOSSIBLE_TURN_SCORES = new Set([179, 178, 176, 175, 173, 172, 169, 166, 163]);
 
 // ---------- Audio (WebAudio for require → number) ----------
-const AUDIO_BASE = "./audio"; // adjust if your folder is named differently
 
+// ---------- Audio (Firestore-synced, WebAudio-only, iOS-safe) ----------
 let audioCtx;
 const bufferCache = new Map();
-
-function playSingleAudio(file) {
-  const a = new Audio(`${AUDIO_BASE}/${file}`);
-  a.play().catch(() => {});
-}
-
+let audioUnlocked = false;
+let lastAudioId = null;
+let activeSources = [];
 
 function ensureAudioCtx() {
-  if (!audioCtx) {
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  }
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   return audioCtx;
 }
 
@@ -42,7 +37,7 @@ async function loadAudioBuffer(src) {
   if (bufferCache.has(src)) return bufferCache.get(src);
 
   const ctx = ensureAudioCtx();
-  const res = await fetch(src);
+  const res = await fetch(src, { cache: "force-cache" });
   const arr = await res.arrayBuffer();
   const buf = await ctx.decodeAudioData(arr);
 
@@ -50,134 +45,65 @@ async function loadAudioBuffer(src) {
   return buf;
 }
 
-async function playRequireThenNumber(requireSrc, numberSrc) {
-  const ctx = ensureAudioCtx();
+function stopAllAudio() {
+  for (const s of activeSources) {
+    try { s.stop(0); } catch {}
+    try { s.disconnect(); } catch {}
+  }
+  activeSources = [];
+}
 
+// IMPORTANT: must be called from a user gesture at least once on iOS
+async function unlockAudioOnce() {
+  if (audioUnlocked) return;
+  audioUnlocked = true;
+
+  const ctx = ensureAudioCtx();
   if (ctx.state === "suspended") {
     try { await ctx.resume(); } catch {}
   }
 
-  const [b1, b2] = await Promise.all([
-    loadAudioBuffer(requireSrc),
-    loadAudioBuffer(numberSrc),
-  ]);
-
-  const t0 = ctx.currentTime + 0.02;
-
-  const s1 = ctx.createBufferSource();
-  s1.buffer = b1;
-  s1.connect(ctx.destination);
-  s1.start(t0);
-
-  const s2 = ctx.createBufferSource();
-  s2.buffer = b2;
-  s2.connect(ctx.destination);
-  s2.start(t0 + b1.duration);
+  // silent tick (reliably unlocks iOS)
+  const buffer = ctx.createBuffer(1, 1, 22050);
+  const src = ctx.createBufferSource();
+  src.buffer = buffer;
+  src.connect(ctx.destination);
+  src.start(0);
 }
 
+async function playClipsWebAudio(clips) {
+  if (!Array.isArray(clips) || clips.length === 0) return;
 
-// ---------- Audio (Firestore-synced) ----------
-let lastAudioId = null;
-let audioUnlocked = false;
-let currentAudio = null;
+  const ctx = ensureAudioCtx();
+  if (ctx.state === "suspended") {
+    try { await ctx.resume(); } catch {}
+  }
+
+  stopAllAudio();
+
+  // Load first, THEN schedule (prevents “2nd clip never plays” on iOS)
+  const buffers = await Promise.all(clips.map(loadAudioBuffer));
+
+  let t = ctx.currentTime + 0.03;
+  for (const b of buffers) {
+    const s = ctx.createBufferSource();
+    s.buffer = b;
+    s.connect(ctx.destination);
+    s.start(t);
+    activeSources.push(s);
+    t += b.duration;
+  }
+}
 
 function pad3(n) {
   return String(n).padStart(3, "0");
 }
 
-function stopAudio() {
-  if (currentAudio) {
-    currentAudio.pause();
-    currentAudio.currentTime = 0;
-    currentAudio = null;
-  }
-}
-
-function isRequireClip(src) {
-  return (
-    typeof src === "string" &&
-    (src.includes("/require.mp3") ||
-      src.includes("/require_richard.mp3") ||
-      src.includes("/require_kameron.mp3"))
-  );
-}
-
-function playClipsSequential(clips) {
-  stopAudio();
-  if (!Array.isArray(clips) || clips.length === 0) return;
-
-  // Special fast-path: [score, require, number]
-  // We keep score as HTMLAudio (fine),
-  // but run require -> number via WebAudio to remove the gap.
-  if (clips.length === 3 && isRequireClip(clips[1])) {
-    const scoreSrc = clips[0];
-    const requireSrc = clips[1];
-    const numberSrc = clips[2];
-
-    const a = new Audio(scoreSrc);
-    currentAudio = a;
-    a.volume = 1;
-
-    a.onended = () => {
-      // Tight join between require -> number
-      playRequireThenNumber(requireSrc, numberSrc);
-    };
-    a.onerror = () => {
-      // If score file fails, still attempt require -> number
-      playRequireThenNumber(requireSrc, numberSrc);
-    };
-
-    a.play().catch(() => {});
-    return;
-  }
-
-  // Default: normal sequential HTMLAudio chain
-  const playNext = (i) => {
-    if (i >= clips.length) return;
-
-    const src = clips[i];
-    const a = new Audio(src);
-    currentAudio = a;
-    a.volume = 1;
-
-    a.onended = () => playNext(i + 1);
-    a.onerror = () => playNext(i + 1);
-
-    a.play().catch(() => {});
-  };
-
-  playNext(0);
-}
-
-
-function unlockAudioOnce() {
-  if (audioUnlocked) return;
-  audioUnlocked = true;
-
-  // Prime HTMLAudio
-  const a = new Audio("audio/phrases/no_score.mp3");
-  a.volume = 0;
-  a.play()
-    .then(() => {
-      a.pause();
-      a.currentTime = 0;
-      a.volume = 1;
-    })
-    .catch(() => {});
-
-  // Prime WebAudio (for require -> number)
-  try {
-    const ctx = ensureAudioCtx();
-    if (ctx.state === "suspended") ctx.resume().catch(() => {});
-  } catch {}
-}
-
-
 function requireClipForName(name) {
   const cleaned = (name || "").trim();
-  if (cleaned === "Richard") return "audio/phrases/require_richard.mp3";
-  if (cleaned === "Kameron") return "audio/phrases/require_kameron.mp3";
-  return "audio/phrases/require.mp3";
+  if (cleaned === "Richard") return "./audio/phrases/require_richard.mp3";
+  if (cleaned === "Kameron") return "./audio/phrases/require_kameron.mp3";
+  return "./audio/phrases/require.mp3";
 }
 
 // Whether someone is "on a possible checkout" (your current rules)
@@ -197,15 +123,15 @@ function buildVisitClips({ scoreCallType, entered, nextPlayerName, nextRemaining
 
   // score call
   if (scoreCallType === "no_score") {
-    clips.push("audio/phrases/no_score.mp3");
+    clips.push("./audio/phrases/no_score.mp3");
   } else {
-    clips.push(`audio/numbers/${pad3(entered)}.mp3`);
+    clips.push(`./audio/numbers/${pad3(entered)}.mp3`);
   }
 
   // require call if next player is on a checkout
   if (isPossibleCheckout(nextRemaining)) {
     clips.push(requireClipForName(nextPlayerName));
-    clips.push(`audio/numbers/${pad3(nextRemaining)}.mp3`);
+    clips.push(`./audio/numbers/${pad3(nextRemaining)}.mp3`);
   }
 
   return clips;
@@ -648,7 +574,7 @@ async function startMatchFromSetup() {
 
   await db.runTransaction(async (tx) => {
     const state = makeNewMatch({ mode, bestOf, p1Name: p1, p2Name: p2 });
-    setAudioEvent(state, ["audio/phrases/match_start.mp3"]);
+    setAudioEvent(state, ["./audio/phrases/match_start.mp3"]);
     tx.set(gameRef, state);
   });
 
@@ -825,9 +751,9 @@ async function confirmCheckout(dartsUsed) {
 
 // Audio: leg end vs match end
 if (match.status === "finished") {
-  setAudioEvent(state, ["audio/phrases/match_end.mp3"]);
+  setAudioEvent(state, ["./audio/phrases/match_end.mp3"]);
 } else {
-  setAudioEvent(state, ["audio/phrases/game_end.mp3"]);
+  setAudioEvent(state, ["./audio/phrases/game_end.mp3"]);
 }
 
 
@@ -946,6 +872,34 @@ async function undoLast() {
   });
 }
 
+function applyTheme(theme) {
+  document.body.setAttribute("data-theme", theme);
+  localStorage.setItem("theme", theme);
+
+  const btn = document.getElementById("themeToggleBtn");
+  if (btn) btn.textContent = theme === "dark" ? "☀️" : "🌙";
+}
+
+function initThemeToggle() {
+  const saved = localStorage.getItem("theme");
+  const preferred =
+    saved ||
+    (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light");
+
+  applyTheme(preferred);
+
+  const btn = document.getElementById("themeToggleBtn");
+  if (!btn) return;
+
+  btn.addEventListener("click", () => {
+    const current = document.body.getAttribute("data-theme") || "light";
+    applyTheme(current === "dark" ? "light" : "dark");
+  });
+}
+
+
 // ---------- Wire UI ----------
 function wireUI() {
   // Main
@@ -1023,13 +977,21 @@ function wireUI() {
   // Checkout modal selection
   window.__selectedCheckoutDarts = null;
 
-  for (const b of dartsBtns) {
-    b.addEventListener("click", () => {
-      const d = Number(b.getAttribute("data-darts"));
-      window.__selectedCheckoutDarts = d;
-      if (checkoutConfirmBtn) checkoutConfirmBtn.disabled = false;
-    });
-  }
+for (const b of dartsBtns) {
+  b.addEventListener("click", () => {
+    // Clear previous selection
+    dartsBtns.forEach(btn => btn.classList.remove("selected"));
+
+    // Mark this one selected
+    b.classList.add("selected");
+
+    const d = Number(b.getAttribute("data-darts"));
+    window.__selectedCheckoutDarts = d;
+
+    if (checkoutConfirmBtn) checkoutConfirmBtn.disabled = false;
+  });
+}
+
 
   if (checkoutCancelBtn) checkoutCancelBtn.addEventListener("click", cancelCheckout);
   if (checkoutConfirmBtn) {
@@ -1076,33 +1038,6 @@ if (confirmNewMatchOkBtn) {
   confirmNewMatchOkBtn.addEventListener("click", () => {
     setConfirmNewMatchModalVisible(false);
     setSetupModalVisible(true);
-  });
-}
-
-function applyTheme(theme) {
-  document.body.setAttribute("data-theme", theme);
-  localStorage.setItem("theme", theme);
-
-  const btn = document.getElementById("themeToggleBtn");
-  if (btn) btn.textContent = theme === "dark" ? "☀️" : "🌙";
-}
-
-function initThemeToggle() {
-  const saved = localStorage.getItem("theme");
-  const preferred =
-    saved ||
-    (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
-      ? "dark"
-      : "light");
-
-  applyTheme(preferred);
-
-  const btn = document.getElementById("themeToggleBtn");
-  if (!btn) return;
-
-  btn.addEventListener("click", () => {
-    const current = document.body.getAttribute("data-theme") || "light";
-    applyTheme(current === "dark" ? "light" : "dark");
   });
 }
 
@@ -1176,7 +1111,7 @@ gameRef.onSnapshot(
     // Firestore-synced audio: every device plays the same event once
     if (state?.audio?.id && state.audio.id !== lastAudioId) {
       lastAudioId = state.audio.id;
-      playClipsSequential(state.audio.clips);
+      playClipsWebAudio(state.audio.clips);
     }
   },
   (err) => {

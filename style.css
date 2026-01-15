@@ -84,6 +84,21 @@ button, input, select, textarea {
   font-family: var(--font);
 }
 
+button:hover {
+  filter: brightness(1.02);
+}
+
+#setupMode, #setupBestOf {
+  border-radius: 16px;
+  border-color: transparent;
+  background-color: var(--key-bg);
+  color: var(--btn-text) !important;
+}
+
+#setupP1, #setupP2 {
+  width: 89%;
+}
+
 input {
   border-color: transparent;
   font-size: 28px !important;
@@ -109,10 +124,6 @@ button {
 #submitBtn, #undoBtn {
   padding: 12px 30px;
   font-size: 20px;
-}
-
-#scoreInput {
-  padding-left: 35px;
 }
 
 select, input, button {
@@ -202,11 +213,93 @@ h1 {
   margin-top: 10px;
 }
 
+.dartsBtn {
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
+
+.dartsBtn.selected {
+  background-color: var(--active-border);
+  color:#eee;
+  box-shadow: 0 0 0 3px var(--active-glow);
+}
+
 .player.active {
   border: 2px solid var(--active-border);
   box-shadow: 0 0 0 4px var(--active-glow);
   transform: translateY(-1px);
 }
+
+/* 3-column action row (matches keypad logic, but separate grid) */
+.actionGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  align-items: center;
+  margin: 14px 0 12px;
+}
+
+/* Each cell centers its content */
+.actionCell {
+  display: grid;
+  place-items: center;
+}
+
+/* Make the buttons fill their column nicely */
+.actionBtn {
+  width: 80%;
+  max-width: 220px; /* optional, keeps them from looking huge on desktop */
+}
+
+/* Make the input sit nicely centered */
+#scoreInput {
+  width: 100%;
+  max-width: 220px;
+  text-align: center;
+  padding: 12px 18px;       /* real padding that actually works */
+  border-radius: 200px;
+  caret-color: transparent;  /* you already like this on mobile */
+  background-color: transparent;
+  font-weight: 800;
+}
+
+/* Score input: text-only (no pill, no outline, no highlight) */
+#scoreInput {
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+
+  /* iOS Safari / some mobile browsers add default styling */
+  -webkit-appearance: none;
+  appearance: none;
+
+  /* Remove blue/grey tap highlight */
+  -webkit-tap-highlight-color: transparent;
+
+  /* If Safari/Chrome apply any focus glow */
+  caret-color: transparent; /* optional if you don't want caret */
+}
+
+/* Kill ALL focus/active/hover visuals explicitly */
+#scoreInput:focus,
+#scoreInput:focus-visible,
+#scoreInput:active,
+#scoreInput:hover {
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Chrome autofill can add weird background - strip it */
+#scoreInput:-webkit-autofill,
+#scoreInput:-webkit-autofill:hover,
+#scoreInput:-webkit-autofill:focus {
+  -webkit-text-fill-color: currentColor;
+  -webkit-box-shadow: 0 0 0px 1000px transparent inset !important;
+  transition: background-color 999999s ease-in-out 0s;
+}
+
 
 .keypad {
   display: grid;
@@ -405,8 +498,8 @@ h1 {
   #scoreInput {
     font-size: 26px !important;
     font-weight: 800;
-    max-width: 50px;
     caret-color: transparent;
+    background-color: transparent;
   }
 
   .row { padding: 0px 4px; }
