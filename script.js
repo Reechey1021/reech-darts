@@ -244,6 +244,7 @@ function requireClipForName(name) {
   const cleaned = (name || "").trim();
   if (cleaned === "Richard") return "./audio/phrases/require_richard.mp3";
   if (cleaned === "Kameron") return "./audio/phrases/require_kameron.mp3";
+  if (cleaned === "Marie") return "./audio/phrases/require_marie.mp3";
   return "./audio/phrases/require.mp3";
 }
 
@@ -391,6 +392,7 @@ function canEditScores(state) {
 function getRequireFile(playerName) {
   if (playerName === "Richard") return "require_richard.mp3";
   if (playerName === "Kameron") return "require_kameron.mp3";
+  if (playerName === "Marie") return "require_marie.mp3";
   return "require.mp3";
 }
 
