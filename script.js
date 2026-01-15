@@ -38,8 +38,8 @@ function setGameIdInUrl(gameId) {
   window.history.replaceState({}, "", url.toString());
 }
 
-let gameId = getGameIdFromUrl() || "test-game";
-let gameRef = db.collection("games").doc(gameId);
+let gameId = getGameIdFromUrl(); // null if no ?game=
+let gameRef = gameId ? db.collection("games").doc(gameId) : null;
 
 function switchToGame(newGameId) {
   gameId = newGameId;
@@ -84,12 +84,12 @@ function updateDartUI() {
 
   if (scoreInput) scoreInput.value = dartThrows.length ? String(total) : "";
 
-// In table/dartpad mode: submit ONLY when 3 darts picked (other rules handled in render())
-if (submitBtn && inputMode === "table") {
-  submitBtn.disabled = (dartThrows.length !== 3);
+  // In table/dartpad mode: submit ONLY when 3 darts picked
+  if (submitBtn && inputMode === "table") {
+    submitBtn.disabled = (dartThrows.length !== 3);
+  }
 }
 
-  }
 
 function setMult(m) {
   dartMult = m;
@@ -416,6 +416,14 @@ function showError(msg) {
   window.__errTimer = setTimeout(() => el.classList.add("hidden"), 2500);
 }
 
+function setLobbyGateVisible(visible) {
+  const card = document.querySelector(".card");
+if (card) card.style.display = visible ? "none" : "";
+  const modal = document.getElementById("lobbyGateModal");
+  if (!modal) return;
+  modal.classList.toggle("hidden", !visible);
+}
+
 function setBullModalVisible(visible) {
   const modal = document.getElementById("bullModal");
   if (!modal) return;
@@ -448,20 +456,23 @@ async function createNewGameAndShowInvite() {
   const newRef = db.collection("games").doc(); // auto id
   const newId = newRef.id;
 
-  // create empty doc so link is “real” immediately
-const now = new Date();
-const expiresAt = new Date(Date.now() + 3 * 60 * 60 * 1000); // 3 hours
+  const now = new Date();
+  const expiresAt = new Date(Date.now() + 3 * 60 * 60 * 1000); // 3 hours
 
-await newRef.set({
-  createdAt: now,
-  updatedAt: now,
-  expiresAt: expiresAt,
-  status: "lobby", // optional but nice: "lobby" | "active" | "finished"
-});
+  await newRef.set({
+    createdAt: now,
+    updatedAt: now,
+    expiresAt: expiresAt,
+    status: "lobby",
+  });
 
-
+  // switchToGame expects to point gameRef at the new doc and bind listener
   switchToGame(newId);
 
+  // hide the welcome gate once we’ve created a lobby
+  setLobbyGateVisible(false);
+
+  // show invite link (existing UI)
   const url = new URL(window.location.href);
   url.searchParams.set("game", newId);
 
@@ -471,6 +482,7 @@ await newRef.set({
 
   setInviteModalVisible(true);
 }
+
 
 
 function setSetupModalVisible(visible) {
@@ -1423,6 +1435,9 @@ const dartTableClearBtn = document.getElementById("dartTableClearBtn");
 // init
 setInputMode(inputMode);
 
+const createLobbyBtn = document.getElementById("createLobbyBtn");
+if (createLobbyBtn) createLobbyBtn.addEventListener("click", createNewGameAndShowInvite);
+
 // toggle button
 if (inputModeBtn) {
   inputModeBtn.addEventListener("click", () => {
@@ -1749,6 +1764,13 @@ setConfirmNewMatchModalVisible(false);
 setInviteModalVisible(false);
 wireGlobalKeyboard();
 
+if (!gameId) {
+  setLobbyGateVisible(true);
+} else {
+  setLobbyGateVisible(false);
+  bindGameListener();
+}
+
 // ---------- Real-time updates ----------
 let unsubscribeGame = null;
 let seatClaimed = false;
@@ -1794,6 +1816,8 @@ function bindGameListener() {
     unsubscribeGame();
     unsubscribeGame = null;
   }
+
+    if (!gameRef) return; // ✅ nothing to listen to yet
 
   unsubscribeGame = gameRef.onSnapshot(
     (doc) => {
@@ -1910,9 +1934,3 @@ if (bullConfirmBtn) {
     bullConfirmBtn.disabled = true;
   });
 }
-
-
-// start listening
-bindGameListener();
-
-
