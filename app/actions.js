@@ -120,17 +120,18 @@ export async function startMatchFromSetup() {
     state.expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
     state.status = "active";
 
-    const d = getActorId();
-if (!d) throw new Error("Not authenticated yet.");
-    if (!d) return; // (or show error) - but authReady should prevent this
-    const gameType = document.getElementById("setupGameType")?.value || "single";
+const uid = getActorId();
+if (!uid) throw new Error("Not authenticated yet.");
 
-    state.match.hostId = uid;
-    state.match.gameType = gameType;
+const gameType = document.getElementById("setupGameType")?.value || "single";
 
-    // Host is always Player 1 (seat 0)
-    state.match.seat1Id = uid;
-    state.match.seat2Id = null;
+state.match.hostId = uid;
+state.match.gameType = gameType;
+
+// Host is always Player 1 (seat 0)
+state.match.seat1Id = uid;
+state.match.seat2Id = null;
+
 
     if (starterChoice !== "bull") {
       setAudioEvent(state, ["./audio/phrases/match_start.mp3"]);
