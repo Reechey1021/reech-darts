@@ -3,6 +3,7 @@ import { app } from "../state.js";
 import { canScoreNow, canUndoNow, canEditScores, mySeatIndex } from "../permissions.js";
 import { checkoutSuggestion, minDartsForCheckout } from "../model/rules.js";
 import { calcLegStats, calcMatchStats, formatPills } from "../model/stats.js";
+import { getActorId } from "../auth.js";
 
 export function showError(msg) {
   const el = document.getElementById("error");

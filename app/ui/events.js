@@ -23,6 +23,26 @@ import {
   initThemeToggle,
 } from "./render.js";
 import { initBullUIHandlers } from "../bull/ui.js";
+import { signInWithGoogle } from "../auth.js";
+
+const googleLoginBtn = document.getElementById("googleLoginBtn");
+if (googleLoginBtn) {
+  googleLoginBtn.addEventListener("click", async () => {
+    try {
+      await signInWithGoogle();
+    } catch (e) {
+      console.error(e);
+      // optional showError("Login failed");
+    }
+  });
+}
+
+// Prevent "Uncaught (in promise)" spam - surface a friendly toast instead.
+const safe = (fn) => (...args) =>
+  Promise.resolve(fn(...args)).catch((err) => {
+    console.error(err);
+    showError("Something went wrong (see console)");
+  });
 
 function isAnyModalOpen() {
   const ids = ["winnerModal", "setupModal", "checkoutModal", "confirmNewMatchModal", "inviteModal", "bullModal", "lobbyGateModal"];
@@ -48,9 +68,9 @@ export function wireUI() {
   const undoBtn = document.getElementById("undoBtn");
   const overlayUndoBtn = document.getElementById("overlayUndoBtn");
 
-  if (newGameBtn) newGameBtn.addEventListener("click", openNewGameFlow);
-  if (submitBtn) submitBtn.addEventListener("click", submitScore);
-  if (undoBtn) undoBtn.addEventListener("click", undoLast);
+  if (newGameBtn) newGameBtn.addEventListener("click", safe(openNewGameFlow));
+  if (submitBtn) submitBtn.addEventListener("click", safe(submitScore));
+  if (undoBtn) undoBtn.addEventListener("click", safe(undoLast));
   if (overlayUndoBtn) {
     overlayUndoBtn.addEventListener("click", () => {
       if (!canUndoNow(app.latestState)) return;
@@ -60,13 +80,13 @@ export function wireUI() {
 
   // Create lobby gate
   const createLobbyBtn = document.getElementById("createLobbyBtn");
-  if (createLobbyBtn) createLobbyBtn.addEventListener("click", createNewGameAndShowInvite);
+  if (createLobbyBtn) createLobbyBtn.addEventListener("click", safe(createNewGameAndShowInvite));
 
   // Invite modal controls
   const inviteBtn = document.getElementById("inviteBtn");
   const copyInviteBtn = document.getElementById("copyInviteBtn");
   const closeInviteBtn = document.getElementById("closeInviteBtn");
-  if (inviteBtn) inviteBtn.addEventListener("click", createNewGameAndShowInvite);
+  if (inviteBtn) inviteBtn.addEventListener("click", safe(createNewGameAndShowInvite));
   if (copyInviteBtn) {
     copyInviteBtn.addEventListener("click", async () => {
       const text = document.getElementById("inviteLinkText")?.textContent || "";

@@ -12,6 +12,11 @@ export const app = {
   unsubscribeGame: null,
   seatClaimed: false,
 
+  //auth
+  auth: null,
+  user: null,
+  authReady: null,
+
   // input
   inputMode: localStorage.getItem("inputMode") || "keypad", // "keypad" | "table"
   dartMult: localStorage.getItem("dartMult") || "S", // "S" | "D" | "T"
@@ -20,3 +25,12 @@ export const app = {
   // audio sync
   lastAudioId: null,
 };
+
+export function getDeviceId() {
+  let id = localStorage.getItem("deviceId");
+  if (!id) {
+    id = (crypto?.randomUUID?.() || (Date.now() + "-" + Math.random())).toString();
+    localStorage.setItem("deviceId", id);
+  }
+  return id;
+}

@@ -1,8 +1,8 @@
 // app/actions.js
 import { app } from "./state.js";
-import { getDeviceId } from "./device.js";
+import { getActorId } from "./auth.js";
 import { setGameIdInUrl } from "./routing.js";
-import { bindGameListener } from "./realtime.js";
+import { bindGameListener, resetRealtimeStateForGameSwitch } from "./realtime.js";
 import { makeNewMatch, makeFreshLeg, starterForLeg } from "./model/match.js";
 import {
   IMPOSSIBLE_TURN_SCORES,
@@ -30,7 +30,9 @@ export function switchToGame(newGameId) {
   app.seatClaimed = false;
 
   console.log("Switched to gameId:", newGameId);
-  bindGameListener();
+    resetRealtimeStateForGameSwitch();
+    bindGameListener();
+
 }
 
 // ---------- Lobby / invite ----------
@@ -118,14 +120,16 @@ export async function startMatchFromSetup() {
     state.expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
     state.status = "active";
 
-    const d = getDeviceId();
+    const d = getActorId();
+if (!d) throw new Error("Not authenticated yet.");
+    if (!d) return; // (or show error) - but authReady should prevent this
     const gameType = document.getElementById("setupGameType")?.value || "single";
 
-    state.match.hostId = d;
+    state.match.hostId = uid;
     state.match.gameType = gameType;
 
     // Host is always Player 1 (seat 0)
-    state.match.seat1Id = d;
+    state.match.seat1Id = uid;
     state.match.seat2Id = null;
 
     if (starterChoice !== "bull") {
