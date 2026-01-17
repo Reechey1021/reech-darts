@@ -19,15 +19,31 @@
 <div id="lobbyGateModal" class="modal hidden">
   <div class="modal-card">
     <h2>Welcome</h2>
-    <p style="opacity:.8; margin-top:0;">Create a lobby to start a match.</p>
+    <p style="opacity:.85; margin-top:0;">Log in, or continue as a guest.</p>
+
     <div class="row" style="justify-content:center; gap:10px; margin-top:12px;">
       <button id="googleLoginBtn" type="button">Log in with Google</button>
     </div>
-    <button id="createLobbyBtn" class="actionBtn" style="margin-top:12px;">
+
+    <hr style="border:none; border-top:1px solid rgba(255,255,255,.12); margin:14px 0;" />
+
+    <div class="formRow" style="margin-top:0;">
+      <label for="guestNameInput">Continue as Guest</label>
+      <input id="guestNameInput" type="text" placeholder="Display Name" autocomplete="nickname" />
+      <div style="font-size:.9em; opacity:.75; margin-top:6px;">
+        This name will be used in the lobby + match.
+      </div>
+    </div>
+
+    <button id="createLobbyBtn" class="actionBtn" style="margin-top:12px;" disabled>
       Create Lobby
     </button>
+
+    <p id="gateError" class="error hidden"></p>
+    
   </div>
 </div>
+
 
   <div class="card">
     <div class="toprow">
@@ -185,6 +201,17 @@
       <button id="winnerNewGameBtn">New Game</button>
     </div>
   </div>
+
+  <!-- Player profile modal (opens only on the device that clicked) -->
+  <div id="profileModal" class="modal hidden">
+    <div class="modal-card">
+      <h2 id="profileTitle">Profile</h2>
+      <div id="profileBody" style="text-align:left;"></div>
+      <div class="row" style="justify-content:center;">
+        <button id="profileCloseBtn" type="button">Close</button>
+      </div>
+    </div>
+  </div>
   
   <div id="setupModal" class="modal hidden">
     <div class="modal-card">
@@ -195,6 +222,14 @@
         <select id="setupGameType">
           <option value="single">Local</option>
           <option value="online">Online</option>
+        </select>
+      </div>
+
+      <div class="formRow">
+        <label for="setupCompetition">Mode</label>
+        <select id="setupCompetition">
+          <option value="casual" selected>Casual (no stats)</option>
+          <option value="competitive">Competitive (save stats)</option>
         </select>
       </div>
 

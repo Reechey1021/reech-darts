@@ -1,7 +1,8 @@
 // app/actions.js
 import { app } from "./state.js";
-import { getActorId } from "./auth.js";
+import { getActorId, getActorName } from "./auth.js";
 import { setGameIdInUrl } from "./routing.js";
+import { getEffectiveDisplayName } from "./profile.js";
 import { bindGameListener, resetRealtimeStateForGameSwitch } from "./realtime.js";
 import { makeNewMatch, makeFreshLeg, starterForLeg } from "./model/match.js";
 import {
@@ -13,6 +14,7 @@ import {
   minDartsForCheckout,
 } from "./model/rules.js";
 import { calcLegStats } from "./model/stats.js";
+import { applyCompetitiveMatchToProfilesTx, applyLifetimeDartsToProfilesTx } from "./userStats.js";
 import { initBullState, tryResolveBull } from "./bull/core.js";
 import { setAudioEvent, buildVisitClips } from "./audio/audio.js";
 import { showError, safeFocusScoreInput, setLobbyGateVisible, setInviteModalVisible, setSetupModalVisible, setConfirmNewMatchModalVisible, setWinnerModalVisible } from "./ui/render.js";
@@ -37,7 +39,14 @@ export function switchToGame(newGameId) {
 
 // ---------- Lobby / invite ----------
 export async function createNewGameAndShowInvite() {
-  const newRef = app.db.collection("games").doc();
+  // Must have a name (guest or signed-in)
+  const actorName = getActorName();
+  if (!actorName) {
+    // showError is UI-level; don’t throw here, just return false for caller
+    return { ok: false, reason: "NO_NAME" };
+  }
+
+  const newRef = app.db.collection("games").doc(); // ✅ missing before
   const newId = newRef.id;
 
   const now = new Date();
@@ -48,20 +57,34 @@ export async function createNewGameAndShowInvite() {
     updatedAt: now,
     expiresAt,
     status: "lobby",
+
+    // Lobby actors (used to auto-populate player names/ids)
+    lobby: {
+      host: {
+        actorId: getActorId(),
+        name: actorName,
+        uid: app.user && !app.user.isAnonymous ? app.user.uid : null,
+      },
+      joiner: null,
+    },
   });
 
+  // Switch routing + bind listener
   switchToGame(newId);
+
+  // Hide gate + show invite modal (existing UI)
   setLobbyGateVisible(false);
 
-  // Build + show invite link
   const url = new URL(window.location.href);
   url.searchParams.set("game", newId);
-  const txt = url.toString();
 
+  const txt = url.toString();
   const linkEl = document.getElementById("inviteLinkText");
   if (linkEl) linkEl.textContent = txt;
 
   setInviteModalVisible(true);
+
+  return { ok: true, gameId: newId };
 }
 
 // ---------- Match flow ----------
@@ -93,58 +116,87 @@ export async function startMatchFromSetup() {
     return;
   }
 
-  const p1 = (document.getElementById("setupP1")?.value || "Player 1").trim() || "Player 1";
-  const p2 = (document.getElementById("setupP2")?.value || "Player 2").trim() || "Player 2";
   const mode = Number(document.getElementById("setupMode")?.value || 501);
   const bestOf = Number(document.getElementById("setupBestOf")?.value || 3);
-  const starterChoice = document.getElementById("setupStarter")?.value || "random";
+  const starterChoice = (document.getElementById("setupStarter")?.value || "random");
+  const gameType = (document.getElementById("setupGameType")?.value || "single");
+  const competition = (document.getElementById("setupCompetition")?.value || "casual");
 
-  await app.db.runTransaction(async (tx) => {
-    const state = makeNewMatch({ mode, bestOf, p1Name: p1, p2Name: p2 });
+  try {
+    await app.db.runTransaction(async (tx) => {
+      const snap = await tx.get(app.gameRef);
+      const lobby = snap.data() || {};
 
-    // Starter selection
-    state.match.starting = starterChoice; // "bull" | "random" | "p1" | "p2"
+      const actorId = getActorId();
+      const actorName = getEffectiveDisplayName(app.user);
 
-    if (starterChoice === "p1") {
-      state.match.starterLeg1 = 0;
-      state.leg.currentPlayer = 0;
-    } else if (starterChoice === "p2") {
-      state.match.starterLeg1 = 1;
-      state.leg.currentPlayer = 1;
-    } else if (starterChoice === "bull") {
-      state.match.bull = initBullState();
-      state.match.starterLeg1 = 0;
-      state.leg.currentPlayer = 0;
-    }
+      const hostName = lobby?.lobby?.host?.name || actorName || "Player 1";
+      const joinerName = lobby?.lobby?.joiner?.name || lobby.seat2Name || "Player 2";
 
-    state.expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-    state.status = "active";
+      const p1Name = (lobby.seat1Name || hostName).trim() || "Player 1";
 
-const uid = getActorId();
-if (!uid) throw new Error("Not authenticated yet.");
+      const p2Name =
+        gameType === "online"
+          ? (String(joinerName).trim() || "Player 2")
+          : "Player 2";
 
-const gameType = document.getElementById("setupGameType")?.value || "single";
+      if (gameType === "online" && !lobby.seat2Id) {
+        throw new Error("Waiting for Player 2 to join…");
+      }
 
-state.match.hostId = uid;
-state.match.gameType = gameType;
+      const state = makeNewMatch({ mode, bestOf, p1Name, p2Name });
 
-// Host is always Player 1 (seat 0)
-state.match.seat1Id = uid;
-state.match.seat2Id = null;
+      // Mark match type for stats persistence later
+      state.match.competition = competition; // "casual" | "competitive"
 
+      // Attach player identity (uid when Google-auth, null for guests)
+      const hostUid = lobby?.lobby?.host?.uid || (app.user && !app.user.isAnonymous ? app.user.uid : null);
+      const joinerUid = lobby?.lobby?.joiner?.uid || null;
+      state.match.players[0].uid = hostUid;
+      state.match.players[1].uid = gameType === "online" ? joinerUid : null;
 
-    if (starterChoice !== "bull") {
-      setAudioEvent(state, ["./audio/phrases/match_start.mp3"]);
-    }
+      // Starter selection
+      state.match.starting = starterChoice; // "bull" | "random" | "p1" | "p2"
 
-    tx.set(app.gameRef, state);
-  });
+      if (starterChoice === "p1") {
+        state.match.starterLeg1 = 0;
+        state.leg.currentPlayer = 0;
+      } else if (starterChoice === "p2") {
+        state.match.starterLeg1 = 1;
+        state.leg.currentPlayer = 1;
+      } else if (starterChoice === "bull") {
+        state.match.bull = initBullState();
+        state.match.starterLeg1 = 0;
+        state.leg.currentPlayer = 0;
+      }
 
-  setSetupModalVisible(false);
+      state.expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      state.status = "active";
 
-  const inputEl = document.getElementById("scoreInput");
-  if (inputEl) inputEl.value = "";
+      // Identity / seating
+      state.match.hostId = actorId;
+      state.match.gameType = gameType;
+
+      // Copy lobby seats into match seats
+      state.match.seat1Id = lobby.seat1Id || actorId;
+      state.match.seat2Id = gameType === "online" ? (lobby.seat2Id || null) : null;
+
+      if (starterChoice !== "bull") {
+        setAudioEvent(state, ["./audio/phrases/match_start.mp3"]);
+      }
+
+      tx.set(app.gameRef, state);
+    });
+
+    setSetupModalVisible(false);
+
+    const inputEl = document.getElementById("scoreInput");
+    if (inputEl) inputEl.value = "";
+  } catch (e) {
+    showError(e?.message || "Could not start match.");
+  }
 }
+
 
 export async function submitScore() {
   if (!app.gameRef) {
@@ -323,6 +375,16 @@ export async function confirmCheckout(dartsUsed) {
     if (match.legsWon[p] >= needed) {
       match.status = "finished";
       match.winner = p;
+    }
+
+    // Persist profile stats once per completed match.
+    // - lifetime darts counts ALL modes
+    // - other aggregates count only in competitive
+    if (match.status === "finished") {
+      await applyLifetimeDartsToProfilesTx(tx, app.db, match);
+      if (match.competition === "competitive") {
+        await applyCompetitiveMatchToProfilesTx(tx, app.db, match);
+      }
     }
 
     if (match.status === "finished") {

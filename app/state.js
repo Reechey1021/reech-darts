@@ -16,6 +16,7 @@ export const app = {
   auth: null,
   user: null,
   authReady: null,
+  userProfile: null, // populated for Google users (users/{uid})
 
   // input
   inputMode: localStorage.getItem("inputMode") || "keypad", // "keypad" | "table"

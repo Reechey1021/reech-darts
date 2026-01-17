@@ -6,7 +6,17 @@ import { calcLegStats, calcMatchStats, formatPills } from "../model/stats.js";
 import { getActorId } from "../auth.js";
 
 export function showError(msg) {
-  const el = document.getElementById("error");
+  // Prefer the in-game error area
+  const gameErr = document.getElementById("error");
+
+  // Fallback for lobby gate (because .card is hidden while gate is open)
+  const gateErr = document.getElementById("gateError");
+
+  // Pick whichever is actually visible / usable
+  const el =
+    (gameErr && gameErr.offsetParent !== null) ? gameErr :
+    (gateErr ? gateErr : gameErr);
+
   if (!el) return;
 
   el.innerText = msg;
@@ -15,6 +25,7 @@ export function showError(msg) {
   clearTimeout(window.__errTimer);
   window.__errTimer = setTimeout(() => el.classList.add("hidden"), 2500);
 }
+
 
 export function setLobbyGateVisible(visible) {
   const card = document.querySelector(".card");

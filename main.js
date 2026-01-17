@@ -12,27 +12,23 @@ window.onerror = (m, s, l, c, e) => console.log("JS ERROR:", m, l, c, e);
 
 app.db = initFirebase();
 
-// ✅ Auth first (so we have a uid for seat logic + rules)
-initAuth().then(() => {
-  app.gameId = getGameIdFromUrl();
-  app.gameRef = app.gameId ? app.db.collection("games").doc(app.gameId) : null;
+// Routing params first
+app.gameId = getGameIdFromUrl();
+app.gameRef = app.gameId ? app.db.collection("games").doc(app.gameId) : null;
 
+// Auth:
+// - If we are entering a lobby/game URL, we need a uid for rules + seat logic (anonymous is fine).
+// - If we're on the landing page (no ?game=), do NOT auto-create anon accounts.
+initAuth({ autoAnonymous: Boolean(app.gameId) }).then(() => {
   wireUI();
   wireGlobalKeyboard();
 
-  // If no gameId -> show lobby gate modal
-  const modal = document.getElementById("lobbyGateModal");
   if (!app.gameId) {
-    if (modal) modal.classList.remove("hidden");
+    setLobbyGateVisible(true);
     return;
   }
 
-  if (modal) modal.classList.add("hidden");
-    if (!app.gameId) {
-    setLobbyGateVisible(true);
-  } else {
-    setLobbyGateVisible(false);
-    bindGameListener();
-  }
+  setLobbyGateVisible(false);
+  bindGameListener();
 });
 
