@@ -9,73 +9,152 @@
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css" />
 </head>
-<body>
-  <h1>Reech Darts</h1>
-  <p class="titleparagraph">Dashboard</p>
-  <button id="themeToggleBtn" type="button" class="iconBtn" title="Toggle theme">🌙</button>
 
-  <div class="card" style="max-width:720px;">
-    <p id="dashWelcome" style="margin-top:0;">Welcome…</p>
-
-	    <!-- Home cards -->
-	    <div id="dashHome" style="display:grid; gap:12px;">
-      <div class="player" style="padding:14px;">
-        <h2 style="margin:0 0 8px;">Play</h2>
-        <p style="margin:0 0 12px; opacity:.85;">Create a lobby and share the link.</p>
-        <button id="dashPlayBtn" class="actionBtn">Create Lobby</button>
-        <p id="dashInvite" style="word-break:break-all; margin:10px 0 0; display:none;"></p>
-        <div id="dashInviteRow" class="row" style="justify-content:flex-start; gap:10px; margin-top:10px; display:none;">
-          <button id="dashCopyBtn">Copy link</button>
-          <button id="dashGoBtn">Open lobby</button>
+<body class="dashboardPage">
+  <div class="dashShell">
+    <!-- Top header -->
+    <header class="dashHeader">
+      <div class="dashIdentity">
+        <img id="dashUserPhoto" class="dashAvatar hidden" alt="Profile photo" />
+        <div class="dashHello">
+          <div class="dashWelcome">Welcome back,</div>
+          <div id="dashName" class="dashName">Player</div>
+          <div id="dashEquipmentDiv" class="dashEquipmentDiv">
+          <img class="dashEquipmentIcon" src="img/icon_dart.png"></img>
+          <div id="dashEquipment" class="dashEquipment"></div>
+          </div>
         </div>
       </div>
 
-	      <div class="player" style="padding:14px;">
-	        <h2 style="margin:0 0 8px;">View Statistics</h2>
-	        <p style="margin:0 0 12px; opacity:.85;">Your competitive stats + recent results.</p>
-	        <button id="dashStatsBtn" class="actionBtn">Open stats</button>
-	      </div>
-
-      <div class="player" style="padding:14px;">
-        <h2 style="margin:0 0 8px;">Settings</h2>
-        <p style="margin:0 0 12px; opacity:.85;">Display name, equipment, sign out.</p>
-        <button id="dashSettingsBtn" class="actionBtn">Open settings</button>
-        <p id="dashMsg" class="error hidden" style="margin-top:10px;"></p>
+      <div class="dashHeaderActions">
+        <label class="dashSwitch" title="Toggle theme">
+          <input id="themeToggle" type="checkbox" />
+          <span class="dashSlider"></span>
+        </label>
+        <button id="dashSignOutBtn" class="dashSignOut" type="button">Sign out</button>
       </div>
-	    </div>
+    </header>
 
-	    <!-- Stats view (simple, no routing) -->
-	    <div id="dashStats" class="hidden" style="display:grid; gap:12px;">
-	      <div class="player" style="padding:14px;">
-	        <div class="row" style="justify-content:space-between; align-items:center;">
-	          <h2 style="margin:0;">Your Statistics</h2>
-	          <button id="dashStatsBackBtn" type="button">Back</button>
-	        </div>
-	        <div id="dashStatsGrid" style="display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-top:12px;"></div>
-	        <div style="margin-top:14px;">
-	          <div style="opacity:.8; margin-bottom:6px;">Recent results</div>
-	          <div id="dashRecent" style="display:flex; gap:8px; flex-wrap:wrap;"></div>
-	        </div>
-	      </div>
-	    </div>
+    <!-- Main content (no browser scroll; internal scroll if needed) -->
+    <main class="dashMain">
+      <section class="dashStatsCard" id="dashStatsCard" role="button" tabindex="0" aria-label="Open statistics">
+        <div>
+        <div class="dashStatsTitle">STATISTICS</div>
+
+        <div class="dashLastRow">
+          <div class="dashLastLabel">Last 5 Matches</div>
+          <div id="dashLast5" class="dashLast5"></div>
+        </div>
+
+        <div class="dashKeyStats">
+          <div class="dashKeyStat">
+            <img class="dashIcon" src="img/icon_3da.png" alt="3DA" />
+            <div class="dashKeyStatLabels">
+              <div id="dashTdaVal" class="dashKeyVal">0.00</div>
+              <div class="dashKeyLabel">THREE DART AVERAGE</div>
+            </div>
+          </div>
+          <div class="dashKeyStat">
+            <img class="dashIcon" src="img/icon_f9d.png" alt="F9D" />
+            <div class="dashKeyStatLabels">
+              <div id="dashF9dVal" class="dashKeyVal">0.00</div>
+              <div class="dashKeyLabel">FIRST 9 AVERAGE</div>
+            </div>
+          </div>
+        </div>
+        
+        <div id = "dashgridstats" class="dashgridstats">
+        <div class="dashMiniGrid">
+          <div class="dashMiniStat"><div class="k">MATCHES PLAYED</div><div id="dashMatchesVal" class="v">0</div></div>
+          <div class="dashMiniStat"><div class="k">DARTS THROWN</div><div id="dashDartsVal" class="v">0</div></div>
+          </div>
+        <div class="dashMiniGrid twoone">
+          <div class="dashministatrowdiv">
+          <div class="dashMiniStatrow"><div class="k">TOTAL WINS</div><div id="dashWinsVal" class="v">0</div></div>
+          <div class="dashMiniStatrow"><div class="k">TOTAL LOSSES</div><div id="dashLossesVal" class="v">0</div></div>
+          </div>
+          <div class="dashMiniStatdh"><div class="k">WIN RATE</div><div id="dashWinRateVal" class="v">0%</div></div>
+        </div>
+        <div class="dashMiniGrid three">
+          <div class="dashMiniStat"><div class="k">100+</div><div id="dash100Val" class="v">0</div></div>
+          <div class="dashMiniStat"><div class="k">140+</div><div id="dash140Val" class="v">0</div></div>
+          <div class="dashMiniStat"><div class="k">180</div><div id="dash180Val" class="v">0</div></div>
+        </div>
+        </div>
+        </div>
+        <div class="fullwidth">
+        <button id="dashSettingsBtn" class="dashSettingsBtn" type="button">Profile Settings</button>
+        </div>
+      </section>
+
+      <section class="dashPlayCol">
+        <div id="dashPlayLocalCard" class="dashPlayCard dashPlayLocal" role="button" tabindex="0">
+          <div class="dashPlayText">
+            <div class="small">PLAY</div>
+            <div class="big">LOCAL</div>
+          </div>
+          <!-- hidden functional button kept for existing JS IDs -->
+          <button id="dashPlayLocalBtn" class="hidden" type="button">Start Local Game</button>
+        </div>
+
+        <div id="dashPlayOnlineCard" class="dashPlayCard dashPlayOnline" role="button" tabindex="0">
+          <div class="dashPlayText">
+            <div class="small">PLAY</div>
+            <div class="big">ONLINE</div>
+          </div>
+          <button id="dashPlayOnlineBtn" class="hidden" type="button">Start Online Game</button>
+        </div>
+
+        <button id="dashJoinGameBtn" class="dashSmallBtn" type="button">Join a Game</button>
+      </section>
+    </main>
+
+    <footer class="dashFooter">
+      <p id="dashMsg" class="error hidden" style="margin:10px 0 0; text-align:center;"></p>
+    </footer>
+  </div>
+
+  <!-- Join Game modal -->
+  <div id="dashJoinModal" class="modal hidden">
+    <div class="modal-card" style="max-width:520px;">
+      <h2 style="margin-top:0;">Join a Game</h2>
+      <p style="opacity:.85; margin-top:0;">Paste the invite link below.</p>
+      <input id="dashJoinLink" type="text" placeholder="https://.../?game=XXXX" style="width:100%;" />
+      <div class="row" style="gap:10px; margin-top:12px;">
+        <button id="dashJoinConfirmBtn" class="actionBtn">Join</button>
+        <button id="dashJoinCloseBtn" type="button">Close</button>
+      </div>
+      <p id="dashJoinError" class="error hidden" style="margin-top:12px;"></p>
+    </div>
   </div>
 
   <!-- Settings modal -->
   <div id="settingsModal" class="modal hidden">
     <div class="modal-card">
-      <h2 style="margin-top:0;">Settings</h2>
+      <h2 style="margin-top:0;">Profile Settings</h2>
       <div class="formRow">
         <label for="setDisplayName">Display name</label>
-        <input id="setDisplayName" type="text" />
+        <input id="setDisplayName" type="text" maxlength="12" />
       </div>
       <div class="formRow">
         <label for="setEquipment">Darts / equipment</label>
-        <input id="setEquipment" type="text" placeholder="e.g. 24g..." />
+        <input id="setEquipment" type="text" placeholder="e.g. Target Bolide 04 25g" maxlength="35" />
       </div>
       <div class="row" style="justify-content:flex-start; gap:10px;">
         <button id="setSaveBtn">Save</button>
         <button id="settingsCloseBtn" type="button">Close</button>
-        <button id="setSignOutBtn">Sign out</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm Sign Out modal -->
+  <div id="confirmSignOutModal" class="modal hidden">
+    <div class="modal-card" style="max-width:520px;">
+      <h2 style="margin-top:0;">Sign out?</h2>
+      <p style="opacity:.85; margin-top:0;">Really sign out?</p>
+      <div class="row" style="justify-content:center; gap:10px; margin-top:14px;">
+        <button id="confirmSignOutCancelBtn" class="actionBtn autowidth" type="button">Cancel</button>
+        <button id="confirmSignOutOkBtn" class="actionBtn autowidth danger" type="button">Sign out</button>
       </div>
     </div>
   </div>

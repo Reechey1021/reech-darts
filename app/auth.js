@@ -1,7 +1,7 @@
 // /app/auth.js
 import { app } from "./state.js";
-import { getEffectiveDisplayName } from "./profile.js";
-import { ensureUserProfile } from "./userProfile.js";
+import { getGuestDisplayName } from "./profile.js";
+import { ensureUserProfile, getMyDisplayName } from "./userProfile.js";
 
 /**
  * Auth goals:
@@ -94,13 +94,17 @@ export async function ensureSignedInAnonymously() {
 }
 
 export function getActorId() {
-  // Always prefer auth uid (anon or google)
-  return app.user?.uid || null;
+  // Prefer Firebase uid (anon or Google); fallback to stable device id.
+  return app.user?.uid || app.deviceId;
 }
 
 export function getActorName() {
-  // Uses: signed-in user's display name OR guest name from localStorage
-  return getEffectiveDisplayName(app.user);
+  // For Google users: use profile displayName (Settings nickname) if set.
+  if (app.user && !app.user.isAnonymous) {
+    return getMyDisplayName();
+  }
+  // For guests (anon): use guest name (localStorage) if set.
+  return getGuestDisplayName() || "Guest";
 }
 
 

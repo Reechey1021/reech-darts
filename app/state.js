@@ -11,6 +11,12 @@ export const app = {
   // realtime
   unsubscribeGame: null,
   seatClaimed: false,
+  autoSetupAfterInviteClose: false,
+
+  // game flow
+  // "local" | "online" (set by lobby/dashboard actions)
+  pendingLobbyType: null,
+
 
   //auth
   auth: null,

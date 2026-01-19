@@ -8,62 +8,76 @@ function setVisible(visible) {
   modal.classList.toggle("hidden", !visible);
 }
 
-function escapeHtml(str) {
-  return String(str || "").replace(/[&<>"']/g, (m) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    "\"": "&quot;",
-    "'": "&#39;",
-  })[m]);
-}
-
-function renderProfile({ title, displayName, equipment, stats, recent }) {
+function renderProfileDashboardStyle({ title, displayName, equipment, photoURL, stats }) {
   const t = document.getElementById("profileTitle");
-  const b = document.getElementById("profileBody");
   if (t) t.textContent = title || "Profile";
 
-  if (!b) return;
-  const lines = [];
+  // Identity
+  const nameEl = document.getElementById("profileName");
+  const eqEl = document.getElementById("profileEquipment");
+  const photoEl = document.getElementById("profileUserPhoto");
 
-  if (displayName) {
-    lines.push(`<div><strong>Name:</strong> ${escapeHtml(displayName)}</div>`);
-  }
-  if (equipment) {
-    lines.push(`<div><strong>Darts:</strong> ${escapeHtml(equipment)}</div>`);
-  }
+  if (nameEl) nameEl.textContent = displayName || "—";
+  if (eqEl) eqEl.textContent = equipment || "";
 
-  if (stats) {
-    const matches = stats.matches || 0;
-    const wins = stats.wins || 0;
-    const losses = stats.losses || 0;
-    const hs = stats.highestScore || 0;
-    const tda = stats.avg3DA || 0;
-    const f9d = stats.avgF9D || 0;
-    const s100 = stats.total100s || 0;
-    const s140 = stats.total140s || 0;
-    const s180 = stats.total180s || 0;
-    const lifeDarts = stats.lifetimeDarts || 0;
-    lines.push("<hr style=\"opacity:.25; margin:12px 0;\" />");
-    lines.push(`<div><strong>Matches:</strong> ${matches} (W ${wins} / L ${losses})</div>`);
-    lines.push(`<div><strong>3DA:</strong> ${tda}</div>`);
-    lines.push(`<div><strong>F9D:</strong> ${f9d}</div>`);
-    lines.push(`<div><strong>HS:</strong> ${hs}</div>`);
-    lines.push(`<div><strong>100+:</strong> ${s100}</div>`);
-    lines.push(`<div><strong>140+:</strong> ${s140}</div>`);
-    lines.push(`<div><strong>180s:</strong> ${s180}</div>`);
-    lines.push(`<div><strong>Lifetime darts thrown:</strong> ${lifeDarts}</div>`);
+  if (photoEl) {
+    if (photoURL) {
+      photoEl.src = photoURL;
+      photoEl.classList.remove("hidden");
+    } else {
+      photoEl.removeAttribute("src");
+      photoEl.classList.add("hidden");
+    }
   }
 
-  if (Array.isArray(recent) && recent.length) {
-    lines.push("<hr style=\"opacity:.25; margin:12px 0;\" />");
-    lines.push(`<div><strong>Last 5:</strong> ${recent.map(escapeHtml).join(" ")}</div>`);
-  }
+  // Stats: mirror dashboard rendering
+  const s = stats || {};
+  const matches = Number(s.matches || 0);
+  const wins = Number(s.wins || 0);
+  const losses = Number(s.losses || 0);
 
-  if (lines.length === 0) {
-    b.innerHTML = `<div style=\"opacity:.8\">No profile data.</div>`;
-  } else {
-    b.innerHTML = lines.join("\n");
+  const totalPoints = Number(s.totalPoints || 0);
+  const totalDarts = Number(s.totalDarts || 0);
+  const first9Points = Number(s.first9Points || s.totalFirst9Points || 0);
+  const first9Darts = Number(s.first9Darts || s.totalFirst9Darts || 0);
+
+  const tda = totalDarts ? Math.round((totalPoints / totalDarts) * 3) : 0;
+  const f9d = first9Darts ? Math.round((first9Points / first9Darts) * 3) : 0;
+
+  const s100 = Number(s.s100 || s.hundredPlus || s.total100s || 0);
+  const s140 = Number(s.s140 || s.oneFortyPlus || s.total140s || 0);
+  const s180 = Number(s.s180 || s.oneEighty || s.total180s || 0);
+  const lifetimeDarts = Number(s.lifetimeDarts || 0);
+
+  const setText = (id, v) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = String(v);
+  };
+
+  setText("profileTdaVal", tda);
+  setText("profileF9dVal", f9d);
+  setText("profileMatchesVal", matches);
+  setText("profileDartsVal", lifetimeDarts || totalDarts || 0);
+  setText("profileWinsVal", wins);
+  setText("profileLossesVal", losses);
+  setText("profileWinRateVal", `${matches ? Math.round((wins / matches) * 100) : 0}%`);
+  setText("profile100Val", s100);
+  setText("profile140Val", s140);
+  setText("profile180Val", s180);
+
+  // Last 5
+  const lastEl = document.getElementById("profileLast5");
+  if (lastEl) {
+    const arr = Array.isArray(s.recentResults) ? s.recentResults.slice(0, 5) : [];
+    lastEl.innerHTML = arr.length
+      ? arr
+          .map((r) => {
+            const v = String(r).toUpperCase();
+            const cls = v === "W" ? "w" : "l";
+            return `<span class="dashWL ${cls}">${v}</span>`;
+          })
+          .join("")
+      : `<span style="opacity:.7;">—</span>`;
   }
 }
 
@@ -77,7 +91,7 @@ export async function openProfileModalForPlayerIndex(playerIndex) {
 
   // Guest / no uid: show name only
   if (!uid) {
-    renderProfile({ title: name, displayName: name });
+    renderProfileDashboardStyle({ title: name, displayName: name, equipment: "", photoURL: null, stats: null });
     setVisible(true);
     return;
   }
@@ -86,16 +100,16 @@ export async function openProfileModalForPlayerIndex(playerIndex) {
   try {
     const snap = await app.db.collection("users").doc(uid).get();
     const p = snap.exists ? snap.data() : null;
-    renderProfile({
+    renderProfileDashboardStyle({
       title: name,
-      displayName: p?.displayName || name,
-      equipment: p?.equipment || "",
+      displayName: (p?.displayName || p?.nickname || name),
+      equipment: (p?.setEquipment || p?.equipment || ""),
+      photoURL: (p?.photoURL || player.photoURL || null),
       stats: p?.stats || null,
-      recent: p?.stats?.recentResults || [],
     });
     setVisible(true);
   } catch {
-    renderProfile({ title: name, displayName: name });
+    renderProfileDashboardStyle({ title: name, displayName: name, equipment: "", photoURL: player.photoURL || null, stats: null });
     setVisible(true);
   }
 }

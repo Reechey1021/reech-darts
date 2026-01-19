@@ -64,14 +64,41 @@ export async function playClipsWebAudio(clips) {
   // Load first, THEN schedule (prevents “2nd clip never plays” on iOS)
   const buffers = await Promise.all(clips.map(loadAudioBuffer));
 
+  // Schedule back-to-back with the AudioContext clock for gapless playback.
+  // NOTE: Some of the "require" phrase clips include a noticeable trailing
+  // silence. For the specific QoL case of "You require" immediately followed
+  // by a number, we advance time by a shorter amount so the number starts
+  // promptly on all devices (including iOS).
+
+  const isRequireClip = (src) => {
+    return typeof src === "string" && src.includes("/audio/phrases/require");
+  };
+
   let t = ctx.currentTime + 0.03;
-  for (const b of buffers) {
+  for (let i = 0; i < buffers.length; i++) {
+    const b = buffers[i];
+    const srcPath = clips[i];
     const s = ctx.createBufferSource();
     s.buffer = b;
     s.connect(ctx.destination);
     s.start(t);
     activeSources.push(s);
-    t += b.duration;
+
+    // Default: use full duration
+    let advance = b.duration;
+
+    // Special-case: "require" phrase → next clip is a number
+    if (isRequireClip(srcPath)) {
+      const nextSrc = clips[i + 1];
+      const nextIsNumber = typeof nextSrc === "string" && nextSrc.includes("/audio/numbers/");
+      if (nextIsNumber) {
+        // Empirically safe value: long enough for the phrase, short enough to
+        // skip trailing silence.
+        advance = Math.min(advance, 1.0);
+      }
+    }
+
+    t += advance;
   }
 }
 

@@ -7,22 +7,22 @@ export function multFactor(m) {
   return 1;
 }
 
+// In "table" mode, the authoritative state is app.dartThrows.
+// We display the breakdown directly in #scoreInput (e.g. "20+20+20").
 export function updateDartUI() {
-  const breakdownEl = document.getElementById("dartBreakdown");
-  const totalEl = document.getElementById("dartTotalVal");
   const scoreInput = document.getElementById("scoreInput");
   const submitBtn = document.getElementById("submitBtn");
 
-  const total = app.dartThrows.reduce((a, b) => a + b, 0);
-  const breakdown = app.dartThrows.length ? app.dartThrows.join("+") : "—";
+  const breakdown = app.dartThrows.length ? app.dartThrows.join("+") : "";
 
-  if (breakdownEl) breakdownEl.textContent = breakdown;
-  if (totalEl) totalEl.textContent = String(total);
-  if (scoreInput) scoreInput.value = app.dartThrows.length ? String(total) : "";
+  // Only drive the input text in table mode.
+  if (scoreInput && app.inputMode === "table") {
+    scoreInput.value = breakdown;
+  }
 
   // In table/dartpad mode: submit ONLY when 3 darts picked
   if (submitBtn && app.inputMode === "table") {
-    submitBtn.disabled = (app.dartThrows.length !== 3);
+    submitBtn.disabled = app.dartThrows.length !== 3;
   }
 }
 
@@ -67,13 +67,19 @@ export function setInputMode(mode) {
   if (btn) btn.textContent = mode === "keypad" ? "🎯" : "⌨️";
 
   // in table mode, prevent typing into the input (table drives it)
-  if (scoreInput) scoreInput.readOnly = (mode === "table");
+  if (scoreInput) scoreInput.readOnly = mode === "table";
 
   if (mode === "table") {
+    // Entering table mode: clear any keypad numeric input and start fresh.
+    if (scoreInput) scoreInput.value = "";
+    clearDarts();
     setMult(app.dartMult);
     updateDartUI();
   } else {
+    // Leaving table mode: clear breakdown from input and reset dart state.
     clearDarts();
+    if (scoreInput) scoreInput.value = "";
+
     // leaving table mode: make sure submit isn't stuck disabled
     const submitBtn = document.getElementById("submitBtn");
     if (submitBtn) submitBtn.disabled = false;

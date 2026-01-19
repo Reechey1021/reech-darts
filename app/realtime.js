@@ -1,9 +1,9 @@
 // app/realtime.js
 import { app } from "./state.js";
-import { getActorId } from "./auth.js";
-import { render, setLobbyGateVisible } from "./ui/render.js";
+import { getActorId, getActorName } from "./auth.js";
+import { render, setLobbyGateVisible, setSetupModalVisible } from "./ui/render.js";
 import { playClipsWebAudio, stopAllAudio } from "./audio/audio.js";
-import { getEffectiveDisplayName } from "./profile.js";
+import { applyFinishedMatchProfileUpdatesForMe } from "./userStats.js";
 
 // Call this whenever we move to a different game document.
 // Prevents stale audio IDs + seat-claim state leaking across lobbies.
@@ -27,8 +27,9 @@ export async function tryClaimSeat2(state) {
 
   // -------- Lobby: claim seat2 BEFORE a match exists --------
   if (state.status === "lobby" && !state.match) {
-    if (!state.seat1Id) return;
-    if (state.seat1Id === d) return;
+    const hostId = state.seat1Id || state?.lobby?.host?.actorId;
+    if (!hostId) return;
+    if (hostId === d) return;
     if (state.seat2Id) return;
 
     app.seatClaimed = true;
@@ -44,14 +45,16 @@ export async function tryClaimSeat2(state) {
         if (fresh.seat1Id === d) return;
         if (fresh.seat2Id) return;
 
-        const name = getEffectiveDisplayName(app.user);
+        const name = getActorName();
         fresh.seat2Id = d;
         fresh.seat2Name = name;
+        fresh.seat2PhotoURL = (app.user && !app.user.isAnonymous) ? (app.user.photoURL || null) : null;
         fresh.lobby = fresh.lobby || {};
         fresh.lobby.joiner = {
           actorId: d,
           name,
-          uid: app.user && !app.user.isAnonymous ? app.user.uid : null,
+          uid: (app.user && !app.user.isAnonymous) ? app.user.uid : null,
+          photoURL: fresh.seat2PhotoURL,
         };
         fresh.updatedAt = new Date();
         tx.set(app.gameRef, fresh);
@@ -83,9 +86,17 @@ export async function tryClaimSeat2(state) {
 
       fresh.match.seat2Id = d;
 
-      // Best-effort identity (for profile popups later)
-      fresh.match.seat2Uid = d;
-      fresh.match.seat2Name = getEffectiveDisplayName(app.user);
+      // Identity (for in-game profile popups)
+      fresh.match.seat2Uid = (app.user && !app.user.isAnonymous) ? app.user.uid : null;
+      fresh.match.seat2Name = getActorName();
+      fresh.match.seat2PhotoURL = (app.user && !app.user.isAnonymous) ? (app.user.photoURL || null) : null;
+
+      // Keep players array in sync if present
+      if (Array.isArray(fresh.match.players) && fresh.match.players[1]) {
+        fresh.match.players[1].uid = fresh.match.seat2Uid;
+        fresh.match.players[1].name = fresh.match.seat2Name;
+        fresh.match.players[1].photoURL = fresh.match.seat2PhotoURL;
+      }
 
       fresh.updatedAt = new Date();
       tx.set(app.gameRef, fresh);
@@ -104,41 +115,85 @@ export function bindGameListener() {
   if (!app.gameRef) return;
 
   app.unsubscribeGame = app.gameRef.onSnapshot(
-(doc) => {
-  // Missing doc (deleted link / bad URL) => show gate
-  if (!doc.exists) {
-    app.latestState = null;
-    render(null);
-    setLobbyGateVisible(true);
-    return;
-  }
+    (doc) => {
+      // Missing doc (deleted link / bad URL) => show gate
+      if (!doc.exists) {
+        app.latestState = null;
+        render(null);
+        setLobbyGateVisible(true);
+        return;
+      }
 
-  const state = doc.data();
-  app.latestState = state;
+      const state = doc.data();
+      app.latestState = state;
 
-  // Expired lobbies should fall back to the gate (prevents “stuck connecting”)
-  const exp = state?.expiresAt?.toDate ? state.expiresAt.toDate() : state?.expiresAt;
-  const isExpired = exp && Date.now() > new Date(exp).getTime();
-  if (state?.status === "lobby" && isExpired) {
-    render(null);
-    setLobbyGateVisible(true);
-    return;
-  }
+      // Expired lobbies should fall back to the gate (prevents “stuck connecting”)
+      const exp = state?.expiresAt?.toDate ? state.expiresAt.toDate() : state?.expiresAt;
+      const isExpired = exp && Date.now() > new Date(exp).getTime();
+      if (state?.status === "lobby" && isExpired) {
+        render(null);
+        setLobbyGateVisible(true);
+        return;
+      }
 
-  render(state);
-  tryClaimSeat2(state);
+      render(state);
 
-  // Firestore-synced audio: every device plays the same event once
-  if (state?.audio?.id && state.audio.id !== app.lastAudioId) {
-    app.lastAudioId = state.audio.id;
-    playClipsWebAudio(state.audio.clips);
-  }
-}
-,
+      // Profile stats (signed-in users only): apply once when the client observes
+      // match.status === "finished". Each client only writes its own /users/{uid}
+      // doc (required by Firestore rules).
+      try {
+        const uid = app.user && !app.user.isAnonymous ? app.user.uid : null;
+        if (uid && state?.match?.status === "finished") {
+          applyFinishedMatchProfileUpdatesForMe(app.db, uid, app.gameRef?.id || app.gameId, state.match);
+        }
+      } catch (e) {
+        console.warn("applyFinishedMatchProfileUpdatesForMe failed (non-fatal)", e);
+      }
+
+      // If we arrived from the dashboard for a local game, auto-open setup.
+      maybeAutoOpenSetup(state);
+
+      tryClaimSeat2(state);
+
+      // Firestore-synced audio: every device plays the same event once
+      if (state?.audio?.id && state.audio.id !== app.lastAudioId) {
+        app.lastAudioId = state.audio.id;
+        playClipsWebAudio(state.audio.clips);
+      }
+    },
     (err) => {
-      console.error(err);
-      const statusEl = document.getElementById("status");
-      if (statusEl) statusEl.innerText = "Firestore error: " + err.message;
+      console.warn("bindGameListener snapshot error", err);
+      render(null);
+      setLobbyGateVisible(true);
     }
   );
+}
+
+function maybeAutoOpenSetup(state) {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("setup") !== "1") return;
+    if (!state || state.status !== "lobby") return;
+    if (state.match) return;
+
+    const lobbyType = state.lobbyType || "local";
+    const isOnline = lobbyType === "online";
+
+    const localFields = document.getElementById("setupLocalNameFields");
+    const onlineOpts = document.getElementById("setupOnlineOptions");
+    const mutualRow = document.getElementById("setupMutualRow");
+
+    if (localFields) localFields.classList.toggle("hidden", isOnline);
+    if (onlineOpts) onlineOpts.classList.toggle("hidden", !isOnline);
+    if (mutualRow) mutualRow.classList.toggle("hidden", !isOnline);
+
+    setSetupModalVisible(true);
+
+    const url = new URL(window.location.href);
+    url.searchParams.delete("setup");
+    window.history.replaceState({}, "", url.toString());
+  } catch (e) {
+    // non-fatal
+    console.warn("maybeAutoOpenSetup failed", e);
+  }
 }

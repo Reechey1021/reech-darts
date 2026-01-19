@@ -54,11 +54,35 @@ export function canScoreNow(state) {
     return false;
   }
 
-  // must be your turn
+  // Allow mutual control: either device can submit scores for whoever is throwing.
+  if (state.match.allowMutualControl) return true;
+
+  // otherwise: must be your turn
   return seat === state.leg.currentPlayer;
 }
 
 export function canActNow(state) {
   // “act” = score actions (submit/keypad/table)
   return canScoreNow(state);
+}
+
+export function isHost(state) {
+  const me = getActorId();
+  if (!me || !state) return false;
+
+  // Lobby phase: host is seat1 (or createdBy / lobby.host as fallback)
+  if (state.status === "lobby") {
+    return (
+      me === state.seat1Id ||
+      me === state.createdBy ||
+      me === state?.lobby?.host?.actorId
+    );
+  }
+
+  // Active match: host is seat1 / hostId
+  if (state.match) {
+    return me === state.match.hostId || me === state.match.seat1Id;
+  }
+
+  return false;
 }

@@ -11,36 +11,83 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 
-<body>
-  <h1>Reech's No-Moneygrab Darts Counter🎯</h1>
-  <p class="titleparagraph"> Because 2000 lines of code should not cost £5.99 a month</p>
+<body data-theme="dark">
 
 
 <div id="lobbyGateModal" class="modal hidden">
-  <div class="modal-card">
+  <div class="modal-card welcome">
     <h2>Welcome</h2>
-    <p style="opacity:.85; margin-top:0;">Log in, or continue as a guest.</p>
+    <p style="opacity:.85; margin-top:0;">Play online (login or guest), or play offline on this device.</p>
+    <div class="welcomewrapper">
 
-    <div class="row" style="justify-content:center; gap:10px; margin-top:12px;">
+    <div class="welcome-left" style="justify-content:center; gap:10px; margin-top:12px;">
       <button id="googleLoginBtn" type="button">Log in with Google</button>
     </div>
-
-    <hr style="border:none; border-top:1px solid rgba(255,255,255,.12); margin:14px 0;" />
-
-    <div class="formRow" style="margin-top:0;">
+    <hr class="mobile-divider">
+    <div class="welcome-right">
+    <div class="formRow column" style="margin-top:0;">
       <label for="guestNameInput">Continue as Guest</label>
-      <input id="guestNameInput" type="text" placeholder="Display Name" autocomplete="nickname" />
-      <div style="font-size:.9em; opacity:.75; margin-top:6px;">
-        This name will be used in the lobby + match.
+      <input id="guestNameInput" type="text" placeholder="Display Name" autocomplete="nickname" maxlength="12" />
       </div>
-    </div>
 
+    <div class="welcomebuttons">
     <button id="createLobbyBtn" class="actionBtn" style="margin-top:12px;" disabled>
       Create Lobby
     </button>
+    <button id="joinGameGateBtn" class="actionBtn" style="margin-top:12px;">
+      Join a Game
+    </button>
+        </div>
+    </div>
+    </div>
+
+    <button id="playOfflineBtn" class="actionBtn" style="margin-top:10px;">
+      Play Offline
+    </button>
+    </div>
 
     <p id="gateError" class="error hidden"></p>
     
+  </div>
+</div>
+
+
+<!-- Direct invite (guest) name prompt -->
+<div id="directGuestNameModal" class="modal hidden">
+  <div class="modal-card" style="max-width:520px; text-align:center;">
+    <h2>Enter Display Name</h2>
+    <p style="opacity:.85; margin-top:0;">Choose a name to join this lobby.</p>
+    <input id="directGuestNameInput" type="text" placeholder="Display Name" autocomplete="nickname" maxlength="12" style="width:100%;" />
+    <div class="row" style="justify-content:center; margin-top:14px; gap:10px;">
+      <button id="directGuestJoinBtn" class="actionBtn autowidth" disabled>Join Game</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- Join Game modal -->
+<div id="joinGameModal" class="modal hidden">
+  <div class="modal-card" style="max-width:520px;">
+    <h2>Join a Game</h2>
+    <p style="opacity:.85; margin-top:0;">Paste the invite link below.</p>
+    <input id="joinGameLink" type="text" placeholder="https://.../?game=XXXX" style="width:100%;" />
+
+    <div class="row" style="justify-content:center; margin-top:14px; gap:10px;">
+        <button id="joinGameCancelBtn" class="actionBtn autowidth">Cancel</button>
+      <button id="joinGameConfirmBtn" class="actionBtn autowidth">Join</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- Seat 2 waiting modal (online lobby) -->
+<div id="seat2WaitingModal" class="modal hidden">
+  <div class="modal-card" style="max-width:520px; text-align:center;">
+    <h2>Waiting for host…</h2>
+    <p style="opacity:.85; margin-top:0;">Waiting for host to start match…</p>
+    <div class="row" style="justify-content:center; margin-top:14px; gap:10px;">
+      <button id="seat2WaitingLeaveBtn" class="actionBtn">Leave Match</button>
+    </div>
   </div>
 </div>
 
@@ -49,19 +96,8 @@
     <div class="toprow">
         <div id="gameMeta" class="gameMeta"></div>
         <div id="masterbuttons" class="masterbuttons">
-          <button id="newGameBtn">New Game</button>
-          <button id="inviteBtn">Create Lobby</button>
-          <!-- Mobile-only settings menu -->
-<div class="mobileMenuWrap">
-  <details id="mobileMenu" class="mobileMenu">
-    <summary id="mobileMenuBtn" aria-label="Menu">⚙️</summary>
-    <div class="mobileMenuPanel">
-      <button type="button" id="mobileNewGameBtn" class="menuItem">New Game</button>
-      <button type="button" id="mobileInviteBtn" class="menuItem">Create Lobby</button>
-    </div>
-  </details>
-</div>
-
+          <button id="gameSettingsBtn">Game Settings</button>
+          <button id="leaveMatchBtn" class="btn hidden">Leave Match</button>
         </div>
 
 
@@ -69,6 +105,7 @@
   <div class="modal-card">
     <h2>Invite link</h2>
     <p id="inviteLinkText" style="word-break: break-all;"></p>
+    <p id="inviteCopyMsg" class="hidden" style="margin:6px 0 0; opacity:.85;">Link copied ✅</p>
     <div class="row">
       <button id="copyInviteBtn">Copy</button>
       <button id="closeInviteBtn">Close</button>
@@ -76,6 +113,8 @@
   </div>
 </div>
 
+        <!-- Theme is controlled from the dashboard for signed-in users.
+             Guests are always dark mode. Button kept for compatibility but hidden. -->
         <button id="themeToggleBtn" type="button">🌙</button>
       </div>      
 
@@ -84,7 +123,10 @@
     <div class="scores">
       <div class="player" id="p1Box">
         <div class="legsBadge" id="p1Legs">0</div>
-        <input id="p1Name" class="name" value="Player 1" />
+        <div class="nameRow">
+          <img id="p1Photo" class="avatar hidden" alt="Player 1 photo" />
+          <span id="p1Name" class="name">Player 1</span>
+        </div>
         <div class="score" id="p1Score">—</div>
         <div class="checkout" id="p1Checkout"></div>
         <div class="stats" id="p1Stats"></div>
@@ -92,7 +134,10 @@
 
       <div class="player" id="p2Box">
         <div class="legsBadge" id="p2Legs">0</div>
-        <input id="p2Name" class="name" value="Player 2" />
+        <div class="nameRow">
+          <img id="p2Photo" class="avatar hidden" alt="Player 2 photo">
+          <span id="p2Name" class="name">Player 2</span>
+        </div>
         <div class="score" id="p2Score">—</div>
         <div class="checkout" id="p2Checkout"></div>
         <div class="stats" id="p2Stats"></div>
@@ -103,6 +148,7 @@
   <div id="turnOverlay" class="turnOverlay hidden">
     <div id="turnOverlayText"></div>
     <button id="overlayUndoBtn" class="overlayUndoBtn">Undo last score</button>
+    <button id="overlayStartBtn" class="overlayUndoBtn hidden">New Game</button>
   </div>
     
     <div class="actionGrid">
@@ -122,10 +168,11 @@
   </div>
 
   <div class="actionCell3">
-    <button id="submitBtn" class="actionBtn">Submit</button>
+    <button id="submitBtn" class="submitBtn">Submit</button>
   </div>
 </div>
 
+      <!-- Legacy inline error (no longer used; kept for CSS/layout safety) -->
       <p id="error" class="error hidden"></p>
       
       <div class="keypad" id="keypad">
@@ -146,13 +193,7 @@
         <button class="key key-wide" id="keyBack">⌫</button>
       </div>
 
-<div id="dartTableArea" class="hidden">
-  <div class="dartBar">
-    <div id="dartBreakdown" class="dartBreakdown">—</div>
-    <div class="dartTotal">Total: <span id="dartTotalVal">0</span></div>
-  </div>
-
-  <div id="dartPad" class="dartPad">
+<div id="dartTableArea" class="hidden"><div id="dartPad" class="dartPad">
     <!-- Top row -->
     <button class="dartMultBtn selected" data-mult="S">Single</button>
     <button class="dartMultBtn" data-mult="D">Double</button>
@@ -197,16 +238,82 @@
   <div id="winnerModal" class="modal hidden">
     <div class="modal-card">
       <h2 id="winnerText">Winner</h2>
-      <div id="matchStatsGrid" class="matchStats"></div>
-      <button id="winnerNewGameBtn">New Game</button>
+      <!-- Match-end summary (rendered client-side) -->
+      <div id="matchStatsGrid" class="matchEndStats"></div>
+      <div class="row" style="justify-content:center; gap:10px;">
+        <button id="winnerNewGameBtn">New Game</button>
+        <button id="winnerLeaveBtn" class="secondary hidden" type="button">Leave</button>
+      </div>
     </div>
   </div>
 
   <!-- Player profile modal (opens only on the device that clicked) -->
   <div id="profileModal" class="modal hidden">
     <div class="modal-card">
-      <h2 id="profileTitle">Profile</h2>
-      <div id="profileBody" style="text-align:left;"></div>
+
+      <!-- Dashboard-style profile (identity + stats card) -->
+      <div id="profileDash" class="profileDash" style="text-align:left;">
+        <div class="dashIdentity" style="margin-bottom:14px;">
+          <img id="profileUserPhoto" class="dashAvatar hidden" alt="Profile photo" />
+          <div class="dashHello">
+            <div class="dashWelcome">Player</div>
+            <div id="profileName" class="dashName">—</div>
+            <div class="dashEquipmentDiv">
+              <img class="dashEquipmentIcon" src="img/icon_dart.png" alt="Darts" />
+              <div id="profileEquipment" class="dashEquipment"></div>
+            </div>
+          </div>
+        </div>
+
+        <section class="dashStatsCard profile" id="profileStatsCard">
+
+          <div class="dashLastRow">
+            <div class="dashLastLabel">Last 5 Matches</div>
+            <div id="profileLast5" class="dashLast5"></div>
+          </div>
+
+          <div class="dashKeyStats">
+            <div class="dashKeyStat">
+              <img class="dashIcon" src="img/icon_3da.png" alt="3DA" />
+              <div class="dashKeyStatLabels">
+                <div id="profileTdaVal" class="dashKeyVal">0.00</div>
+                <div class="dashKeyLabel">THREE DART AVERAGE</div>
+              </div>
+            </div>
+            <div class="dashKeyStat">
+              <img class="dashIcon" src="img/icon_f9d.png" alt="F9D" />
+              <div class="dashKeyStatLabels">
+                <div id="profileF9dVal" class="dashKeyVal">0.00</div>
+                <div class="dashKeyLabel">FIRST 9 AVERAGE</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="dashgridstats">
+            <div class="dashMiniGrid">
+              <div class="dashMiniStat"><div class="k">MATCHES PLAYED</div><div id="profileMatchesVal" class="v">0</div></div>
+              <div class="dashMiniStat"><div class="k">DARTS THROWN</div><div id="profileDartsVal" class="v">0</div></div>
+            </div>
+
+            <div class="dashMiniGrid twoone">
+              <div class ="dashministatrowdiv">
+              <div class="dashMiniStatrow"><div class="k">TOTAL WINS</div><div id="profileWinsVal" class="v">0</div></div>
+              <div class="dashMiniStatrow"><div class="k">TOTAL LOSSES</div><div id="profileLossesVal" class="v">0</div></div>
+              </div>
+              <div class="dashMiniStatdh"><div class="k">WIN RATE</div><div id="profileWinRateVal" class="v">0%</div></div>
+            </div>
+
+            <div class="dashMiniGrid three">
+              <div class="dashMiniStat"><div class="k">100+</div><div id="profile100Val" class="v">0</div></div>
+              <div class="dashMiniStat"><div class="k">140+</div><div id="profile140Val" class="v">0</div></div>
+              <div class="dashMiniStat"><div class="k">180</div><div id="profile180Val" class="v">0</div></div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- Legacy body kept for backwards compat (unused) -->
+      <div id="profileBody" class="hidden"></div>
       <div class="row" style="justify-content:center;">
         <button id="profileCloseBtn" type="button">Close</button>
       </div>
@@ -217,31 +324,36 @@
     <div class="modal-card">
       <h2>New Match</h2>
 
-      <div class="formRow">
-        <label for="setupGameType">Game type</label>
-        <select id="setupGameType">
-          <option value="single">Local</option>
-          <option value="online">Online</option>
-        </select>
+      <!-- Game type is decided by where you started the match (Local vs Online) -->
+
+      <div id="setupOnlineOptions" class="setupBlock">
+        <div class="formRow">
+          <label for="setupCompetition">Mode</label>
+          <select id="setupCompetition">
+            <option value="casual" selected>Casual (no stats)</option>
+            <option value="competitive">Competitive (save stats)</option>
+          </select>
+        </div>
+
+        <div class="formRow">
+          <label for="setupMutualControl">Allow mutual control</label>
+          <select id="setupMutualControl">
+            <option value="no" selected>No (turn-based)</option>
+            <option value="yes">Yes (either device can score)</option>
+          </select>
+        </div>
       </div>
 
-      <div class="formRow">
-        <label for="setupCompetition">Mode</label>
-        <select id="setupCompetition">
-          <option value="casual" selected>Casual (no stats)</option>
-          <option value="competitive">Competitive (save stats)</option>
-        </select>
-      </div>
+      <div id="setupLocalNameFields" class="setupBlock">
+        <div class="formRow">
+          <label>Player 1 Name</label>
+          <input id="setupP1" type="text" value="Player 1" />
+        </div>
 
-  
-      <div class="formRow">
-        <label>Player 1 Name</label>
-        <input id="setupP1" type="text" value="Player 1" />
-      </div>
-  
-      <div class="formRow">
-        <label>Player 2 Name</label>
-        <input id="setupP2" type="text" value="Player 2" />
+        <div class="formRow">
+          <label>Player 2 Name</label>
+          <input id="setupP2" type="text" value="Player 2" />
+        </div>
       </div>
   
       <div class="formRow">
@@ -313,6 +425,52 @@
     </div>
   </div>
 
+  <!-- Game Settings -->
+  <div id="gameSettingsModal" class="modal hidden">
+    <div class="modal-card">
+      <h2>Game Settings</h2>
+      <div class="row padding" style="justify-content:center; flex-direction:column; gap:10px;">
+        <button id="gsNewGameBtn" class="actionBtn">New Game</button>
+        <button id="gsRestartGameBtn" class="actionBtn">Restart Game</button>
+        <button id="gsLeaveMatchBtn" class="actionBtn danger">Leave Match</button>
+        <button id="gsCloseBtn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="confirmRestartMatchModal" class="modal hidden">
+    <div class="modal-card">
+      <h2>Restart this game?</h2>
+      <p>This will reset the current match back to the start.</p>
+      <div class="row" style="justify-content:center;">
+        <button id="confirmRestartCancelBtn">Cancel</button>
+        <button id="confirmRestartOkBtn">Restart</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="confirmLeaveMatchModal" class="modal hidden">
+    <div class="modal-card">
+      <h2>Leave match?</h2>
+      <p>You will exit this lobby/match.</p>
+      <div class="row" style="justify-content:center;">
+        <button id="confirmLeaveCancelBtn">Cancel</button>
+        <button id="confirmLeaveOkBtn" class="actionBtn danger autowidth">Leave</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Generic error popup (used instead of inline error text) -->
+  <div id="errorModal" class="modal hidden">
+    <div class="modal-card error">
+      <h2>Error</h2>
+      <p id="errorModalText" style="opacity:.9;"></p>
+      <div class="row" style="justify-content:center;">
+        <button id="errorOkBtn">Okay</button>
+      </div>
+    </div>
+  </div>
+
   <div id="bullModal" class="modal hidden">
   <div class="modal-card">
     <h2>Throw for Bull</h2>
@@ -333,13 +491,12 @@
 
   <!-- Firebase SDKs (compat) -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 
   <!-- New modular entrypoint (script.legacy.js kept for reference) -->
   <script type="module" src="main.js"></script>
 
 </body>
+
 </html>

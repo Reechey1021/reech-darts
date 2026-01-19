@@ -11,3 +11,9 @@ export function setGameIdInUrl(gameId) {
   url.searchParams.set("game", gameId);
   window.history.replaceState({}, "", url.toString());
 }
+
+export function clearGameIdFromUrl() {
+  const url = new URL(window.location.href);
+  url.searchParams.delete("game");
+  window.history.replaceState({}, "", url.toString());
+}

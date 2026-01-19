@@ -1,6 +1,6 @@
 // app/ui/events.js
 import { app } from "../state.js";
-import { canScoreNow, canUndoNow } from "../permissions.js";
+import { canScoreNow, canUndoNow, isHost } from "../permissions.js";
 import {
   openNewGameFlow,
   submitScore,
@@ -10,8 +10,11 @@ import {
   confirmCheckout,
   continueOrNewMatch,
   createNewGameAndShowInvite,
+  createLocalGameAndOpenSetup,
+  leaveMatch,
+  restartMatch,
 } from "../actions.js";
-import { applyTheme, initThemeToggle, showError, setInviteModalVisible } from "./render.js";
+import { applyTheme, initThemeToggle, showError, hideError, setInviteModalVisible, setSetupModalVisible, setLobbyGateVisible} from "./render.js";
 import { unlockAudioOnce } from "../audio/audio.js";
 import { initBullUI } from "../bull/ui.js";
 import { signInWithGoogle, ensureAnonymousSignIn } from "../auth.js";
@@ -28,6 +31,17 @@ import {
   updateDartUI,
 } from "../input/dartpad.js";
 
+// ---------- Setup UI mode (local vs online) ----------
+function configureSetupModalForLobbyType(lobbyType) {
+  const isOnline = lobbyType === "online";
+
+  const localFields = document.getElementById("setupLocalNameFields");
+  const onlineFields = document.getElementById("setupOnlineFields");
+
+  if (localFields) localFields.style.display = isOnline ? "none" : "";
+  if (onlineFields) onlineFields.style.display = isOnline ? "" : "none";
+}
+
 
 // ---------- Helpers ----------
 function isAnyModalOpen() {
@@ -43,63 +57,224 @@ export function wireUI() {
   // Gate UI
   const guestNameInput = document.getElementById("guestNameInput");
   const createLobbyBtn = document.getElementById("createLobbyBtn");
+  const joinGameBtn = document.getElementById("joinGameBtn");
   const googleLoginBtn = document.getElementById("googleLoginBtn");
+  const playOfflineBtn = document.getElementById("playOfflineBtn");
+
+  const joinGameModal = document.getElementById("joinGameModal");
+  const joinGameLink = document.getElementById("joinGameLink");
+  const joinGameConfirmBtn = document.getElementById("joinGameConfirmBtn");
+  const joinGameCancelBtn = document.getElementById("joinGameCancelBtn");
+  const joinGameCloseBtn = document.getElementById("joinGameCloseBtn");
+  const joinGameGateBtn = document.getElementById("joinGameGateBtn");
+
+  // Gate button state: guests must provide a display name before they can create/join.
+  // Signed-in users (Google) won't see the gate anyway, but keep logic correct.
+  const refreshGateButtons = () => {
+    const signedIn = !!(app.user && !app.user.isAnonymous);
+    const name = (guestNameInput?.value || "").trim().slice(0, 12);
+    const okGuest = name.length > 0;
+    if (createLobbyBtn) createLobbyBtn.disabled = !(signedIn || okGuest);
+    if (joinGameGateBtn) joinGameGateBtn.disabled = !(signedIn || okGuest);
+  };
+
+  if (guestNameInput) {
+    guestNameInput.addEventListener("input", refreshGateButtons);
+  }
+
+  if (joinGameCloseBtn) {
+  joinGameCloseBtn.addEventListener("click", () => {
+    const modal = document.getElementById("joinGameModal");
+    if (modal) modal.classList.add("hidden");
+  });
+}
 
   // Profile modal (closes only on this device)
   wireProfileModalClose();
 
-if (createLobbyBtn) {
-  createLobbyBtn.addEventListener("click", async () => {
-    const name = (guestNameInput?.value || "").trim();
+  // Initial gate button state
+  refreshGateButtons();
 
-    // ✅ HARD BLOCK if blank
+  // Create Online Lobby (guest)
+  if (createLobbyBtn) {
+    createLobbyBtn.addEventListener("click", async () => {
+      const name = (guestNameInput?.value || "").trim().slice(0, 12);
+
+      if (!name) {
+        showError("Enter guest name");
+        return;
+      }
+
+      setGuestDisplayName(name);
+      await ensureAnonymousSignIn();
+
+      // After we show the invite link, auto-open the setup modal when the invite popup is closed.
+      app.pendingLobbyType = "online";
+      app.autoSetupAfterInviteClose = true;
+
+      const res = await createNewGameAndShowInvite({ lobbyType: "online", openInvite: true });
+      if (!res || res.ok !== true) {
+        showError("Couldn’t create lobby. Please try again.");
+        return;
+      }
+    });
+  }
+
+  if (joinGameGateBtn) {
+  joinGameGateBtn.addEventListener("click", () => {
+    // If not logged in, require guest display name before joining
+    const isLoggedIn = !!(app.user && !app.user.isAnonymous);
+    if (!isLoggedIn) {
+      const name = (guestNameInput?.value || "").trim().slice(0, 12);
+
+      if (!name) {
+        showError("Enter guest name");
+        return;
+      }
+
+      // Make sure the app knows this guest name
+      setGuestDisplayName(name);
+    }
+
+    // Open the join modal
+    const modal = document.getElementById("joinGameModal");
+    if (modal) modal.classList.remove("hidden");
+  });
+}
+
+  // Join modal cancel should work (return to gate)
+  if (joinGameCancelBtn) {
+    joinGameCancelBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      if (joinGameModal) joinGameModal.classList.add("hidden");
+      // Gate is already visible, but ensure it is shown.
+      setLobbyGateVisible(true);
+      refreshGateButtons();
+    });
+  }
+
+  // Join Game (guest) -> open join modal
+  if (joinGameBtn) {
+    joinGameBtn.addEventListener("click", () => {
+      const name = (guestNameInput?.value || "").trim().slice(0, 12);
+      if (!name) {
+        showError("Please enter a display name to continue.");
+        return;
+      }
+      if (joinGameLink) joinGameLink.value = "";
+      if (joinGameModal) joinGameModal.classList.remove("hidden");
+      try { joinGameLink?.focus(); } catch {}
+    });
+  }
+
+  if (joinGameCloseBtn && joinGameModal) {
+    joinGameCloseBtn.addEventListener("click", () => joinGameModal.classList.add("hidden"));
+  }
+
+  async function joinGameByLinkFromGate() {
+    const name = (guestNameInput?.value || "").trim().slice(0, 12);
     if (!name) {
       showError("Please enter a display name to continue.");
       return;
     }
 
-    // Save guest display name
-    setGuestDisplayName(name);
-
-    // We need an auth uid for Firestore rules + seat-claiming.
-    // Guests can use anonymous auth.
-    await ensureAnonymousSignIn();
-
-    // Create lobby
-    const res = await createNewGameAndShowInvite();
-
-    // ✅ Surface any failure
-    if (!res || res.ok !== true) {
-      showError("Couldn’t create lobby. Please try again.");
+    const txt = (joinGameLink?.value || "").trim();
+    if (!txt) {
+      showError("Paste an invite link first.");
       return;
     }
 
-    // Success: (createNewGameAndShowInvite already opens invite modal)
-  });
-}
+    let gameId = null;
+    try {
+      const url = new URL(txt, window.location.origin);
+      gameId = (url.searchParams.get("game") || "").trim() || null;
+    } catch {
+      // allow pasting raw game id
+      gameId = txt;
+    }
 
-      if (guestNameInput && createLobbyBtn) {
-    guestNameInput.addEventListener("input", () => {
-      createLobbyBtn.disabled = !(guestNameInput.value || "").trim();
+    if (!gameId) {
+      showError("That doesn't look like a valid invite link.");
+      return;
+    }
+
+    // Ensure guest profile name is set
+    setGuestDisplayName(name);
+    await ensureAnonymousSignIn();
+
+    // Pre-check lobby fullness for online games
+    try {
+      const snap = await app.db.collection("games").doc(gameId).get();
+      if (!snap.exists) {
+        showError("Game not found.");
+        return;
+      }
+      const data = snap.data() || {};
+      const match = data.match || null;
+      if (match?.gameType === "online" && match.seat1Id && match.seat2Id) {
+        const me = app.actorId;
+        if (me !== match.seat1Id && me !== match.seat2Id) {
+          showError("This lobby is full.");
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn("Join precheck failed", e);
+    }
+
+    // Navigate to the match
+    window.location.href = `index.html?game=${encodeURIComponent(gameId)}`;
+  }
+
+  if (joinGameConfirmBtn) {
+    joinGameConfirmBtn.addEventListener("click", () => {
+      joinGameByLinkFromGate();
     });
   }
 
+  // Start Offline Local Game (no invite link)
+  if (playOfflineBtn) {
+    playOfflineBtn.addEventListener("click", async () => {
+      try {
+        await ensureAnonymousSignIn();
+        app.pendingLobbyType = "local";
+        await createLocalGameAndOpenSetup();
+        configureSetupModalForLobbyType("local");
+      } catch (e) {
+        console.error(e);
+        showError("Couldn’t start offline game.");
+      }
+    });
+  }
 
-    const closeInviteBtn = document.getElementById("closeInviteBtn");
-    const copyInviteBtn = document.getElementById("copyInviteBtn");
+  const closeInviteBtn = document.getElementById("closeInviteBtn");
+  const copyInviteBtn = document.getElementById("copyInviteBtn");
 
-    if (closeInviteBtn) {
-      closeInviteBtn.addEventListener("click", () => {
-        setInviteModalVisible(false);
-      });
-    }
+  if (closeInviteBtn) {
+    closeInviteBtn.addEventListener("click", () => {
+      setInviteModalVisible(false);
 
-    if (copyInviteBtn) {
-      copyInviteBtn.addEventListener("click", async () => {
-        const text = document.getElementById("inviteLinkText")?.textContent || "";
-        try { await navigator.clipboard.writeText(text); } catch {}
-      });
-    }
+      if (app.autoSetupAfterInviteClose) {
+        app.autoSetupAfterInviteClose = false;
+        configureSetupModalForLobbyType(app.pendingLobbyType || app.latestState?.lobbyType || "online");
+        setSetupModalVisible(true);
+      }
+    });
+  }
+
+  if (copyInviteBtn) {
+    copyInviteBtn.addEventListener("click", async () => {
+      const text = document.getElementById("inviteLinkText")?.textContent || "";
+      try { await navigator.clipboard.writeText(text); } catch {}
+
+      const msg = document.getElementById("inviteCopyMsg");
+      if (msg) {
+        msg.classList.remove("hidden");
+        clearTimeout(window.__inviteCopyTimer);
+        window.__inviteCopyTimer = setTimeout(() => msg.classList.add("hidden"), 1500);
+      }
+    });
+  }
 
 
   // Google login
@@ -117,16 +292,30 @@ if (createLobbyBtn) {
   }
 
   // Main UI refs
-  const newGameBtn = document.getElementById("newGameBtn");
-  const inviteBtn = document.getElementById("inviteBtn");
+  const gameSettingsBtn = document.getElementById("gameSettingsBtn");
+  const leaveMatchBtn = document.getElementById("leaveMatchBtn");
+  const seat2WaitingLeaveBtn = document.getElementById("seat2WaitingLeaveBtn");
+
+  // Confirm Leave modal
+  const confirmLeaveMatchModal = document.getElementById("confirmLeaveMatchModal");
+  const confirmLeaveCancelBtn = document.getElementById("confirmLeaveCancelBtn");
+  const confirmLeaveOkBtn = document.getElementById("confirmLeaveOkBtn");
+  const gameSettingsModal = document.getElementById("gameSettingsModal");
+  const gsNewGameBtn = document.getElementById("gsNewGameBtn");
+  const gsRestartBtn = document.getElementById("gsRestartGameBtn");
+  const gsLeaveBtn = document.getElementById("gsLeaveMatchBtn");
+  const gsCloseBtn = document.getElementById("gsCloseBtn");
+
+  const confirmRestartMatchModal = document.getElementById("confirmRestartMatchModal");
+  const confirmRestartMatchCancelBtn = document.getElementById("confirmRestartMatchCancelBtn");
+  const confirmRestartMatchOkBtn = document.getElementById("confirmRestartMatchOkBtn");
   const submitBtn = document.getElementById("submitBtn");
   const undoBtn = document.getElementById("undoBtn");
   const scoreInputEl = document.getElementById("scoreInput");
   const overlayUndoBtn = document.getElementById("overlayUndoBtn");
+  const overlayStartBtn = document.getElementById("overlayStartBtn");
   const inputModeBtn = document.getElementById("inputModeBtn");
-  const mobileNewGameBtn = document.getElementById("mobileNewGameBtn");
-  const mobileInviteBtn = document.getElementById("mobileInviteBtn");
-  const mobileMenu = document.getElementById("mobileMenu");
+  // Legacy mobile menu refs (no longer used)
 
     // ----------------------------
   // Input mode init + toggle
@@ -147,7 +336,8 @@ if (createLobbyBtn) {
   if (dartPad) {
     dartPad.addEventListener("click", (e) => {
       if (app.inputMode !== "table") return;
-      if (!canScoreNow(app.latestState)) return;
+      // Allow building the dart entry even if you can't score right now.
+      // Submit will still be disabled/blocked by permissions.
 
       const btn = e.target.closest("button");
       if (!btn) return;
@@ -238,49 +428,97 @@ if (createLobbyBtn) {
   document.addEventListener("click", unlockAudioOnce, { once: true });
   document.addEventListener("touchstart", unlockAudioOnce, { once: true });
 
-  // New Game / Invite
-  if (newGameBtn) newGameBtn.addEventListener("click", openNewGameFlow);
+  // Game Settings menu
+  const openGameSettings = () => {
+    // Host-only. No popup; the UI will hide the button for player 2.
+    if (!isHost(app.latestState)) return;
+    if (gameSettingsModal) gameSettingsModal.classList.remove("hidden");
+  };
 
-  if (inviteBtn) {
-    inviteBtn.addEventListener("click", async () => {
-      try {
-        const res = await createNewGameAndShowInvite();
-        if (!res?.ok) showError(res?.msg || "Could not create lobby.");
-      } catch (e) {
-        console.error(e);
-        showError("Could not create lobby.");
-      }
-    });
-  }
+  const closeGameSettings = () => {
+    if (gameSettingsModal) gameSettingsModal.classList.add("hidden");
+  };
 
-  // Mobile menu buttons
-  if (mobileNewGameBtn) {
-    mobileNewGameBtn.addEventListener("click", () => {
-      if (mobileMenu) mobileMenu.removeAttribute("open");
+  if (gameSettingsBtn) gameSettingsBtn.addEventListener("click", openGameSettings);
+  if (gsCloseBtn) gsCloseBtn.addEventListener("click", closeGameSettings);
+
+  if (gsNewGameBtn) {
+    gsNewGameBtn.addEventListener("click", () => {
+      closeGameSettings();
       openNewGameFlow();
     });
   }
 
-  if (mobileInviteBtn) {
-    mobileInviteBtn.addEventListener("click", async () => {
-      if (mobileMenu) mobileMenu.removeAttribute("open");
-      try {
-        const res = await createNewGameAndShowInvite();
-        if (!res?.ok) showError(res?.msg || "Could not create lobby.");
-      } catch (e) {
-        console.error(e);
-        showError("Could not create lobby.");
-      }
+  if (gsRestartBtn) {
+    gsRestartBtn.addEventListener("click", () => {
+      closeGameSettings();
+      const m = document.getElementById("confirmRestartMatchModal");
+      if (m) m.classList.remove("hidden");
     });
   }
 
-  // Close mobile menu if click outside
-  document.addEventListener("click", (e) => {
-    const menu = document.getElementById("mobileMenu");
-    if (!menu) return;
-    if (!menu.hasAttribute("open")) return;
-    if (!menu.contains(e.target)) menu.removeAttribute("open");
-  });
+  const openConfirmLeaveModal = () => {
+    if (confirmLeaveMatchModal) confirmLeaveMatchModal.classList.remove("hidden");
+  };
+
+  const closeConfirmLeaveModal = () => {
+    if (confirmLeaveMatchModal) confirmLeaveMatchModal.classList.add("hidden");
+  };
+
+  async function doLeaveMatchWithHandling() {
+    closeConfirmLeaveModal();
+    closeGameSettings(); // if modal is open, close it
+    try {
+      await leaveMatch();
+    } catch (e) {
+      console.error(e);
+      showError("Could not leave match.");
+    }
+  }
+
+  function confirmLeaveMatch() {
+    // Use in-app modal (no browser confirm)
+    openConfirmLeaveModal();
+  }
+
+  if (confirmLeaveCancelBtn) {
+    confirmLeaveCancelBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      closeConfirmLeaveModal();
+    });
+  }
+
+  if (confirmLeaveOkBtn) {
+    confirmLeaveOkBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      doLeaveMatchWithHandling();
+    });
+  }
+
+  // NEW: Top-bar Leave button (player 2 will see this instead of settings)
+  if (leaveMatchBtn) {
+    leaveMatchBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      confirmLeaveMatch();
+    });
+  }
+
+  // Seat 2 lobby waiting modal: leave without confirmation (quick exit)
+  if (seat2WaitingLeaveBtn) {
+    seat2WaitingLeaveBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      leaveMatch();
+    });
+  }
+
+  // Existing: Leave inside Game Settings modal (host will use this)
+  if (gsLeaveBtn) {
+    gsLeaveBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      confirmLeaveMatch();
+    });
+  }
+
 
   // Submit/Undo
   if (submitBtn) submitBtn.addEventListener("click", submitScore);
@@ -291,6 +529,15 @@ if (createLobbyBtn) {
     overlayUndoBtn.addEventListener("click", () => {
       if (!canUndoNow(app.latestState)) return;
       undoLast();
+    });
+  }
+
+  // Overlay "New Game" (shown when no match is active). Host-only.
+  if (overlayStartBtn) {
+    overlayStartBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      if (!isHost(app.latestState)) return;
+      openNewGameFlow();
     });
   }
 
@@ -352,6 +599,11 @@ if (createLobbyBtn) {
     winnerNewGameBtn.addEventListener("click", continueOrNewMatch);
   }
 
+  const winnerLeaveBtn = document.getElementById("winnerLeaveBtn");
+  if (winnerLeaveBtn) {
+    winnerLeaveBtn.addEventListener("click", leaveMatch);
+  }
+
   // Confirm New Match modal
   const confirmNewMatchCancelBtn = document.getElementById("confirmNewMatchCancelBtn");
   const confirmNewMatchOkBtn = document.getElementById("confirmNewMatchOkBtn");
@@ -372,8 +624,37 @@ if (createLobbyBtn) {
     });
   }
 
+  // Confirm Restart Match modal
+  const confirmRestartCancelBtn = document.getElementById("confirmRestartCancelBtn");
+  const confirmRestartOkBtn = document.getElementById("confirmRestartOkBtn");
+
+  if (confirmRestartCancelBtn) {
+    confirmRestartCancelBtn.addEventListener("click", () => {
+      const modal = document.getElementById("confirmRestartMatchModal");
+      if (modal) modal.classList.add("hidden");
+    });
+  }
+
+  if (confirmRestartOkBtn) {
+    confirmRestartOkBtn.addEventListener("click", async () => {
+      const modal = document.getElementById("confirmRestartMatchModal");
+      if (modal) modal.classList.add("hidden");
+      try {
+        const res = await restartMatch();
+        if (!res?.ok) showError(res?.msg || "Could not restart match.");
+      } catch (e) {
+        console.error(e);
+        showError("Could not restart match.");
+      }
+    });
+  }
+
   // Theme
   initThemeToggle();
+
+  // Error modal
+  const errorOkBtn = document.getElementById("errorOkBtn");
+  if (errorOkBtn) errorOkBtn.addEventListener("click", hideError);
 
   // Bull throw UI
   initBullUI();
@@ -387,12 +668,17 @@ if (createLobbyBtn) {
     if (!el) return;
     el.addEventListener("click", (e) => {
       const st = app.latestState;
+      // Online games only, and viewer must be logged in (guests can't browse profiles)
+      const online = st?.match?.gameType === "online";
+      const viewerAuthed = !!(app.user && !app.user.isAnonymous);
+      if (!online || !viewerAuthed) return;
+
       const uid = st?.match?.players?.[idx]?.uid;
       if (!uid) return; // guests: don't open profile
 
       e.preventDefault();
       e.stopPropagation();
-      openProfileForPlayer(st, idx);
+      openProfileForPlayer(idx);
       try { el.blur(); } catch {}
     });
   };
