@@ -439,13 +439,13 @@ body.dashboardPage {
       to bottom,
       rgba(0, 0, 0, 0) 40%,
       rgba(0, 0, 0, 0.85) 80%
-    ), url("/img/play_local_bg.jpg"); opacity: 1; background-repeat: no-repeat; background-size:cover}
+    ), url("img/play_local_bg.jpg"); opacity: 1; background-repeat: no-repeat; background-size:cover}
 .dashPlayCard.dashPlayOnline {   background:
     linear-gradient(
       to bottom,
       rgba(0, 0, 0, 0) 30%,
       rgba(0, 0, 0, 0.85) 80%
-    ), url("/img/play_online_bg.jpg"); opacity: 1; background-repeat: no-repeat; background-size:cover}
+    ), url("img/play_online_bg.jpg"); opacity: 1; background-repeat: no-repeat; background-size:cover}
 
 .dashPlayIcon {
   max-width: 400px;display:flex;
