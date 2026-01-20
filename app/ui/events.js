@@ -86,12 +86,7 @@ export function wireUI() {
     guestNameInput.addEventListener("input", refreshGateButtons);
   }
 
-  if (joinGameCloseBtn) {
-  joinGameCloseBtn.addEventListener("click", () => {
-    const modal = document.getElementById("joinGameModal");
-    if (modal) modal.classList.add("hidden");
-  });
-}
+  // joinGameCloseBtn is wired later using closeModal(joinGameModal) so it animates.
 
   // Profile modal (closes only on this device)
   wireProfileModalClose();
@@ -140,9 +135,9 @@ export function wireUI() {
       setGuestDisplayName(name);
     }
 
-    // Open the join modal
+    // Open the join modal (animated)
     const modal = document.getElementById("joinGameModal");
-    if (modal) modal.classList.remove("hidden");
+    if (modal) openModal(modal);
   });
 }
 
@@ -150,7 +145,7 @@ export function wireUI() {
   if (joinGameCancelBtn) {
     joinGameCancelBtn.addEventListener("click", (e) => {
       e.preventDefault();
-      if (joinGameModal) joinGameModal.classList.add("hidden");
+      if (joinGameModal) closeModal(joinGameModal);
       // Gate is already visible, but ensure it is shown.
       setLobbyGateVisible(true);
       refreshGateButtons();
@@ -166,13 +161,13 @@ export function wireUI() {
         return;
       }
       if (joinGameLink) joinGameLink.value = "";
-      if (joinGameModal) joinGameModal.classList.remove("hidden");
+      if (joinGameModal) openModal(joinGameModal);
       try { joinGameLink?.focus(); } catch {}
     });
   }
 
   if (joinGameCloseBtn && joinGameModal) {
-    joinGameCloseBtn.addEventListener("click", () => joinGameModal.classList.add("hidden"));
+    joinGameCloseBtn.addEventListener("click", () => closeModal(joinGameModal));
   }
 
   async function joinGameByLinkFromGate() {
@@ -587,7 +582,7 @@ export function wireUI() {
 
   if (setupCancelBtn) setupCancelBtn.addEventListener("click", () => {
     const modal = document.getElementById("setupModal");
-    if (modal) modal.classList.add("hidden");
+    if (modal) closeModal(modal);
   });
 
   if (setupStartBtn) setupStartBtn.addEventListener("click", startMatchFromSetup);
@@ -640,16 +635,16 @@ export function wireUI() {
   if (confirmNewMatchCancelBtn) {
     confirmNewMatchCancelBtn.addEventListener("click", () => {
       const modal = document.getElementById("confirmNewMatchModal");
-      if (modal) modal.classList.add("hidden");
+      if (modal) closeModal(modal);
     });
   }
 
   if (confirmNewMatchOkBtn) {
     confirmNewMatchOkBtn.addEventListener("click", () => {
       const modal = document.getElementById("confirmNewMatchModal");
-      if (modal) modal.classList.add("hidden");
+      if (modal) closeModal(modal);
       const setup = document.getElementById("setupModal");
-      if (setup) setup.classList.remove("hidden");
+      if (setup) openModal(setup);
     });
   }
 
@@ -660,14 +655,14 @@ export function wireUI() {
   if (confirmRestartCancelBtn) {
     confirmRestartCancelBtn.addEventListener("click", () => {
       const modal = document.getElementById("confirmRestartMatchModal");
-      if (modal) modal.classList.add("hidden");
+      if (modal) closeModal(modal);
     });
   }
 
   if (confirmRestartOkBtn) {
     confirmRestartOkBtn.addEventListener("click", async () => {
       const modal = document.getElementById("confirmRestartMatchModal");
-      if (modal) modal.classList.add("hidden");
+      if (modal) closeModal(modal);
       try {
         const res = await restartMatch();
         if (!res?.ok) showError(res?.msg || "Could not restart match.");

@@ -683,6 +683,12 @@ h1 {
   text-align: center;
 }
 
+.greenbutton {
+  background: var(--submit-bg) !important;
+  color: var(--btn-bg);
+  font-weight: 600;
+}
+
 .actionBtn.danger.autowidth {
   width: auto;
 }

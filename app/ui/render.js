@@ -11,6 +11,16 @@ import { isHost } from "../permissions.js";
 // -----------------------------
 export function openModal(modal) {
   if (!modal) return;
+  // Cancel any pending close fallback timer from a previous close.
+  if (modal.__closeTimer) {
+    clearTimeout(modal.__closeTimer);
+    modal.__closeTimer = null;
+  }
+  // Remove any lingering transitionend handler from a previous close.
+  if (modal.__onCloseTransitionEnd) {
+    try { modal.removeEventListener("transitionend", modal.__onCloseTransitionEnd); } catch {}
+    modal.__onCloseTransitionEnd = null;
+  }
   modal.classList.remove("hidden");
   modal.style.display = "flex";
   // Allow the browser to apply display before transitioning
@@ -22,6 +32,15 @@ export function openModal(modal) {
 
 export function closeModal(modal) {
   if (!modal) return;
+  // If already hidden, nothing to do.
+  if (modal.classList.contains("hidden")) return;
+
+  // Cancel any pending close fallback timer.
+  if (modal.__closeTimer) {
+    clearTimeout(modal.__closeTimer);
+    modal.__closeTimer = null;
+  }
+
   modal.classList.remove("is-open");
   modal.classList.add("is-closing");
 
@@ -37,11 +56,17 @@ export function closeModal(modal) {
     if (e.target === modal && e.propertyName === "opacity") finish();
   };
 
+  // Ensure we don't accumulate listeners.
+  if (modal.__onCloseTransitionEnd) {
+    try { modal.removeEventListener("transitionend", modal.__onCloseTransitionEnd); } catch {}
+  }
+  modal.__onCloseTransitionEnd = onEnd;
   modal.addEventListener("transitionend", onEnd);
   // Fallback in case transitionend doesn't fire (rare)
-  setTimeout(() => {
-    if (!modal.classList.contains("hidden")) finish();
-  }, 250);
+  modal.__closeTimer = setTimeout(() => {
+    // If the modal was re-opened, don't force-hide it.
+    if (!modal.classList.contains("is-open") && !modal.classList.contains("hidden")) finish();
+  }, 280);
 }
 
 export function showError(msg) {
