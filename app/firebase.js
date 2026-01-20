@@ -9,8 +9,11 @@ export function initFirebase() {
     appId: "1:470859725756:web:88cbe8cfd067fe0ab049b9",
   };
 
-  firebase.initializeApp(firebaseConfig);
+  if (!firebase.apps || !firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+  }
   const db = firebase.firestore();
+
   console.log("Firebase connected");
   return db;
 }
