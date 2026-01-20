@@ -14,7 +14,7 @@ import {
   leaveMatch,
   restartMatch,
 } from "../actions.js";
-import { applyTheme, initThemeToggle, showError, hideError, setInviteModalVisible, setSetupModalVisible, setLobbyGateVisible} from "./render.js";
+import { applyTheme, initThemeToggle, showError, hideError, setInviteModalVisible, setSetupModalVisible, setLobbyGateVisible, openModal, closeModal } from "./render.js";
 import { unlockAudioOnce } from "../audio/audio.js";
 import { initBullUI } from "../bull/ui.js";
 import { signInWithGoogle, ensureAnonymousSignIn } from "../auth.js";
@@ -434,11 +434,11 @@ export function wireUI() {
   const openGameSettings = () => {
     // Host-only. No popup; the UI will hide the button for player 2.
     if (!isHost(app.latestState)) return;
-    if (gameSettingsModal) gameSettingsModal.classList.remove("hidden");
+    if (gameSettingsModal) openModal(gameSettingsModal);
   };
 
   const closeGameSettings = () => {
-    if (gameSettingsModal) gameSettingsModal.classList.add("hidden");
+    if (gameSettingsModal) closeModal(gameSettingsModal);
   };
 
   if (gameSettingsBtn) gameSettingsBtn.addEventListener("click", openGameSettings);
@@ -455,16 +455,16 @@ export function wireUI() {
     gsRestartBtn.addEventListener("click", () => {
       closeGameSettings();
       const m = document.getElementById("confirmRestartMatchModal");
-      if (m) m.classList.remove("hidden");
+      if (m) openModal(m);
     });
   }
 
   const openConfirmLeaveModal = () => {
-    if (confirmLeaveMatchModal) confirmLeaveMatchModal.classList.remove("hidden");
+    if (confirmLeaveMatchModal) openModal(confirmLeaveMatchModal);
   };
 
   const closeConfirmLeaveModal = () => {
-    if (confirmLeaveMatchModal) confirmLeaveMatchModal.classList.add("hidden");
+    if (confirmLeaveMatchModal) closeModal(confirmLeaveMatchModal);
   };
 
   async function doLeaveMatchWithHandling() {

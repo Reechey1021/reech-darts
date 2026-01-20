@@ -67,10 +67,46 @@ async function isLobbyFull(db, gameId) {
 // This dashboard is a single-screen layout; keep for backwards compat.
 function showView() {}
 
+// -----------------------------
+// Modal helpers (match in-game modal animation system)
+// Dashboard uses the same .modal / .modal-card CSS.
+// -----------------------------
+function openModalEl(modal) {
+  if (!modal) return;
+  modal.classList.remove("hidden");
+  modal.style.display = "flex";
+  requestAnimationFrame(() => {
+    modal.classList.remove("is-closing");
+    modal.classList.add("is-open");
+  });
+}
+
+function closeModalEl(modal) {
+  if (!modal) return;
+  modal.classList.remove("is-open");
+  modal.classList.add("is-closing");
+
+  const finish = () => {
+    modal.classList.remove("is-closing");
+    modal.classList.add("hidden");
+    modal.style.display = "none";
+    modal.removeEventListener("transitionend", onEnd);
+  };
+
+  const onEnd = (e) => {
+    if (e.target === modal && e.propertyName === "opacity") finish();
+  };
+
+  modal.addEventListener("transitionend", onEnd);
+  setTimeout(() => {
+    if (!modal.classList.contains("hidden")) finish();
+  }, 250);
+}
+
 function setSettingsModalVisible(visible) {
   const modal = qs("settingsModal");
   if (!modal) return;
-  modal.classList.toggle("hidden", !visible);
+  visible ? openModalEl(modal) : closeModalEl(modal);
 }
 
 function applyTheme(theme) {
@@ -263,7 +299,7 @@ function wireDashboardUI() {
 
   const setConfirmSignOutVisible = (visible) => {
     if (!confirmSignOutModal) return;
-    confirmSignOutModal.classList.toggle("hidden", !visible);
+    visible ? openModalEl(confirmSignOutModal) : closeModalEl(confirmSignOutModal);
   };
 
   // Join modal
@@ -318,14 +354,14 @@ function wireDashboardUI() {
     joinGameBtn.addEventListener("click", (e) => {
       e.preventDefault();
       if (joinLink) joinLink.value = "";
-      if (joinModal) joinModal.classList.remove("hidden");
+      if (joinModal) openModalEl(joinModal);
     });
   }
 
   if (joinClose) {
     joinClose.addEventListener("click", (e) => {
       e.preventDefault();
-      if (joinModal) joinModal.classList.add("hidden");
+      if (joinModal) closeModalEl(joinModal);
     });
   }
 

@@ -1,11 +1,12 @@
 // app/ui/profileModal.js
 
 import { app } from "../state.js";
+import { openModal, closeModal } from "./render.js";
 
 function setVisible(visible) {
   const modal = document.getElementById("profileModal");
   if (!modal) return;
-  modal.classList.toggle("hidden", !visible);
+  visible ? openModal(modal) : closeModal(modal);
 }
 
 function renderProfileDashboardStyle({ title, displayName, equipment, photoURL, stats }) {

@@ -6,6 +6,44 @@ import { calcLegStats, calcMatchStats, formatPills } from "../model/stats.js";
 import { getActorId } from "../auth.js";
 import { isHost } from "../permissions.js";
 
+// -----------------------------
+// Modal animation helpers
+// -----------------------------
+export function openModal(modal) {
+  if (!modal) return;
+  modal.classList.remove("hidden");
+  modal.style.display = "flex";
+  // Allow the browser to apply display before transitioning
+  requestAnimationFrame(() => {
+    modal.classList.remove("is-closing");
+    modal.classList.add("is-open");
+  });
+}
+
+export function closeModal(modal) {
+  if (!modal) return;
+  modal.classList.remove("is-open");
+  modal.classList.add("is-closing");
+
+  const finish = () => {
+    modal.classList.remove("is-closing");
+    modal.classList.add("hidden");
+    modal.style.display = "none";
+    modal.removeEventListener("transitionend", onEnd);
+  };
+
+  const onEnd = (e) => {
+    // Only act on the overlay opacity transition
+    if (e.target === modal && e.propertyName === "opacity") finish();
+  };
+
+  modal.addEventListener("transitionend", onEnd);
+  // Fallback in case transitionend doesn't fire (rare)
+  setTimeout(() => {
+    if (!modal.classList.contains("hidden")) finish();
+  }, 250);
+}
+
 export function showError(msg) {
   // Use a modal popup (requested). This is local only (doesn't sync).
   const modal = document.getElementById("errorModal");
@@ -18,8 +56,7 @@ export function showError(msg) {
   if (textEl) textEl.textContent = String(msg || "");
 
   if (modal) {
-    modal.classList.remove("hidden");
-    modal.style.display = "flex";
+    openModal(modal);
     return;
   }
 
@@ -34,10 +71,7 @@ export function showError(msg) {
 
 export function hideError() {
   const modal = document.getElementById("errorModal");
-  if (modal) {
-    modal.classList.add("hidden");
-    modal.style.display = "none";
-  }
+  if (modal) closeModal(modal);
   const el = document.getElementById("error");
   if (el) el.classList.add("hidden");
 }
@@ -48,13 +82,13 @@ export function setLobbyGateVisible(visible) {
   if (card) card.style.display = visible ? "none" : "";
   const modal = document.getElementById("lobbyGateModal");
   if (!modal) return;
-  modal.classList.toggle("hidden", !visible);
+  visible ? openModal(modal) : closeModal(modal);
 }
 
 export function setBullModalVisible(visible) {
   const modal = document.getElementById("bullModal");
   if (!modal) return;
-  modal.classList.toggle("hidden", !visible);
+  visible ? openModal(modal) : closeModal(modal);
 }
 
 export function setWinnerModalVisible(visible, winnerName = "") {
@@ -64,43 +98,41 @@ export function setWinnerModalVisible(visible, winnerName = "") {
 
   if (visible) {
     if (winnerText) winnerText.innerText = `${winnerName} has won 🎉`;
-    modal.style.display = "flex";
-    modal.classList.remove("hidden");
+    openModal(modal);
   } else {
     if (winnerText) winnerText.innerText = "";
-    modal.style.display = "none";
-    modal.classList.add("hidden");
+    closeModal(modal);
   }
 }
 
 export function setInviteModalVisible(visible) {
   const modal = document.getElementById("inviteModal");
   if (!modal) return;
-  modal.classList.toggle("hidden", !visible);
+  visible ? openModal(modal) : closeModal(modal);
 }
 
 export function setSetupModalVisible(visible) {
   const modal = document.getElementById("setupModal");
   if (!modal) return;
-  modal.classList.toggle("hidden", !visible);
+  visible ? openModal(modal) : closeModal(modal);
 }
 
 export function setCheckoutModalVisible(visible) {
   const modal = document.getElementById("checkoutModal");
   if (!modal) return;
-  modal.classList.toggle("hidden", !visible);
+  visible ? openModal(modal) : closeModal(modal);
 }
 
 export function setConfirmNewMatchModalVisible(visible) {
   const modal = document.getElementById("confirmNewMatchModal");
   if (!modal) return;
-  modal.classList.toggle("hidden", !visible);
+  visible ? openModal(modal) : closeModal(modal);
 }
 
 export function setSeat2WaitingModalVisible(visible) {
   const modal = document.getElementById("seat2WaitingModal");
   if (!modal) return;
-  modal.classList.toggle("hidden", !visible);
+  visible ? openModal(modal) : closeModal(modal);
 }
 
 export function safeFocusScoreInput() {
@@ -347,7 +379,10 @@ export function render(state) {
       quickCheckoutBtn.disabled = true;
       quickCheckoutBtn.classList.add("hidden");
     }
-    if (undoBtn) undoBtn.disabled = true;
+    if (undoBtn) {
+      undoBtn.disabled = true;
+      undoBtn.hidden = false;
+    }
 
     setWinnerModalVisible(false);
     setCheckoutModalVisible(false);
@@ -378,7 +413,10 @@ export function render(state) {
       quickCheckoutBtn.disabled = true;
       quickCheckoutBtn.classList.add("hidden");
     }
-    if (undoBtn) undoBtn.disabled = true;
+    if (undoBtn) {
+      undoBtn.disabled = true;
+      undoBtn.hidden = false;
+    }
   } else {
     if (scoreInput) scoreInput.disabled = !scoreAllowed;
     if (submitBtn) submitBtn.disabled = !scoreAllowed;
@@ -397,13 +435,29 @@ export function render(state) {
       const hasFinish = typeof remaining === "number" && !!checkoutSuggestion(remaining);
       quickCheckoutBtn.classList.toggle("hidden", !hasFinish);
       quickCheckoutBtn.disabled = !scoreAllowed;
+
+      // When quick checkout is available, turn Submit into an icon-only send button
+      if (submitBtn) {
+        if (!submitBtn.dataset.label) submitBtn.dataset.label = submitBtn.textContent || "Submit";
+        if (hasFinish) {
+          submitBtn.classList.add("iconOnly");
+          submitBtn.innerHTML =
+            '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">' +
+            '<path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" fill="currentColor"/>' +
+            '</svg>';
+        } else {
+          submitBtn.classList.remove("iconOnly");
+          submitBtn.textContent = submitBtn.dataset.label;
+        }
+      }
     }
 
     if (undoBtn) {
-      // In online games with mutual logging disabled, undo can be abused to undo the other device's last entry.
-      // Keep it fully disabled in that configuration.
+      // Hide undo ONLY for online games when mutual control is OFF.
+      // Otherwise it behaves normally (and is disabled when you cannot score).
       const mutualOff = isOnline && state.match?.allowMutualControl === false;
-      undoBtn.hidden = mutualOff || (isOnline && !scoreAllowed);
+      undoBtn.hidden = !!mutualOff;
+      undoBtn.disabled = !!(!scoreAllowed);
     }
   }
 
