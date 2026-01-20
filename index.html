@@ -95,6 +95,7 @@
   <div class="card">
     <div class="toprow">
         <div id="gameMeta" class="gameMeta"></div>
+        <p id="status">Connecting…</p>
         <div id="masterbuttons" class="masterbuttons">
           <button id="gameSettingsBtn">Game Settings</button>
           <button id="leaveMatchBtn" class="btn hidden">Leave Match</button>
@@ -118,7 +119,6 @@
         <button id="themeToggleBtn" type="button">🌙</button>
       </div>      
 
-    <p id="status">Connecting…</p>
 
     <div class="scores">
       <div class="player" id="p1Box">
@@ -147,7 +147,7 @@
     <div id="inputArea" class="inputArea">
   <div id="turnOverlay" class="turnOverlay hidden">
     <div id="turnOverlayText"></div>
-    <button id="overlayUndoBtn" class="overlayUndoBtn">Undo last score</button>
+    <button id="overlayUndoBtn" class="overlayUndoBtn danger">Undo last score</button>
     <button id="overlayStartBtn" class="overlayUndoBtn hidden">New Game</button>
   </div>
     
@@ -161,7 +161,7 @@
     <input
       id="scoreInput"
       type="text"
-      inputmode="numeric"
+      inputmode="none"
       placeholder=""
       autocomplete="off"
     />
@@ -169,6 +169,23 @@
 
   <div class="actionCell3">
     <button id="submitBtn" class="submitBtn">Submit</button>
+    <button id="quickCheckoutBtn"
+        class="submitBtn checkoutBtn hidden"
+        aria-label="Checkout">
+  <svg
+    width="24"
+    height="24"
+    viewBox="0 0 24 16"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="4.5"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    aria-hidden="true">
+    <path d="M20 6L9 17l-5-5" />
+  </svg>
+</button>
+
   </div>
 </div>
 

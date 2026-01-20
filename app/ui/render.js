@@ -339,9 +339,14 @@ export function render(state) {
 
     const scoreInput = document.getElementById("scoreInput");
     const submitBtn = document.getElementById("submitBtn");
+    const quickCheckoutBtn = document.getElementById("quickCheckoutBtn");
     const undoBtn = document.getElementById("undoBtn");
     if (scoreInput) scoreInput.disabled = true;
     if (submitBtn) submitBtn.disabled = true;
+    if (quickCheckoutBtn) {
+      quickCheckoutBtn.disabled = true;
+      quickCheckoutBtn.classList.add("hidden");
+    }
     if (undoBtn) undoBtn.disabled = true;
 
     setWinnerModalVisible(false);
@@ -363,11 +368,16 @@ export function render(state) {
 
   const scoreInput = document.getElementById("scoreInput");
   const submitBtn = document.getElementById("submitBtn");
+  const quickCheckoutBtn = document.getElementById("quickCheckoutBtn");
   const undoBtn = document.getElementById("undoBtn");
 
   if (readOnly) {
     if (scoreInput) scoreInput.disabled = true;
     if (submitBtn) submitBtn.disabled = true;
+    if (quickCheckoutBtn) {
+      quickCheckoutBtn.disabled = true;
+      quickCheckoutBtn.classList.add("hidden");
+    }
     if (undoBtn) undoBtn.disabled = true;
   } else {
     if (scoreInput) scoreInput.disabled = !scoreAllowed;
@@ -378,7 +388,23 @@ export function render(state) {
       submitBtn.disabled = (!scoreAllowed) || (app.dartThrows.length !== 3);
     }
 
-    if (undoBtn) undoBtn.disabled = isOnline && !scoreAllowed;
+    // Quick checkout button: appears only when the current player has a finish suggestion.
+    if (quickCheckoutBtn) {
+      const leg = state.leg;
+      const remaining = typeof leg?.players?.[leg?.currentPlayer]?.score === "number"
+        ? leg.players[leg.currentPlayer].score
+        : null;
+      const hasFinish = typeof remaining === "number" && !!checkoutSuggestion(remaining);
+      quickCheckoutBtn.classList.toggle("hidden", !hasFinish);
+      quickCheckoutBtn.disabled = !scoreAllowed;
+    }
+
+    if (undoBtn) {
+      // In online games with mutual logging disabled, undo can be abused to undo the other device's last entry.
+      // Keep it fully disabled in that configuration.
+      const mutualOff = isOnline && state.match?.allowMutualControl === false;
+      undoBtn.hidden = mutualOff || (isOnline && !scoreAllowed);
+    }
   }
 
   // Lock/disable input UI when it’s not your turn online (better UX)

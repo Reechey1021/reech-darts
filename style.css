@@ -661,6 +661,8 @@ button.submitBtn {
 
 .masterbuttons {
   gap:15px;
+  display: flex;
+  justify-content: flex-end;
 }
 
 #submitBtn, #undoBtn, #inputModeBtn {
@@ -693,7 +695,7 @@ h1 {
 .gameMeta {
   font-weight: 800;
   opacity: 0.8;
-  text-align: center;
+  text-align: left;
 }
 
 #guestNameInput {
@@ -790,8 +792,9 @@ h1 {
 
 .toprow {
   justify-content: space-between;
-  padding: 0px 8px;
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr 2fr 1fr;
+  gap: 16px;
   gap: 10px;
   align-items: center;
   flex-wrap: wrap;
@@ -799,8 +802,8 @@ h1 {
 }
 
 #status {
+  /* Status now lives inside .toprow. On desktop it naturally wraps under the meta/buttons. */
   text-align: center;
-  padding-bottom: 10px;
   font-weight: 600;
   font-size: 20px;
   margin: 8px 0 16px 0;
@@ -883,6 +886,17 @@ h1 {
 .actionCell3 {
   display: flex;
   justify-content: stretch;
+  gap: 10px;
+}
+
+/* Split submit/checkout buttons evenly when both are visible */
+.actionCell3 > button {
+  flex: 1 1 0;
+}
+
+button.checkoutBtn {
+  background: #3b82f6 !important;
+  color: #ffffff !important;
 }
 
 /* Make the buttons fill their column nicely */
@@ -1544,6 +1558,19 @@ button:disabled,
     flex-direction: row;
   }
 
+
+  .actionCell3 {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.actionCell3.submitBtn {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px !important;
+}
+
   .matchEndStats .msHead {
     display: block;
   }
@@ -1615,9 +1642,13 @@ button:disabled,
     box-shadow: none;
   }
 
+  button#gameSettingsBtn {
+    justify-self: end !important;
+  }
+
   .score {
     font-size: 58px;
-    margin-top: -10px;
+    margin-top: 10px;
   }
 
   .name {
@@ -1655,7 +1686,36 @@ button:disabled,
 }
 
   .toprow {
-      flex-direction: row-reverse;
+    display: grid;
+    width: 100%;
+  }
+
+  /* On mobile, keep the status inline in the top row to save space */
+  #status {
+    flex: 1 1 auto;
+    margin: 0;
+    font-size: 14px;
+  }
+
+  /* Turn Game Settings into a small cog button on mobile */
+  #gameSettingsBtn {
+    width: 44px;
+    height: 32px;
+    padding: 0;
+    font-size: 0;
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
+  }
+  #gameSettingsBtn::before {
+    content: "\2699";
+    font-size: 20px;
+  }
+
+  .gameMeta {
+    display:flex;
+    justify-content:left;
+    font-size: 14px;
   }
 
   .dartPad button {
@@ -1665,8 +1725,8 @@ button:disabled,
 /* Mobile: hide the two top buttons and show the cog menu */
 #newGameBtn, #inviteBtn { display: none !important; }
 .mobileMenuWrap { display: block; order: 1;}
-#gameMeta {order:2;}
-#themeToggleBtn {order:3;}
+#gameMeta
+#themeToggleBtn
 
 /* Theme is controlled from dashboard for signed-in users; guests are always dark. */
 #themeToggleBtn { display: none; }

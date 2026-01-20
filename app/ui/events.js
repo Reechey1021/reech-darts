@@ -52,6 +52,10 @@ function isAnyModalOpen() {
   });
 }
 
+function isIOSDevice() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent || "") && !window.MSStream;
+}
+
 // ---------- Wire UI ----------
 export function wireUI() {
   // Gate UI
@@ -310,6 +314,7 @@ export function wireUI() {
   const confirmRestartMatchCancelBtn = document.getElementById("confirmRestartMatchCancelBtn");
   const confirmRestartMatchOkBtn = document.getElementById("confirmRestartMatchOkBtn");
   const submitBtn = document.getElementById("submitBtn");
+  const quickCheckoutBtn = document.getElementById("quickCheckoutBtn");
   const undoBtn = document.getElementById("undoBtn");
   const scoreInputEl = document.getElementById("scoreInput");
   const overlayUndoBtn = document.getElementById("overlayUndoBtn");
@@ -395,7 +400,6 @@ export function wireUI() {
       const digit = btn.getAttribute("data-digit");
       if (digit !== null) {
         scoreInputEl.value = (scoreInputEl.value + digit).slice(0, 3);
-        scoreInputEl.focus?.();
       }
     });
   }
@@ -406,7 +410,6 @@ export function wireUI() {
       if (!canScoreNow(app.latestState)) return;
 
       scoreInputEl.value = "";
-      scoreInputEl.focus?.();
     });
   }
 
@@ -416,7 +419,6 @@ export function wireUI() {
       if (!canScoreNow(app.latestState)) return;
 
       scoreInputEl.value = scoreInputEl.value.slice(0, -1);
-      scoreInputEl.focus?.();
     });
   }
 
@@ -522,6 +524,28 @@ export function wireUI() {
 
   // Submit/Undo
   if (submitBtn) submitBtn.addEventListener("click", submitScore);
+  if (quickCheckoutBtn) {
+    quickCheckoutBtn.addEventListener("click", () => {
+      const state = app.latestState;
+      if (!canScoreNow(state)) return;
+      const leg = state?.leg;
+      if (!leg || !leg.players) return;
+      const p = leg.currentPlayer;
+      const remaining = Number(leg.players?.[p]?.score);
+      if (!Number.isFinite(remaining) || remaining <= 0) return;
+
+      // Ensure we can submit a normal score using existing logic.
+      // If the user is currently in table mode, switch to keypad mode first.
+      if (app.inputMode !== "keypad") {
+        setInputMode("keypad");
+        clearDarts();
+        updateDartUI();
+      }
+
+      if (scoreInputEl) scoreInputEl.value = String(remaining);
+      submitScore();
+    });
+  }
   if (undoBtn) undoBtn.addEventListener("click", undoLast);
 
   // Overlay undo (allowed even when not your turn in online mode)
@@ -543,6 +567,11 @@ export function wireUI() {
 
   // Keyboard: Enter submits (input box)
   if (scoreInputEl) {
+    // iOS: prevent the native on-screen keyboard popping up (we use our custom keypad)
+    scoreInputEl.addEventListener("focus", () => {
+      if (isIOSDevice()) scoreInputEl.blur();
+    });
+
     scoreInputEl.addEventListener("keydown", (e) => {
       if (e.key === "Enter") submitScore();
     });
