@@ -440,22 +440,26 @@ function wireDashboardUI() {
 
 // -------------------- init --------------------
 
-app.db = initFirebase();
-initAuth({ autoAnonymous: false });
-initDashboardThemeToggle();
-wireDashboardUI();
+(async () => {
+  app.db = initFirebase();
+  initDashboardThemeToggle();
+  wireDashboardUI();
 
-onUserChanged(async (user) => {
-  app.user = user;
+  await initAuth({ autoAnonymous: false });
 
-  // Dashboard only for signed-in non-anonymous users
-  if (!user || user.isAnonymous) {
-    window.location.href = "./index.html";
-    return;
-  }
+  onUserChanged(async (user) => {
+    app.user = user;
 
-  await ensureUserProfile();
-  renderWelcome(app.userProfile);
-  renderStats(app.userProfile);
-  showView("home");
-});
+    if (!user || user.isAnonymous) {
+      window.location.href = "./index.html";
+      return;
+    }
+
+    await ensureUserProfile();
+    renderWelcome(app.userProfile);
+    renderStats(app.userProfile);
+    showView("home");
+  });
+})();
+
+

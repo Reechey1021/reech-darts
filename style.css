@@ -1380,7 +1380,7 @@ button:disabled,
     min-height: 100vh;
     display: flex;
     flex-direction: column;
-    justify-content: center; /* vertical centering */
+    padding-top: 15px;
     align-items: center;     /* horizontal centering */
   }
 
