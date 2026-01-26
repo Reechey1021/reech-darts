@@ -1,3 +1,4 @@
+
 :root {
   --font: "Poppins", system-ui, -apple-system, "SF Pro Text", "SF Pro Display",
     "Segoe UI", Roboto, Arial, sans-serif;
@@ -25,17 +26,134 @@
   --modal-overlay: rgba(0, 0, 0, 0.55);
   --modal-card: #ffffff;
 
-  --active-border: #3b82f6;
-  --active-glow: rgba(59, 130, 246, 0.18);
+  --active-border: var(--accent);
+  --active-glow: var(--accent-glow-soft);
 
   --shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
 
   --submit-bg: #80ef80;
+  --submit-strong: #57d95783;
   --danger: #ff746c;
+  --danger-strong: #ff3a3093;
 
-  --error-bg: #fff1f2;
-  --error-border: #fecdd3;
+  --error-bg: color-mix(in srgb, var(--danger) 10%, var(--modal-card) 90%);
+  --error-border: color-mix(in srgb, var(--danger) 45%, var(--border) 55%);
+
+  /* Brand / accent tokens (used across the UI) */
+  --accent: #22f2f2;
+  --accent-ink: #022; /* text/icon color on accent surfaces */
+  --accent-glow: color-mix(in srgb, var(--accent) 38%, transparent);
+  --accent-glow-soft: color-mix(in srgb, var(--accent) 22%, transparent);
+
+  /* Surfaces */
+  --panel: rgba(0, 0, 0, 0.06);
+  --panel-border: rgba(34, 242, 242, 0.35);
+  --panel-border-strong: rgba(34, 242, 242, 0.80);
+  --panel-glass: rgba(255, 255, 255, 0.04);
+
+  /* Text */
+  --text-muted: rgba(17, 17, 17, 0.72);
+
+  /* Semantic colors */
+  --win: #39ff7a;
+  --loss: #ff6b6b;
+
+  /* Shadows */
+  --shadow-sm: 0 6px 16px rgba(0, 0, 0, 0.08);
+  --shadow-strong: 0 10px 24px rgba(0, 0, 0, 0.28);
+
+
+  --shadow-md: 0 10px 30px rgba(0, 0, 0, 0.10);
+  --shadow-lg: 0 18px 45px rgba(0, 0, 0, 0.14);
+  --shadow-glow: 0 10px 26px rgba(34, 242, 242, 0.20);
+
+  /* Dashboard stats palette (keep existing names for JS/CSS) */
+  --dash-accent: var(--accent);
+
+  /* Semantic glow + dashboard surfaces (theme-friendly) */
+  --accent-glow: color-mix(in srgb, var(--accent) 38%, transparent);
+  --accent-glow-soft: color-mix(in srgb, var(--accent) 22%, transparent);
+
+  --dash-panel-bg: color-mix(in srgb, var(--accent) 10%, var(--panel) 90%);
+  --dash-tile-glow: var(--accent-glow-soft);
+
+  --error-bg: color-mix(in srgb, var(--danger) 10%, var(--modal-card) 90%);
+  --error-border: color-mix(in srgb, var(--danger) 45%, var(--border) 55%);
+  --error-glow: color-mix(in srgb, var(--danger) 32%, transparent);
+  --error-glow-soft: color-mix(in srgb, var(--danger) 20%, transparent);
+  --dash-accent-2: var(--accent-glow-soft);
+  --dash-panel: var(--panel-glass);
+  --dash-panel-border: var(--panel-border-strong);
+  --dash-win: var(--win);
+  --dash-loss: var(--loss);
+
+  /* Motion */
+  --dur-fast: 140ms;
+  --dur-med: 220ms;
+  --dur-slow: 360ms;
+  --ease-out: cubic-bezier(.2,.8,.2,1);
+
+  /* Extra semantic colors */
+  --accent-alt: #2b6fff;
+  --on-bright: #0b0f14;
+  --chip-ink: #081018;
+  --win-chip-bg: #7ef3a0;
+
+  /* Auto color literals (generated) */
+  --c_76a249: #000;
+  --c_ad31ce: #eee;
+  --c_6aaa00: #fff;
+  --c_54922f: #ffffff;
+  --c_a0b514: rgba(0, 0, 0, 0);
+  --c_8391d5: rgba(0, 0, 0, 0.15);
+  --c_b40bee: rgba(0, 0, 0, 0.18);
+  --c_cd433a: rgba(0, 0, 0, 0.25);
+  --c_afc27b: rgba(0, 0, 0, 0.35);
+  --c_6f1da3: rgba(0, 0, 0, 0.85);
+  --c_ba2d92: rgba(0, 100, 100, 0.12);
+  --c_984d8f: rgba(0,0,0,0.25);
+  --c_93d83d: rgba(0,0,0,0.35);
+  --c_e87378: rgba(0,0,0,1);
+  --c_1cdb22: rgba(120, 120, 255, 0.10);
+  --c_29dbf5: rgba(120, 180, 255, 0.03);
+  --c_301eaf: rgba(120, 180, 255, 0.08);
+  --c_ad2e34: rgba(120, 180, 255, 0.45);
+  --c_0d34c0: rgba(140, 190, 255, 0.15);
+  --c_8b0c0f: rgba(15, 17, 22, 0.96);
+  --c_554a73: rgba(180, 40, 40, 0.96);
+  --c_d7af08: rgba(19, 247, 255, 0.05);
+  --c_009890: rgba(255, 140, 140, 0.15);
+  --c_c6c207: rgba(255, 255, 255, 0.015);
+  --c_188c3f: rgba(255, 255, 255, 0.06);
+  --c_ead409: rgba(255, 255, 255, 0.10);
+  --c_4b7c21: rgba(255, 255, 255, 0.12);
+  --c_5b89af: rgba(255, 255, 255, 0.2);
+  --c_27defe: rgba(255, 255, 255, 0.25);
+  --c_d87807: rgba(255, 255, 255, 0.35);
+  --c_583d50: rgba(255, 90, 90, 0.15);
+  --c_bbbc86: rgba(255,255,255,.06);
+  --c_1f523d: rgba(255,255,255,.08);
+  --c_0b109d: rgba(255,255,255,.10);
+  --c_d2a2e1: rgba(255,255,255,.12);
+  --c_888f0c: rgba(255,255,255,0.03);
+  --c_080c2a: rgba(255,255,255,0.06);
+  --c_7f2d1a: rgba(255,255,255,0.08);
+  --c_c27a2f: rgba(255,255,255,0.10);
+  --c_4c4d33: rgba(255,255,255,0.12);
+  --c_6252f3: rgba(255,255,255,0.16);
+  --c_6bcd48: rgba(255,255,255,0.18);
+  --c_f9c4db: rgba(255,255,255,0.28);
+  --c_02bf4c: rgba(255,255,255,0.95);
+  --c_3cc02c: rgba(34, 242, 242, 0.06);
+  --c_cb6cd2: rgba(34, 242, 242, 0.08);
+  --c_a2c9cb: rgba(34, 242, 242, 0.35);
+  --c_ea3cbb: rgba(34, 242, 242, 0.45);
+  --c_aaf8e1: rgba(34, 242, 242, 0.88);
+  --c_2b4dc7: rgba(34,197,94,0.8);
+  --c_b6848b: rgba(57, 255, 122, 0.22);
+  --c_57db0f: rgba(90, 160, 255, 0.15);
 }
+
 
 html {
   touch-action: manipulation;
@@ -49,39 +167,345 @@ button,
   -webkit-tap-highlight-color: transparent;
 }
 
+.keypad, .dartPad {
+  height:400px;
+}
+
 
 /* DARK THEME OVERRIDES */
 body[data-theme="dark"] {
-  --bg: #0b0f14;
+  --bg: #000a0d;
   --text: #e7eaf0;
-  --card: #121a24;
+  --card: #00171c;
 
-  --btn-bg: #1b2532;
+  --btn-bg: #00303c;
   --btn-text: #e7eaf0;
 
-  --key-bg: #1b2532;
-  --key-border: #2a3a4f;
+  --key-bg: #0a2730;
+  --key-border: rgba(34, 242, 242, 0.24);
 
-  --border: #223043;
+  --border: rgba(34, 242, 242, 0.24);
 
-  --pill-bg: #1b2532;
-  --pill-border: #2a3a4f;
+  --pill-bg: #1b322f;
+  --pill-border: rgba(34, 242, 242, 0.24);
   --pill-text: #e7eaf0;
 
-  --stats-pill-bg: #1b2532;
+  --stats-pill-bg: #1b322f;
   --stats-pill-border: #2a3a4f;
 
   --modal-overlay: rgba(0, 0, 0, 0.7);
-  --modal-card: #121a24;
+  --modal-card: #00171c;
 
   --shadow: 0 12px 35px rgba(0, 0, 0, 0.45);
 
-  --error-bg: rgba(255, 90, 120, 0.12);
-  --error-border: rgba(255, 90, 120, 0.35);
+  --error-bg: color-mix(in srgb, var(--danger) 10%, var(--modal-card) 90%);
+  --error-border: color-mix(in srgb, var(--danger) 45%, var(--border) 55%);
 
   /* Optional: slightly different submit color in dark */
   --submit-bg: #57d957;
+
+  /* Dark theme surface + accent tuning */
+  --panel: rgba(255, 255, 255, 0.04);
+  --panel-border: rgba(34, 242, 242, 0.24);
+  --panel-border-strong: rgba(34, 242, 242, 0.60);
+  --panel-glass: rgba(255, 255, 255, 0.04);
+
+  --text-muted: rgba(231, 234, 240, 0.72);
+
+  --shadow-md: 0 16px 40px rgba(0, 0, 0, 0.40);
+  --shadow-lg: 0 22px 55px rgba(0, 0, 0, 0.55);
+  --shadow-glow: 0 14px 34px rgba(34, 242, 242, 0.22);
+
+  /* Motion */
+  --dur-fast: 140ms;
+  --dur-med: 220ms;
+  --ease-out: cubic-bezier(.2,.8,.2,1);
+
+  /* Extra semantic colors */
+  --accent-alt: #2b6fff;
+  --on-bright: #0b0f14;
+  --chip-ink: #081018;
+  --win-chip-bg: #7ef3a0;
+  --accent-glow: color-mix(in srgb, var(--accent) 38%, transparent);
+  --accent-glow-soft: color-mix(in srgb, var(--accent) 22%, transparent);
+  --dash-accent: var(--accent);
+  --dash-accent-2: var(--accent-glow-soft);
+  --dash-panel-border: var(--panel-border-strong);
+  --dash-panel-bg: color-mix(in srgb, var(--accent) 10%, var(--panel) 90%);
+  --dash-tile-glow: var(--accent-glow-soft);
+  --error-glow: color-mix(in srgb, var(--danger) 34%, transparent);
+  --error-glow-soft: color-mix(in srgb, var(--danger) 22%, transparent);
 }
+
+
+/* THEME: CYAN GLASS (default) */
+body[data-theme="cyan"] {
+  --bg: #000a0d;
+  --text: #e7eaf0;
+  --card: #00171c;
+
+  --accent: #22f2f2;
+  --accent-alt: #2b6fff;
+
+  --btn-bg: #00303c;
+  --btn-text: var(--text);
+
+  --key-bg: #0a2730;
+  --key-border: rgba(34, 242, 242, 0.24);
+
+  --border: rgba(34, 242, 242, 0.24);
+
+  --pill-bg: #1b322f;
+  --pill-border: rgba(34, 242, 242, 0.24);
+  --pill-text: var(--text);
+
+  --stats-pill-bg: #1b322f;
+  --stats-pill-border: rgba(34, 242, 242, 0.24);
+
+  --modal-overlay: rgba(0, 0, 0, 0.7);
+  --modal-card: #00171c;
+
+  --shadow: 0 12px 35px rgba(0, 0, 0, 0.45);
+
+  --error-bg: color-mix(in srgb, var(--danger) 10%, var(--modal-card) 90%);
+  --error-border: color-mix(in srgb, var(--danger) 45%, var(--border) 55%);
+
+  --submit-bg: #57d957;
+
+  --panel: rgba(255, 255, 255, 0.04);
+  --panel-border: rgba(34, 242, 242, 0.24);
+  --panel-border-strong: rgba(34, 242, 242, 0.60);
+  --panel-glass: rgba(255, 255, 255, 0.04);
+
+  --text-muted: rgba(231, 234, 240, 0.72);
+
+  --shadow-md: 0 16px 40px rgba(0, 0, 0, 0.40);
+  --shadow-lg: 0 22px 55px rgba(0, 0, 0, 0.55);
+  --shadow-glow: 0 14px 34px rgba(34, 242, 242, 0.22);
+
+  --active-border: var(--accent);
+  --active-glow: 0 0 0 3px rgba(34, 242, 242, 0.18), 0 10px 26px rgba(34, 242, 242, 0.35);
+  --accent-glow: color-mix(in srgb, var(--accent) 38%, transparent);
+  --accent-glow-soft: color-mix(in srgb, var(--accent) 22%, transparent);
+  --dash-accent: var(--accent);
+  --dash-accent-2: var(--accent-glow-soft);
+  --dash-panel-border: var(--panel-border-strong);
+  --dash-panel-bg: color-mix(in srgb, var(--accent) 10%, var(--panel) 90%);
+  --dash-tile-glow: var(--accent-glow-soft);
+  --error-glow: color-mix(in srgb, var(--danger) 34%, transparent);
+  --error-glow-soft: color-mix(in srgb, var(--danger) 22%, transparent);
+  
+
+/* Theme swatch preview colors */
+--sw-cyan-1: #22f2f2;
+--sw-cyan-2: #00171c;
+--sw-cyan-3: #7ef3a0;
+
+--sw-purple-1: #b06bff;
+--sw-purple-2: #130622;
+--sw-purple-3: #22f2f2;
+
+--sw-emerald-1: #34f2a6;
+--sw-emerald-2: #061a12;
+--sw-emerald-3: #c8ff4d;
+
+--sw-amber-1: #ffb020;
+--sw-amber-2: #1a0f05;
+--sw-amber-3: #ff4d6d;
+
+--sw-light-1: #ffffff;
+--sw-light-2: #22f2f2;
+--sw-light-3: #111111;
+
+}
+
+
+/* THEME: PURPLE NEON */
+body[data-theme="purple"] {
+  --bg: #0b0614;
+  --text: #efeaff;
+  --card: #140a24;
+
+  --accent: #b06bff;
+  --accent-alt: #22f2f2;
+
+  --btn-bg: #2a1242;
+  --btn-text: var(--text);
+
+  --key-bg: #1b0f2e;
+  --key-border: rgba(176, 107, 255, 0.26);
+
+  --border: rgba(176, 107, 255, 0.22);
+
+  --pill-bg: #221733;
+  --pill-border: rgba(176, 107, 255, 0.24);
+  --pill-text: var(--text);
+
+  --stats-pill-bg: #221733;
+  --stats-pill-border: rgba(176, 107, 255, 0.24);
+
+  --modal-overlay: rgba(0, 0, 0, 0.72);
+  --modal-card: #140a24;
+
+  --shadow: 0 12px 35px rgba(0, 0, 0, 0.50);
+
+  --panel: rgba(255, 255, 255, 0.045);
+  --panel-border: rgba(176, 107, 255, 0.26);
+  --panel-border-strong: rgba(176, 107, 255, 0.64);
+  --panel-glass: rgba(255, 255, 255, 0.05);
+
+  --text-muted: rgba(239, 234, 255, 0.72);
+
+  --shadow-md: 0 16px 40px rgba(0, 0, 0, 0.42);
+  --shadow-lg: 0 22px 55px rgba(0, 0, 0, 0.58);
+  --shadow-glow: 0 14px 34px rgba(176, 107, 255, 0.24);
+
+  --active-border: var(--accent);
+  --active-glow: 0 0 0 3px rgba(176, 107, 255, 0.18), 0 10px 26px rgba(176, 107, 255, 0.35);
+  --accent-glow: color-mix(in srgb, var(--accent) 38%, transparent);
+  --accent-glow-soft: color-mix(in srgb, var(--accent) 22%, transparent);
+  --dash-accent: var(--accent);
+  --dash-accent-2: var(--accent-glow-soft);
+  --dash-panel-border: var(--panel-border-strong);
+  --dash-panel-bg: color-mix(in srgb, var(--accent) 10%, var(--panel) 90%);
+  --dash-tile-glow: var(--accent-glow-soft);
+  --error-bg: color-mix(in srgb, var(--danger) 10%, var(--modal-card) 90%);
+  --error-border: color-mix(in srgb, var(--danger) 45%, var(--border) 55%);
+  --error-glow: color-mix(in srgb, var(--danger) 34%, transparent);
+  --error-glow-soft: color-mix(in srgb, var(--danger) 22%, transparent);
+}
+
+
+/* THEME: EMERALD DARK */
+body[data-theme="emerald"] {
+  --bg: #04100a;
+  --text: #e9fff5;
+  --card: #071a12;
+
+  --accent: #34f2a6;
+  --accent-alt: #c8ff4d;
+
+  --btn-bg: #0a2b1e;
+  --btn-text: var(--text);
+
+  --key-bg: #092116;
+  --key-border: rgba(52, 242, 166, 0.22);
+
+  --border: rgba(52, 242, 166, 0.20);
+
+  --pill-bg: #0d2b1f;
+  --pill-border: rgba(52, 242, 166, 0.22);
+  --pill-text: var(--text);
+
+  --stats-pill-bg: #0d2b1f;
+  --stats-pill-border: rgba(52, 242, 166, 0.22);
+
+  --modal-overlay: rgba(0, 0, 0, 0.72);
+  --modal-card: #071a12;
+
+  --shadow: 0 12px 35px rgba(0, 0, 0, 0.50);
+
+  --panel: rgba(255, 255, 255, 0.04);
+  --panel-border: rgba(52, 242, 166, 0.22);
+  --panel-border-strong: rgba(52, 242, 166, 0.60);
+  --panel-glass: rgba(255, 255, 255, 0.045);
+
+  --text-muted: rgba(233, 255, 245, 0.72);
+
+  --shadow-md: 0 16px 40px rgba(0, 0, 0, 0.42);
+  --shadow-lg: 0 22px 55px rgba(0, 0, 0, 0.58);
+  --shadow-glow: 0 14px 34px rgba(52, 242, 166, 0.22);
+
+  --active-border: var(--accent);
+  --active-glow: 0 0 0 3px rgba(52, 242, 166, 0.18), 0 10px 26px rgba(52, 242, 166, 0.35);
+  --accent-glow: color-mix(in srgb, var(--accent) 38%, transparent);
+  --accent-glow-soft: color-mix(in srgb, var(--accent) 22%, transparent);
+  --dash-accent: var(--accent);
+  --dash-accent-2: var(--accent-glow-soft);
+  --dash-panel-border: var(--panel-border-strong);
+  --dash-panel-bg: color-mix(in srgb, var(--accent) 10%, var(--panel) 90%);
+  --dash-tile-glow: var(--accent-glow-soft);
+  --error-bg: color-mix(in srgb, var(--danger) 10%, var(--modal-card) 90%);
+  --error-border: color-mix(in srgb, var(--danger) 45%, var(--border) 55%);
+  --error-glow: color-mix(in srgb, var(--danger) 34%, transparent);
+  --error-glow-soft: color-mix(in srgb, var(--danger) 22%, transparent);
+}
+
+
+/* THEME: AMBER CLASSIC */
+body[data-theme="amber"] {
+  --bg: #120b05;
+  --text: #fff3e2;
+  --card: #1a0f05;
+
+  --accent: #ffb020;
+  --accent-alt: #ff4d6d;
+
+  --btn-bg: #2a1608;
+  --btn-text: var(--text);
+
+  --key-bg: #221207;
+  --key-border: rgba(255, 176, 32, 0.22);
+
+  --border: rgba(255, 176, 32, 0.20);
+
+  --pill-bg: #2a1608;
+  --pill-border: rgba(255, 176, 32, 0.22);
+  --pill-text: var(--text);
+
+  --stats-pill-bg: #2a1608;
+  --stats-pill-border: rgba(255, 176, 32, 0.22);
+
+  --modal-overlay: rgba(0, 0, 0, 0.72);
+  --modal-card: #1a0f05;
+
+  --shadow: 0 12px 35px rgba(0, 0, 0, 0.55);
+
+  --panel: rgba(255, 255, 255, 0.04);
+  --panel-border: rgba(255, 176, 32, 0.24);
+  --panel-border-strong: rgba(255, 176, 32, 0.62);
+  --panel-glass: rgba(255, 255, 255, 0.045);
+
+  --text-muted: rgba(255, 243, 226, 0.72);
+
+  --shadow-md: 0 16px 40px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 22px 55px rgba(0, 0, 0, 0.62);
+  --shadow-glow: 0 14px 34px rgba(255, 176, 32, 0.22);
+
+  --active-border: var(--accent);
+  --active-glow: 0 0 0 3px rgba(255, 176, 32, 0.18), 0 10px 26px rgba(255, 176, 32, 0.35);
+  --accent-glow: color-mix(in srgb, var(--accent) 38%, transparent);
+  --accent-glow-soft: color-mix(in srgb, var(--accent) 22%, transparent);
+  --dash-accent: var(--accent);
+  --dash-accent-2: var(--accent-glow-soft);
+  --dash-panel-border: var(--panel-border-strong);
+  --dash-panel-bg: color-mix(in srgb, var(--accent) 10%, var(--panel) 90%);
+  --dash-tile-glow: var(--accent-glow-soft);
+  --error-bg: color-mix(in srgb, var(--danger) 10%, var(--modal-card) 90%);
+  --error-border: color-mix(in srgb, var(--danger) 45%, var(--border) 55%);
+  --error-glow: color-mix(in srgb, var(--danger) 34%, transparent);
+  --error-glow-soft: color-mix(in srgb, var(--danger) 22%, transparent);
+}
+
+
+/* THEME: LIGHT CLEAN (explicit) */
+body[data-theme="light"] {
+  /* Uses :root defaults */
+  --accent-glow: color-mix(in srgb, var(--accent) 38%, transparent);
+  --accent-glow-soft: color-mix(in srgb, var(--accent) 22%, transparent);
+  --dash-accent: var(--accent);
+  --dash-accent-2: var(--accent-glow-soft);
+  --dash-panel-border: var(--panel-border-strong);
+  --dash-panel-bg: color-mix(in srgb, var(--accent) 10%, var(--panel) 90%);
+  --dash-tile-glow: var(--accent-glow-soft);
+  --error-bg: color-mix(in srgb, var(--danger) 10%, var(--modal-card) 90%);
+  --error-border: color-mix(in srgb, var(--danger) 45%, var(--border) 55%);
+  --error-glow: color-mix(in srgb, var(--danger) 34%, transparent);
+  --error-glow-soft: color-mix(in srgb, var(--danger) 22%, transparent);
+}
+
+
+
 
 body, button, input, select, textarea {
   font-family: var(--font);
@@ -90,16 +514,56 @@ body, button, input, select, textarea {
 body {
   margin: 0;
   padding: 24px;
-  background: var(--bg);
+  background:
+    radial-gradient(900px circle at 10% -10%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 55%),
+    radial-gradient(1100px circle at 90% 100%, var(--border), transparent 50%),
+    var(--bg);
+  background-attachment: fixed;
   color: var(--text);
 }
+/* Subtle ambient texture layer (kept very light to avoid distraction) */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(1200px circle at 20% 0%, var(--c_3cc02c), transparent 60%),
+    radial-gradient(900px circle at 80% 20%, var(--c_d7af08), transparent 65%),
+    repeating-linear-gradient(
+      0deg,
+      var(--c_c6c207) 0px,
+      var(--c_c6c207) 1px,
+      transparent 1px,
+      transparent 6px
+    );
+  mix-blend-mode: overlay;
+  opacity: 0.55;
+  z-index: -1;
+}
 
-.danger {
+@media (prefers-reduced-motion: reduce) {
+  body { background-attachment: scroll; }
+}
+
+
+button.danger {
   background-color: var(--danger) !important;
+  border-color: var(--danger) !important;
   background: transparent;
   color: var(--card);
   font-weight: 600;
+  transition: box-shadow 0.8s ease, border-color 0.2s ease !important;
 }
+
+button.danger:hover {
+  background-color: var(--danger) !important;
+  border-color: var(--danger-strong) !important;
+  box-shadow:
+    0 0px 12px var(--danger-strong);
+}
+
+
 
 /* User avatars (Google profile photo) */
 .avatar {
@@ -115,7 +579,7 @@ body {
    ------------------------------------------------------------------ */
 
 body.dashboardPage {
-  height: 100vh;
+  height: 92vh;
   padding: 18px;
 }
 
@@ -131,13 +595,17 @@ body.dashboardPage {
 
 .dashHeader {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 14px;
-  padding: 14px 0px;
+  padding: 14px 14px;
   border-radius: 18px;
   background: var(--panel);
   border: 1px solid var(--panel-border);
+}
+
+.profileDash {
+  padding-top:10px;
 }
 
 .dashIdentity {
@@ -158,6 +626,8 @@ body.dashboardPage {
 
 .dashHello { min-width: 0; padding-left: 20px;}
 
+.dashHello.friends {padding-left: 0px;}
+
 .dashWelcome {
   opacity: 0.85;
   font-size: 20px;
@@ -176,7 +646,6 @@ body.dashboardPage {
 }
 
 .dashEquipment {
-  margin-top: 6px;
   opacity: 1;
   font-weight: 600;
   font-size: 15px;
@@ -195,12 +664,44 @@ body.dashboardPage {
   gap: 12px;
 }
 
-.dashSignOut {
+.dashSignOut, .dashSettingsBtn {
   padding: 10px 14px;
-  border-radius: 14px;
   border: 1px solid var(--panel-border);
   background: var(--btn-bg);
   color: var(--text);
+}
+
+.dashMiscCardDiv {
+  flex: 1 0 1;
+  display: flex;
+  flex-direction: row;
+  min-height: 180px;
+  position: relative;
+  overflow: hidden;
+  gap: 12px;
+  border-radius:16px;
+  padding-top:2px;
+  margin-top:-2px;
+}
+
+.dashMiscCard {
+  background-color: var(--btn-bg);
+  border-radius: 18px;
+  flex: 1 1 0;
+  min-height: 0;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items:center;
+  gap: 20px;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.dashFriends, .dashJoinGame {
+  width: auto;
 }
 
 .dashSwitch {
@@ -216,7 +717,7 @@ body.dashboardPage {
   position: absolute;
   inset: 0;
   border-radius: 999px;
-  background: rgba(255,255,255,0.08);
+  background: var(--panel-glass);
   border: 1px solid var(--panel-border);
 }
 
@@ -229,7 +730,7 @@ body.dashboardPage {
   width: 22px;
   height: 22px;
   border-radius: 999px;
-  background: rgba(255,255,255,0.92);
+  background: color-mix(in srgb, var(--card), var(--c_6aaa00) 65%);
 }
 
 .dashEquipmentDiv {
@@ -237,6 +738,7 @@ body.dashboardPage {
   flex-direction: row;
   align-items: flex-start;
   padding-top: 6px;
+  gap: 6px;
 }
 
 .dashSwitch input:checked + .dashSlider::after {
@@ -253,20 +755,21 @@ body.dashboardPage {
 
 .dashStatsCard,
 .dashPlayCard,
+.dashMiscCard,
 .dashBottomBtn {
   border-radius: 22px;
   background: var(--card);
   border: 1px solid var(--panel-border);
-  box-shadow: 0 12px 40px rgba(0,0,0,0.18);
+  box-shadow: var(--shadow-lg);
 }
 
 .dashStatsCard {
   padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 20px;
   min-height: 0;
-  justify-content: space-between;
+  justify-content: flex-start;
 }
 
 .dashStatsTitle {
@@ -276,23 +779,327 @@ body.dashboardPage {
   letter-spacing:0px;
 }
 
+/* ------------------------------------------------------------------
+   Dashboard: new Statistics panel layout (V5 -> refreshed)
+   ------------------------------------------------------------------ */
+
+.dashStatTiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.dashStatTile {
+  background: color-mix(
+  in srgb,
+  var(--dash-panel-bg) 35%,
+  transparent
+);
+  border: 1px solid var(--dash-panel-border);
+  border-radius: 18px;
+  padding: 16px;
+
+  box-shadow:
+    /* inner highlight */
+    inset 0 0 0 1px var(--panel),
+
+    /* depth shadow */
+    0 12px 28px var(--c_b40bee),
+
+    /* neon glow */
+    0 0px 14px var(--dash-tile-glow);
+}
+
+/* Base: keep your existing .dashStatTile rules.
+   This adds the premium glow/glass treatment. */
+.dashStatTile--glow{
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  outline: 1px solid color-mix(in srgb, var(--accent), transparent 75%);
+  outline-offset: -1px;
+
+  border: 1px solid color-mix(in srgb, var(--dash-panel-border), var(--accent) 18%);
+  border-radius: 18px;
+}
+
+/* Hotspot border glow (this is what your "after" is missing) */
+.dashStatTile--glow::before{
+  content:"";
+  position:absolute;
+  inset:-2px;
+  border-radius: inherit;
+  pointer-events:none;
+  z-index:0;
+
+
+  /* hotspots + edge glow */
+  background:
+    radial-gradient(70px 50px at 16% 18%,
+      color-mix(in srgb, var(--accent), transparent 85%) 0%,
+      transparent 70%),
+    radial-gradient(90px 60px at 90% 18%,
+      color-mix(in srgb, var(--accent-2, var(--accent)), transparent 90%) 0%,
+      transparent 52%),
+    radial-gradient(110px 70px at 55% 105%,
+      color-mix(in srgb, var(--accent), transparent 95%) 0%,
+      transparent 50%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--accent), transparent 90%),
+      transparent 60%
+    );
+
+  /* key: this makes it look like the border has “bright points” */
+  mix-blend-mode: screen;
+  opacity: .95;
+  filter: blur(0.2px);
+}
+
+/* Glass sheen streak */
+.dashStatTile--glow::after{
+  content:"";
+  position:absolute;
+  inset:-50% -20%;
+  border-radius: inherit;
+  pointer-events:none;
+  z-index:0;
+
+  background: linear-gradient(
+    125deg,
+    transparent 10%,
+    rgba(0,0,0,0.5) 50%,
+    transparent 60%
+  );
+
+  transform: rotate(10deg);
+  opacity: .65;
+}
+
+/* Keep content above effects */
+.dashStatTile--glow > *{
+  position: relative;
+  z-index: 1;
+}
+
+.dashStatTileIcon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--dash-accent);
+  display: grid;
+  place-items: center;
+  margin-bottom: 10px;
+  box-shadow: 0 0px 16px var(--dash-accent-2);
+}
+
+.dashStatTileIcon.small {
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  margin-bottom: 0px;
+}
+
+.dashStatTileIcon.small img{
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+  filter: brightness(0) saturate(100%);
+}
+
+.dashStatTileIcon img {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  filter: brightness(0) saturate(100%);
+}
+
+.dashStatTileLabel {
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  font-size: 12px;
+  text-transform: uppercase;
+  opacity: 0.9;
+}
+
+.dashStatTileValue {
+  margin-top: 6px;
+  font-weight: 900;
+  font-size: 48px;
+  line-height: 1;
+  color: color-mix(in srgb, var(--dash-accent), var(--text) 90%);
+}
+
+.dashStatMid {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  padding-top: 12px;
+  gap: 26px;
+  align-items: center;
+}
+
+.dashStatList {
+  display: grid;
+  gap: 14px;
+  padding: 8px 2px;
+}
+
+.dashStatRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dashStatRow .k {
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 14px;
+  opacity: 0.95;
+}
+
+.dashStatRow .v {
+  font-weight: 900;
+  font-size: 22px;
+  color: color-mix(in srgb, var(--dash-accent), var(--text) 40%);
+}
+
+.dashWinRate {
+  display: grid;
+  place-items: center;
+}
+
+/* Donut chart (CSS only; JS sets --p 0..1) */
+.dashDonut {
+  --size: 188px;
+  --thickness: 18px;
+  width: var(--size);
+  height: var(--size);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background:
+    conic-gradient(
+      var(--dash-win) calc(var(--p) * 1turn),
+      var(--dash-loss) 0
+    );
+  box-shadow:
+    0 18px 45px var(--c_afc27b),
+    0 0 0 1px var(--c_188c3f),
+    0 0 24px var(--c_b6848b);
+  position: relative;
+}
+
+.dashDonut::after {
+  content: "";
+  position: absolute;
+  inset: var(--thickness);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--card), var(--c_76a249) 28%);
+  box-shadow:
+    inset 0 0 0 1px var(--c_188c3f),
+    inset 0 14px 30px var(--c_afc27b);
+}
+
+.dashDonutInner {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  display: grid;
+  gap: 6px;
+}
+
+.dashDonutLabel {
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.dashDonutValue {
+  font-weight: 900;
+  font-size: 44px;
+  line-height: 1;
+}
+
+.dashStatsBottom {
+  display: grid;
+  gap: 12px;
+}
+
+.dashLastRowTight {
+  border-top: 0;
+  padding-bottom: 12px;
+  margin-top: 4px;
+}
+
+.dashLast5 {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+  justify-content: center;
+}
+
+.dashMilestones {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.dashMilestone {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: color-mix(
+  in srgb,
+  var(--dash-panel-bg) 65%,
+  transparent
+);
+  border: 1px solid var(--dash-accent);
+    box-shadow:
+    /* inner highlight */
+    inset 0 0 0 1px var(--panel),
+
+    /* depth shadow */
+    0 12px 28px var(--c_b40bee),
+
+    /* neon glow */
+    0 0px 10px var(--dash-tile-glow);
+}
+
+.dashMilestone .k {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.dashMilestone .v {
+  font-size: 18px;
+  font-weight: 900;
+}
+
 .autowidth {
   width: auto !important;
 }
 
 .fullwidth {
   display: flex;
+  flex-direction: column;
   justify-content: center;
   padding: 0px;
 }
 
 .dashLastRow {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  border-top: 1px solid rgba(255,255,255,0.08);
-  padding: 25px 15px 10px 0px;
 }
 
 #joinGameLink {
@@ -312,17 +1119,31 @@ body.dashboardPage {
   place-items: center;
   font-weight: 800;
   font-size: 14px;
-  color: #081018;
+  color: var(--chip-ink);
 }
 
-.dashWL.w { background: #7ef3a0; }
-.dashWL.l { background: #ff6b6b; }
+.dashWL.w { background: var(--win-chip-bg); }
+.dashWL.l { background: var(--loss); }
+
+.mhPill {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 14px;
+  color: var(--chip-ink);
+}
+
+.mhPill.win { background: var(--win-chip-bg); }
+.mhPill.lose { background: var(--loss); }
 
 .dashKeyStats {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
-  border-top: 1px solid rgba(255,255,255,0.08);
+  border-top: 1px solid var(--c_7f2d1a);
   padding-top: 12px;
 }
 
@@ -345,11 +1166,7 @@ body.dashboardPage {
 }
 
 .dashEquipmentIcon {
-  width: 20px;
-  height: 20px;
-  border-radius: 10px;
   background: transparent;
-  padding: 6px;
 }
 
 .dashKeyVal {
@@ -370,8 +1187,8 @@ body.dashboardPage {
 .dashMiniStat {
   padding: 10px;
   border-radius: 12px;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.08);
+  background: var(--panel);
+  border: 1px solid var(--c_7f2d1a);
   text-align: center
 }
 
@@ -385,8 +1202,8 @@ body.dashboardPage {
   flex-direction:column;
   padding: 10px;
   border-radius: 12px;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.08);
+  background: var(--panel);
+  border: 1px solid var(--c_7f2d1a);
   text-align: center;
   align-items: center;
   justify-content: center;
@@ -398,8 +1215,8 @@ body.dashboardPage {
   flex-direction:row;
   justify-content:space-between;
   border-radius: 12px;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.08);
+  background: var(--panel);
+  border: 1px solid var(--c_7f2d1a);
   text-align: center;
   align-items: center;
 }
@@ -415,6 +1232,10 @@ body.dashboardPage {
   grid-template-columns: 2fr 1fr;
 }
 
+.dashMiniGrid.one {
+  grid-template-columns: 1fr;
+}
+
 .dashPlayCol {
   display: flex;
   flex-direction: column;
@@ -423,29 +1244,192 @@ body.dashboardPage {
 }
 
 .dashPlayCard {
-  flex: 1 1 0;
-  min-height: 0;
+  flex: 1 0 1;
+  min-height: 140px;
   padding: 18px;
   display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
+  flex-direction: row;
+  justify-content: center;
+  align-items:center;
   cursor: pointer;
   position: relative;
   overflow: hidden;
+  gap:15px;
+}
+
+/* 1) One clean base transition (remove the !important block) */
+.dashPlayCard,
+.dashMiscCard {
+  border: 1px solid var(--dash-panel-border);
+  border-radius: 18px;
+
+  box-shadow:
+    0 0 12px var(--accent-glow-soft),
+    var(--shadow-md);
+
+  transition:
+    transform 220ms cubic-bezier(.2,.8,.2,1),
+    box-shadow 320ms ease,
+    border-color 220ms ease,
+    filter 320ms ease;
+  will-change: transform;
+}
+
+/* 2) Apply glow class to the actual cards you want */
+.dashPlayCard--glow {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+
+  /* keep outline if you like */
+  outline: 1px solid color-mix(in srgb, var(--accent), transparent 55%);
+  outline-offset: -1px;
+}
+
+/* 3) Hotspot border glow lives on ::before (NOT on :hover) */
+.dashPlayCard--glow::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 0;
+
+  /* hotspots + faint edge wash */
+  background:
+    radial-gradient(80px 60px at 18% 18%,
+      color-mix(in srgb, var(--accent), transparent 15%) 0%,
+      transparent 82%),
+    radial-gradient(110px 70px at 86% 22%,
+      color-mix(in srgb, var(--accent-2, var(--accent)), transparent 20%) 0%,
+      transparent 74%),
+    radial-gradient(130px 80px at 55% 110%,
+      color-mix(in srgb, var(--accent), transparent 20%) 0%,
+      transparent 72%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--accent), transparent 28%),
+      transparent 60%
+    );
+  opacity: 0.35;
+  filter: blur(0.4px);
+  mix-blend-mode: screen;
+  transition: opacity 320ms ease;
+}
+
+
+.dashPlayCard,
+.dashMiscCard {
+  /* this affects the background image since it's part of background painting */
+  filter: saturate(0.85) contrast(0.9) brightness(0.9);
+}
+
+.dashPlayCard--glow::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 0;
+
+  /* Always-on overlay: darken + glass tint + slight vignette */
+  background:
+    radial-gradient(120% 120% at 20% 0%,
+      color-mix(in srgb, var(--accent), transparent 90%) 0%,
+      transparent 55%),
+    radial-gradient(140% 120% at 100% 20%,
+      rgba(0,0,0,0.55) 0%,
+      rgba(0,0,0,0.15) 60%,
+      rgba(0,0,0,0.65) 100%),
+    linear-gradient(
+      180deg,
+      rgba(0,0,0,0.25),
+      rgba(0,0,0,0.55)
+    );
+
+  /* IMPORTANT: not too low, so it actually wins over the photo */
+  opacity: 0.85;
+
+  transition: opacity 320ms ease;
+}
+
+
+/* 5) Content above */
+.dashPlayCard--glow > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* 6) Hover feels “alive” (no jolt) */
+.dashPlayCard--glow:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--dash-panel-border), var(--accent) 35%);
+  box-shadow:
+    0 0 18px var(--accent-glow-soft),
+    0 18px 44px var(--shadow-strong, var(--shadow-md));
+}
+
+.dashPlayCard--glow:hover::before {
+  opacity: 0.95;
+}
+
+.dashPlayCard--glow:hover::after {
+  opacity: 0.92;
+}
+
+/* 7) Press state like your other buttons */
+.dashPlayCard--glow:active {
+  transform: translateY(-1px) scale(0.99);
+}
+
+.dashMilestone.dashStatTile--glow:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--dash-panel-border), var(--accent) 35%);
+  box-shadow:
+    0 0 18px var(--accent-glow-soft),
+    0 18px 44px var(--shadow-strong, var(--shadow-md));
+}
+
+.dashMilestone.dashStatTile--glow:hover::before {
+  opacity: 0.95;
+}
+
+.dashMilestone.dashStatTile--glow:hover::after {
+  opacity: 0.92;
+}
+
+/* 7) Press state like your other buttons */
+.dashMilestone.dashStatTile--glow:active {
+  transform: translateY(-1px) scale(0.99);
+}
+
+
+.dashboardGameIcon{
+  max-width: 80px;
+  max-height: 80px;  
 }
 
 .dashPlayCard.dashPlayLocal {   background:
     linear-gradient(
       to bottom,
-      rgba(0, 0, 0, 0) 40%,
-      rgba(0, 0, 0, 0.85) 80%
-    ), url("img/play_local_bg.jpg"); opacity: 1; background-repeat: no-repeat; background-size:cover}
+      var(--c_a0b514) 40%,
+      var(--c_6f1da3) 80%
+    ), url("img/play_local_bg.png"); opacity: 1; background-repeat: no-repeat; background-size:cover}
 .dashPlayCard.dashPlayOnline {   background:
     linear-gradient(
       to bottom,
-      rgba(0, 0, 0, 0) 30%,
-      rgba(0, 0, 0, 0.85) 80%
-    ), url("img/play_online_bg.jpg"); opacity: 1; background-repeat: no-repeat; background-size:cover}
+      var(--c_a0b514) 30%,
+      var(--c_6f1da3) 80%
+    ), url("img/play_online_bg.png"); opacity: 1; background-repeat: no-repeat; background-size:cover}
+
+    .dashMiscCard {   background:
+    linear-gradient(
+      to bottom,
+      var(--c_a0b514) 30%,
+      var(--c_6f1da3) 80%
+    ), url("img/play_misc_bg.png"); opacity: 1; background-repeat: no-repeat; background-size:cover}
+
+
 
 .dashPlayIcon {
   max-width: 400px;display:flex;
@@ -454,14 +1438,16 @@ body.dashboardPage {
 
 .dashPlayText {
   position: relative;
+
   z-index: 1;
   color: var(--btn-text);
-  text-shadow: 0 2px 0 rgba(255,255,255,0.18);
+  text-shadow: 0 2px 0 var(--c_6bcd48);
   font-weight: 900;
   letter-spacing: -0.01em;
 }
 
-.small { font-size: 24px; opacity: 0.9; color: white;}
+.small { font-size: 20px; font-weight: 500; opacity: 0.9; color: white;}
+.medium { font-size: 24px; font-weight: 700; line-height: 1; color: white;}
 .big { font-size: 42px; line-height: 0.95; color: white;}
 
 .dashJoinRow {
@@ -474,8 +1460,9 @@ body.dashboardPage {
   padding: 12px 14px;
   border-radius: 18px;
   border: 1px solid var(--panel-border);
-  background: rgba(255,255,255,0.06);
+  background: var(--c_080c2a);
   color: var(--text);
+  box-shadow: var(--shadow-sm);
 }
 
 .dashBottomBtn {
@@ -489,10 +1476,31 @@ body.dashboardPage {
 
 @media (max-width: 860px) {
   body.dashboardPage { padding: 12px; }
-  .dashMain { flex-direction: row;}
+  .dashMain { flex-direction: column-reverse !important; display:flex; justify-content: flex-end;}
   .dashName { font-size: 38px; }
 }
 
+#matchHistoryModal.modal, #oppProfileModal.modal {
+  padding: 6px;
+}
+
+#oppProfileModal .modal-card {
+  padding: 8px;
+}
+
+.dashStatsCard.profile {
+  padding: 16px;
+}
+
+#oppProfileCloseBtn {
+  margin-top: 20px;
+}
+
+#oppRemoveFriendBtn, #profileRemoveFriendBtn {
+  font-size: 12px; padding: 6px 6px;
+}
+
+.build-tag {display:none;}
 
 .nameRow {
   display: inline-flex;
@@ -502,7 +1510,6 @@ body.dashboardPage {
   width: auto;
   border-radius: 50px;
   padding: 4px;
-  margin: 0 auto;
   background: var(--card);
   color: var(--text);
   border: 1px solid var(--border);
@@ -534,8 +1541,8 @@ button:hover {
 
 /* Connected state */
 .lobbyIndicator.connected .dot {
-  border-color: rgba(34,197,94,0.8);
-  background: rgba(34,197,94,0.8);
+  border-color: var(--c_2b4dc7);
+  background: var(--c_2b4dc7);
 }
 
 #inputArea { position: relative; }
@@ -585,14 +1592,14 @@ button:hover {
 }
 
 .menuItem:hover {
-  background: rgba(255,255,255,0.06); /* subtle - works in dark too */
+  background: var(--c_080c2a); /* subtle - works in dark too */
 }
 
 
-#setupMode, #setupBestOf, #setupGameType, #setupStarter, #setupCompetition, #setupMutualControl {
+#setupMode, #setupBestOf, #setupGameType, #setupStarter, #setupCompetition, #setupMutualControl, #setupPreset, #setupCheckIn, #setupCheckOut {
   border-radius: 16px;
   border-color: transparent;
-  background-color: var(--key-bg);
+  background-color: var(--btn-bg);
   color: var(--btn-text) !important;
 }
 
@@ -630,8 +1637,8 @@ button {
   -webkit-backdrop-filter: blur(6px) saturate(130%);
 
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.25),
-    0 0px 6px rgba(0, 0, 0, 0.15);
+    inset 0 1px 0 var(--c_27defe),
+    0 0px 6px var(--c_8391d5);
 
   transition:
     transform 0.15s ease,
@@ -639,24 +1646,28 @@ button {
     background 0.2s ease;
 }
 
-button:hover {
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.35),
-    0 0px 12px rgba(90, 160, 255, 0.15);
-}
-
 button:focus-visible {
   outline: none;
   box-shadow:
-    0 0 0 3px rgba(120, 180, 255, 0.45),
-    0 0px 6px rgba(0, 0, 0, 0.25);
+    0 0 0 3px var(--c_ad2e34),
+    0 0px 6px var(--c_cd433a);
 }
 
 button.submitBtn {  
   background: var(--submit-bg) !important;
-  color: #0b0f14;
+  color: var(--on-bright);
   width: 100%;
-  border-width: 0px;}
+  border-width: 0px;
+  border-color: var(--submit-bg) !important;
+  transition: box-shadow 0.8s ease, border-color 0.2s ease !important;
+}
+
+button.submitBtn:hover {  
+    border-color: var(--submit-strong) !important;
+    box-shadow:
+    0 0px 12px var(--submit-strong),
+    var(--shadow-md);
+}
 
 .masterbuttons {
   gap:15px;
@@ -689,6 +1700,98 @@ h1 {
   font-weight: 600;
 }
 
+.greenbutton:hover {
+    border-color: var(--submit-strong) !important;
+    box-shadow:
+    0 0px 12px var(--submit-strong),
+    var(--shadow-md);
+}
+
+.redbutton {
+  background: var(--danger) !important;
+  color: var(--on-bright);
+  font-weight: 600;
+}
+
+.redbutton.danger.friends {
+  padding: 2px 6px;
+  width: auto;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.friendActions {
+  margin-top: 10px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.friendPendingRow {
+  display: flex;
+  gap: 10px;
+}
+
+.friendStatus {
+  font-size: 14px;
+  opacity: 0.85;
+  padding: 8px 10px;
+  border: 1px solid var(--c_4c4d33);
+  border-radius: 12px;
+}
+
+.modalSubhead {
+  margin: 10px 0 8px;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+.mutedRow {
+  opacity: 0.75;
+  padding: 10px 6px;
+}
+
+.friendsList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.friendRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 2px 2px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--c_c27a2f);
+  background: var(--c_888f0c);
+}
+
+.friendRowLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  cursor:pointer;
+}
+
+.friendRowName {
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.friendRowActions {
+  display: flex;
+  gap: 2px;
+}
+
 .actionBtn.danger.autowidth {
   width: auto;
 }
@@ -709,10 +1812,13 @@ h1 {
 
 .modal-card.error {
   background: var(--error-bg);
-    box-shadow:
-    inset 0 0 0 1px rgba(255, 140, 140, 0.15),
-    0 0 80px rgba(255, 90, 90, 0.15);
+  border: 1px solid var(--error-border);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--error-border) 55%, transparent),
+    0 18px 46px var(--shadow-lg),
+    0 0 80px var(--error-glow-soft);
 }
+
 
 #errorOkBtn {
   background: var(--error-border);
@@ -723,8 +1829,8 @@ h1 {
   background:
     linear-gradient(
       180deg,
-      rgba(120, 180, 255, 0.08),
-      rgba(120, 180, 255, 0.03)
+      var(--c_301eaf),
+      var(--c_29dbf5)
     ),
     color-mix(in srgb, var(--modal-card) 65%, transparent);
   color: var(--text);
@@ -734,8 +1840,8 @@ h1 {
   backdrop-filter: blur(14px) saturate(140%);
   -webkit-backdrop-filter: blur(14px) saturate(140%);
   box-shadow:
-    inset 0 0 0 1px rgba(140, 190, 255, 0.15),
-    0 0 80px rgba(90, 160, 255, 0.15);
+    inset 0 0 0 1px var(--c_0d34c0),
+    0 0 80px var(--c_57db0f);
 }
 
 .welcomewrapper {
@@ -773,6 +1879,10 @@ h1 {
   gap: 10px;
   align-items: center;
   margin: 10px 0;
+}
+
+.flexrow {
+  flex-direction: row;
 }
 
 .card {
@@ -853,11 +1963,27 @@ h1 {
   transition: background-color 0.15s ease, transform 0.1s ease;
 }
 
+
+.checkInDartsBtn {
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
 .dartsBtn.selected {
-  background-color: var(--active-border);
-  color:#eee;
+  background-color: var(--accent);
+  background: var(--accent);
+  color:var(--c_ad31ce);
   box-shadow: 0 0 0 3px var(--active-glow);
 }
+
+.doubleDartsBtn {
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
+.doubleDartsBtn.selected {
+  background-color: var(--accent);
+  background: var(--accent);
+  color:var(--c_ad31ce);
+  box-shadow: 0 0 0 3px var(--active-glow);
+}
+
 
 .player.active {
   border: 2px solid var(--active-border);
@@ -900,8 +2026,8 @@ h1 {
 }
 
 button.checkoutBtn {
-  background: #3b82f6 !important;
-  color: #ffffff !important;
+  background: var(--accent) !important;
+  color: var(--c_54922f) !important;
 }
 
 /* Make the buttons fill their column nicely */
@@ -1070,7 +2196,7 @@ button:disabled,
 }
 
 .dartTable th, .dartTable td {
-  border: 1px solid rgba(255,255,255,0.12);
+  border: 1px solid var(--c_4c4d33);
   padding: 10px;
   text-align: center;
 }
@@ -1131,7 +2257,7 @@ button:disabled,
   margin-top: 10px;
 }
 
-.key {
+button.key {
   padding: 14px 0;
   min-height: 70px;
   font-size: 32px;
@@ -1141,12 +2267,16 @@ button:disabled,
   color: var(--text);
 }
 
-.key:active {
-  transform: translateY(1px);
+button {
+  border-width: 1px !important;
+}
+
+button.key:active {
+  transform: translateY(1px) scale(0.99);
 }
 
 .key-wide {
-  font-size: 26px;
+  font-size: 22px !important;
 }
 
 /* Editable names */
@@ -1237,8 +2367,8 @@ button:disabled,
   background:
     linear-gradient(
       180deg,
-      rgba(120, 180, 255, 0.08),
-      rgba(120, 180, 255, 0.03)
+      var(--c_301eaf),
+      var(--c_29dbf5)
     ),
     color-mix(in srgb, var(--modal-card) 65%, transparent);
   color: var(--text);
@@ -1248,24 +2378,25 @@ button:disabled,
   backdrop-filter: blur(14px) saturate(140%);
   -webkit-backdrop-filter: blur(14px) saturate(140%);
   box-shadow:
-    inset 0 0 0 1px rgba(140, 190, 255, 0.15),
-    0 0 80px rgba(90, 160, 255, 0.15);
+    inset 0 0 0 1px var(--c_0d34c0),
+    0 0 80px var(--c_57db0f);
 
-  /* Card entrance animation */
-  transform: scale(0.96);
+  /* Card entrance animation (avoid scale subpixel “shimmy”) */
+  transform: translateY(6px);
   opacity: 0;
+  will-change: transform, opacity;
   transition:
-    transform 160ms cubic-bezier(0.2, 0.9, 0.2, 1),
+    transform 180ms cubic-bezier(0.2, 0.9, 0.2, 1),
     opacity 160ms ease;
 }
 
 .modal.is-open .modal-card {
-  transform: scale(1);
+  transform: translateY(0);
   opacity: 1;
 }
 
 .modal.is-closing .modal-card {
-  transform: scale(0.96);
+  transform: translateY(6px);
   opacity: 0;
 }
 
@@ -1275,6 +2406,15 @@ button:disabled,
   place-items: center;
   padding-left: 10px;
   padding-right: 10px;
+}
+
+button.iconOnly {
+  padding: 0;
+  width: 36px;
+  height:auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .modal-card h2 {
@@ -1377,12 +2517,14 @@ button:disabled,
 
 /* Match-end summary grid in winner modal */
 .matchEndStats {
-  margin-top: 14px;
+  padding-top: 20px;
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   gap: 10px 12px;
   text-align: center;
   padding-bottom: 18px;
+  background-color: #00000020;
+  border-radius: 0px 0px 12px 12px;
 }
 
 .matchEndStats .msHead {
@@ -1431,6 +2573,10 @@ button:disabled,
   font-weight: 800;
 }
 
+.hiddenmobile {
+   display: block;
+ }
+
 /* Utility */
 .hidden { display: none !important; }
 
@@ -1458,10 +2604,14 @@ button:disabled,
     width: auto;
   }
 
+  .hiddenmobile {
+    display: none !important;
+  }
+
   .mobile-divider {
     display: block;
     height: 100%;
-    background: rgba(255, 255, 255, 0.2);
+    background: var(--c_5b89af);
     margin: 16px 0px;
   }
 
@@ -1474,12 +2624,6 @@ button:disabled,
   padding: 0px 0px;
 }
 
-  .dashMain {
-    display:grid;
-    gap: 45px;
-    flex:none
-  }
-
   .msName {
     font-size: 11px !important;
   }
@@ -1489,18 +2633,59 @@ button:disabled,
   }
 
   .big {
-    font-size: 26px;
-    text-shadow: 4px 4px 6px rgba(0,0,0,1);
+    font-size: 22px;
+    text-align:center;
+    text-shadow: 4px 4px 6px var(--c_e87378);
   }
+
+  .matchHistoryModal {
+    width: 100% !important;
+    padding: 16px 8px;
+    align-items:stretch;
+  }
+
+  #setEquipment {font-size:12px !important;}
+
+  .mhGrid {
+    grid-template-columns: 18px 15px 25px 65px 50px 20px 45px !important;
+    justify-content: space-evenly;
+  }
+
+  .mhPill {
+    width: 18px; height: 18px;
+    font-size: 12px;
+  }
+
+
+  .mhGrid.mhRow {font-size: 11px;  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis; text-align: center;}
+
+  .mhGrid.mhHeader {text-align:center;font-size:10px;}
+
+  .mhOpponent {padding:4px !important;}
+
+  .mhOppAvatar, .mhOppAvatarFallback {min-width: 14px; min-height:14px; max-width:14px; max-height:14px;}
+
 
   .avatar {
     width: 16px;
     height: 16px;
   }
 
+  .dashShell {
+    padding-top: 0px;
+  }
+
   .dashAvatar {
-    width: 100px;
-    height: 100px;
+    width: 80px;
+    height: 80px;
+  }
+
+  .dashStatTileIcon.small {
+    min-width:20px; min-height:20px;
+    max-width:20px; max-height:20px;
+    border-radius:6px;
   }
 
   .nameRow {
@@ -1513,11 +2698,17 @@ button:disabled,
 
   }
 
+  .dashStatMid {
+    padding-top:0px;
+  }
+
   .name {
     font-size:12px;
   }
 
   .dashHello { min-width: 0; padding-left: 6px;}
+
+    .dashHello.friends {padding-left: 6px;}
 
 .dashWelcome {
   opacity: 1;
@@ -1536,6 +2727,16 @@ button:disabled,
   padding-top: 6px;
 }
 
+body.dashboardPage {
+  height: 100vh;
+  padding: 6px;
+}
+
+.dashMilestone {
+  font-size: 12px;
+}
+
+
 .dashEquipment {
   margin-top: 3px;
   opacity: 1;
@@ -1548,46 +2749,100 @@ button:disabled,
   text-transform: uppercase;
 }
 
-.dashEquipmentIcon {
-  padding: 0px;
-  padding-top: 4px;
-  width: 16px;
-  height: 16px;
+.dashStatTileLabel {
+  font-size: 9px;
 }
 
-  .dashSignOut {
+.dashStatTileValue, .dashDonutValue {
+  font-size: 32px;
+}
+
+.dashEquipmentdiv {
+  gap:0px;
+}
+
+.dashEquipmentIcon {
+  padding: 0px;
+  width: 12px;
+  height: 12px;
+}
+
+  .dashSignOut, .dashSettingsBtn {
     font-size: 12px;
   }
 
   .small {
+    font-size: 12px;
+    text-align:center;
+    text-shadow: 4px 4px 6px var(--c_e87378);
+  }
+
+  .medium {
     font-size: 16px;
-    text-shadow: 4px 4px 6px rgba(0,0,0,1);
+    text-align:center;
+    text-shadow: 4px 4px 6px var(--c_e87378);
   }
 
   .dashStatsCard {
-    min-width: 100%;
-    max-width: 100%;
     border-radius: 16px;
+    gap: 12px;
     justify-content: space-between;
   }
 
   .dashWL {
-    width: 16px;
-    height: 16px;
+    width: 22px;
+    height: 22px;
     font-size: 10px;
   }
 
   .dashPlayCol {
-    min-width: 100%;
-    margin-left: 0px;
+    display:grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap:5px;
+    max-height: 135px;
+  }
+
+  .dashMiscCardDiv {
+    display:flex;
+    flex-direction:column;
+    flex:auto;
+    overflow: auto;
+    gap: 6px;
+    padding: 0px;
+    margin-top: 0px;
+  }
+
+  .dashMiscCard{
+    padding:12px;
+    max-height: 40px;
+    gap: 6px;
   }
 
   .dashStatsTitle {
+    display:none;
     font-size: 16px;
   }
 
+  .dashStatTileIcon {
+    width: 28px;
+    height: 28px;
+    border-radius:8px;
+  }
+
+  .modal-card.mobilepad {
+    padding:6px;
+  }
+
+  .topToast {font-size:12px; text-align:center;}
+
+  .dashStatTiles {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 0px;
+  }
+
   .dashLastLabel {
-    font-size: 12px;
+    font-size: 14px;
   }
 
   .dashKeyStats {
@@ -1608,11 +2863,20 @@ button:disabled,
 
   .dashPlayCard {
     flex:none;
-    min-height:100px;
+    min-height:60px;
     max-height:100px;
-    min-width: 100px;
     border-radius: 16px;
+    display:flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 10px;
   }
+
+  .dashboardGameIcon {
+    width: 36px;
+    height: 36px;
+  }
+
 
   .dashKeyStat {
     gap:0px;
@@ -1620,6 +2884,9 @@ button:disabled,
     flex-direction: row;
   }
 
+  .mutedRow {
+    font-size:12px;
+  }
 
   .actionCell3 {
   display: flex;
@@ -1657,14 +2924,18 @@ button:disabled,
     padding-top: 5px;
   }
 
-  .k {
-    font-size: 8px;
+  .k, .dashDonutLabel {
+    font-size: 12px !important;
   }
 
-  .v {
-    font-size: 16px;
+  .v{
+    font-size: 16px !important;
     padding-top: 0px;
     margin-top: 0px;
+  }
+
+  .dashDonut {
+    --size: 140px !important;
   }
 
   .dashIcon {
@@ -1676,6 +2947,10 @@ button:disabled,
   .dashKeyVal{
     font-size: 16px;
   }
+
+  .keypad, .dartPad {
+    height: 350px;
+}
 
   .key {
     padding: 14px 0;
@@ -1700,8 +2975,10 @@ button:disabled,
   .dashStatsCard.profile {
     min-width: auto;
     max-width: auto;
-    background:transparent;
+    background: transparent !important;
     box-shadow: none;
+    padding: 4px;
+    border: none;
   }
 
   button#gameSettingsBtn {
@@ -1744,9 +3021,17 @@ button:disabled,
     padding-bottom: 20px;
   }
 
+  .bluebutton {
+    padding: 2px 8px;
+  }
+
   #setupP1, #setupP2 {
     width: 100%;
     max-width: 100%;
+  }
+
+  .dashHeader {
+    width: auto;
   }
 
   .toprow {
@@ -1819,11 +3104,18 @@ button:disabled,
   height: 16px;
   border-radius: 999px;
   transform: translate(-50%, -50%);
-  border: 2px solid rgba(255,255,255,0.95);
-  background: rgba(59,130,246,0.9);
-  box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  border: 2px solid color-mix(in srgb, var(--accent), #fff 18%);
+  background: color-mix(in srgb, var(--accent) 85%, var(--accent-alt) 0%);
+  box-shadow: 0 4px 14px var(--accent-glow-soft);
   pointer-events: none;
 }
+
+.bullMarker.p1{ border-color: color-mix(in srgb, var(--accent), #fff 22%); }
+.bullMarker.p2{ border-color: color-mix(in srgb, var(--accent-2, var(--accent)), #fff 22%);
+  background: color-mix(in srgb, var(--accent-2, var(--accent)) 85%, var(--accent-alt) 0%);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--accent-2, var(--accent)) 30%, transparent);
+}
+.bullMarker.pending{ opacity: .85; filter: saturate(1.1); }
 
 .actionCell1 {
   gap:5px;
@@ -1859,3 +3151,682 @@ button:disabled,
   background: var(--key-bg);
   color: var(--text);
 }
+
+/* Build/version tag (Stage 0) */
+.build-tag {
+  position: fixed;
+  left: 10px;
+  bottom: 8px;
+  z-index: 9999;
+  font-size: 12px;
+  opacity: 0.65;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--key-border);
+  background: var(--panel, var(--c_984d8f));
+  color: var(--text);
+  pointer-events: none;
+}
+
+
+/* V4 Stage 1 - Setup presets */
+.setupPresetDesc {
+  margin: 6px 0 12px 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--card);
+  font-size: 0.92rem;
+  line-height: 1.3;
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  padding-top: 10px;
+  justify-content: center;
+  gap: 10px;
+  user-select: none;
+}
+
+/* Base checkbox wrapper */
+.neoCheck {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+}
+
+/* Hide native checkbox */
+.neoCheck input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Custom checkbox square */
+.checkUI {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+
+  background: var(--c_cd433a);
+  border: 1px solid var(--accent);
+  display: grid;
+  place-items: center;
+
+  transition:
+    background 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+/* Checkmark */
+.checkUI::after {
+  content: "";
+  width: 10px;
+  height: 6px;
+  margin-bottom: 4px;
+  border-left: 2px solid var(--accent-ink);
+  border-bottom: 2px solid var(--accent-ink);
+  transform: rotate(-45deg) scale(0);
+  transition: transform 140ms ease;
+}
+
+/* Checked state */
+.neoCheck input:checked + .checkUI {
+  background: var(--accent);
+  border-color: var(--accent);
+
+  box-shadow:
+    0 0px 16px var(--accent-glow-soft);
+}
+
+.neoCheck input:checked + .checkUI::after {
+  transform: rotate(-45deg) scale(1);
+}
+
+/* Label text */
+.checkText {
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+/* Keyboard accessibility */
+.neoCheck input:focus-visible + .checkUI {
+  box-shadow:
+    0 0 0 3px var(--accent-glow-soft),
+    0 12px 26px var(--accent-glow);
+}
+
+
+.checkoutAttemptDartsBtn {
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
+
+
+/* Match stats tabs (Winner modal) */
+.msTabs{display:flex;gap:1%;justify-content:center;flex-wrap:wrap; padding-top:20px; align-items: flex-end}
+.msTabBtn {
+  box-sizing: border-box;
+  display: inline-block; /* or block / flex */
+  padding: 2px 24px;
+  border-radius: 12px 12px 0 0;
+  background: var(--card);
+  cursor: pointer;
+  width: 32.6%;
+  height: 32px;
+  transition: height 5000ms ease !important;
+}
+
+.msTabBtn.active{background:var(--accent); height: 36px; color: black; font-weight: 600;}
+
+
+.matchHistoryModal {
+  width: 650px;
+  align-items: stretch;
+  display:flex;
+  flex-direction: column;
+}
+/* Match History (dashboard) */
+.mhGrid{
+  display:grid;
+  grid-template-columns: 50px 50px 50px 120px 150px 50px 80px;
+  gap:10px;
+  align-items:center;
+  text-align: left;
+}
+.mhHeader{
+  font-size:12px;
+  opacity:.8;
+  padding:8px 0;
+  border-bottom:1px solid var(--c_d2a2e1);
+}
+.mhRows{
+  margin-top:8px;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  max-height:420px;
+  overflow:auto;
+}
+.mhRow{
+  padding:8px 0;
+  border-bottom:1px solid var(--c_bbbc86);
+}
+
+.mhOpponent{
+  display:flex;
+  width:fit-content;
+  background: var(--c_888f0c);
+  padding:8px 12px 8px 8px;
+  border-radius:20px;
+  align-items:center;
+  gap:8px;
+  cursor:pointer;
+  user-select:none;
+}
+.mhOppAvatar{
+  width:26px;
+  height:26px;
+  border-radius:999px;
+  object-fit:cover;
+  background: var(--c_1f523d);
+}
+.mhOpponent:hover{ opacity:.9; }
+
+.friendsbox {
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 14px;
+    border: 1px solid var(--c_c27a2f);
+    background: var(--c_888f0c);
+}
+
+.mhOppAvatarFallback{
+  width:26px;
+  height:26px;
+  border-radius:999px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-weight:700;
+  font-size:12px;
+  background: var(--c_0b109d);
+}
+
+
+/* Blue action button (invites) */
+.bluebutton {
+  background: var(--accent);
+  border: 1px solid var(--c_4c4d33);
+  color: var(--c_6aaa00);
+  color: black;
+  font-weight: 600;
+}
+.bluebutton:hover { filter: brightness(1.05); }
+
+/* Ensure feedback/invite modals always appear above other overlays */
+#friendFeedbackModal,
+#inviteConfirmModal,
+#incomingInviteModal {
+  /* Must beat profile + other overlays */
+  z-index: 99999 !important;
+}
+
+/* -----------------------------
+   Slide-down top toast (seat join)
+------------------------------ */
+.topToast {
+  position: fixed;
+  left: 50%;
+  top: 0;
+  transform: translate(-50%, -110%);
+  padding: 12px 16px;
+  border-radius: 999px;
+  background: var(--card);
+  border: 1px solid var(--c_ead409);
+  color: var(--c_6aaa00);
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  box-shadow: 0 10px 30px var(--c_93d83d);
+  transition: transform 240ms ease;
+  z-index: 999999; /* above everything */
+}
+
+.topToast.show {
+  transform: translate(-50%, 18px);
+}
+
+
+/* Top toast variants */
+.topToast.danger {
+  background: var(--c_554a73);
+  border-color: var(--c_4b7c21);
+}
+
+/* Lobby name-row warning when a player leaves */
+.nameRow.danger {
+  outline: 2px solid var(--danger);
+  outline-offset: 2px;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Motion + interaction polish (variable-driven)
+   ───────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: no-preference) {
+  button, .btn, .pill, .dashStatTile, .metric-card, .playCard, .modal-card, .key, .iconBtn, a {
+    transition:
+      transform var(--dur-med) var(--ease-out),
+      box-shadow var(--dur-med) var(--ease-out),
+      background var(--dur-med) var(--ease-out),
+      border-color var(--dur-med) var(--ease-out),
+      filter var(--dur-med) var(--ease-out),
+      opacity var(--dur-med) var(--ease-out);
+  }
+
+  /* Smoother glow ramps for interactive controls */
+  button, .btn, .key, .pill, .iconBtn {
+    transition:
+      transform var(--dur-med) var(--ease-out),
+      box-shadow var(--dur-slow) var(--ease-out),
+      background var(--dur-med) var(--ease-out),
+      border-color var(--dur-med) var(--ease-out),
+      filter var(--dur-med) var(--ease-out),
+      opacity var(--dur-med) var(--ease-out);
+  }
+
+  button:active, .btn:active,.key:active {
+    transform: translateY(1px) scale(0.99);
+  }
+
+  .metric-card:hover {
+    box-shadow:
+      inset 0 0 0 1px var(--panel-glass),
+      var(--shadow-lg),
+      0 10px 30px var(--accent-glow-soft);
+    border-color: var(--panel-border-strong);
+    filter: saturate(1.03);
+  }
+
+  .playCard:hover {
+    box-shadow:
+      inset 0 0 0 1px var(--panel-glass),
+      var(--shadow-lg),
+      0 14px 40px var(--accent-glow);
+    border-color: var(--panel-border-strong);
+  }
+
+  button:hover, .btn:hover, .dashPlayCard:hover, .dashMiscCard:hover {
+    border-width: 1px;
+    border-color: var(--active-border);
+    box-shadow:
+      0 0px 12px var(--accent-glow-soft),
+      var(--shadow-md);
+  }
+
+  .key:hover, .iconBtn:hover {
+    box-shadow:
+      0 8px 20px var(--accent-glow-soft),
+      var(--shadow-md);
+    border-color: var(--active-border);
+    transform: translateY(-1px);
+  }
+}
+
+/* Focus rings (variable-driven) */
+:where(button, .btn, .pill, .key, input, select, textarea, a):focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--active-glow);
+  border-color: var(--active-border);
+}
+
+
+/* Theme tokens */
+
+:root {
+  --t1: #22f2f2;
+  --t2: #0e1c24;
+  --t3: #0b1218;
+}
+
+[data-theme="cyan"] {
+  --accent: #22f2f2;
+  --panel: #0e1c24;
+  --bg: #0b1218;
+}
+
+[data-theme="purple"] {
+  --accent: #b48cff;
+  --panel: #18112a;
+  --bg: #120c1e;
+}
+
+[data-theme="emerald"] {
+  --accent: #2ee6a6;
+  --panel: #0f1f1a;
+  --bg: #0a1512;
+}
+
+[data-theme="amber"] {
+  --accent: #f0b429;
+  --panel: #221a0c;
+  --bg: #161008;
+}
+
+[data-theme="light"] {
+  --accent: #2b7cff;
+  --panel: #ffffff;
+  --bg: #f2f4f8;
+  --text: #111;
+}
+
+
+.themeGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(56px, 1fr));
+  gap: 12px;
+}
+
+.themeSwatch {
+  border-radius: 12px;
+  border: 1px solid var(--panel-border);
+  padding: 8px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  cursor: pointer;
+  background: var(--panel);
+  transition: transform .18s ease, box-shadow .18s ease;
+}
+
+.themeSwatch span {
+  display: block;
+  height: 16px;
+  border-radius: 4px;
+}
+
+.themeSwatch:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px var(--accent-glow);
+}
+
+
+.themeSwatch span {
+  width: 100%;
+  height: 18px;
+  border-radius: 6px;
+  background: var(--t1);
+  box-shadow: inset 0 0 0 1px var(--panel-border);
+}
+.themeSwatch span:nth-child(2) { background: var(--t2); }
+.themeSwatch span:nth-child(3) { background: var(--t3); }
+
+.themeSwatch.isSelected {
+  box-shadow: var(--active-glow, var(--shadow-glow));
+  border-color: var(--panel-border-strong, var(--accent));
+}
+.themeSwatch:hover {
+  transform: translateY(-1px);
+}
+
+
+/* Dashboard settings cog (matches in-game #gameSettingsBtn) */
+.dashSettingsBtn.iconOnly{
+  width: 44px;
+  height: 32px;
+  padding: 0;
+  font-size: 0;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+}
+.dashSettingsBtn.iconOnly::before{
+  content: "\2699";
+  font-size: 20px;
+}
+
+
+/* Ensure confirm modals sit above bull throw */
+.confirmModal, #bullModal { z-index: 9999; }
+#confirmLeaveMatchModal, #confirmSignOutModal { z-index: 11000; }
+
+
+/* Bull markers: resolved view (client-local coloring) */
+.bullMarker.me{
+  border-color: var(--submit-strong);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--submit-strong) 35%, transparent);
+}
+.bullMarker.them{
+  border-color: var(--error-border);
+  background: color-mix(in srgb, var(--error-border) 60%, transparent);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--error-border) 35%, transparent);
+}
+
+
+/* Chat & Audits panel */
+.gameChatWrap{
+  display:flex;
+  align-items:stretch;
+  justify-content:center;
+  gap:20px;
+  width:100%;
+  box-sizing:border-box;
+  padding: 0 12px;
+}
+/* Remove the default .card margin:auto so flex layout can work reliably */
+.gameChatWrap > .card{ margin:0; }
+.gameChatWrap > #gameCard{
+  flex: 0 1 720px;
+}
+.gameChatWrap > #auditChatPanel{
+  flex: 0 0 auto;
+  max-width: 440px;
+  min-width: 320px;
+  width: min(440px, 38vw);
+}
+
+.auditChatPanel{
+  display:flex;
+  flex-direction:column;
+  padding:14px;
+  gap:10px;
+  overflow:hidden; /* cap overall height; let only the feed scroll */
+}
+.auditChatPanel.hidden{ display:none !important; }
+.auditChatHeader{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:200px;
+}
+.auditChatTitle{ margin:0; font-size:16px; }
+.auditChatClose{
+  width:34px; height:34px;
+  border-radius:10px;
+  display:grid; place-items:center; justify-content:center; align-content:center; font-weight:700;}
+.auditChatFeed{
+  flex:1;
+  min-height:0;
+  overflow-y:auto;
+  padding-right:6px;
+}
+.auditLine{ font-size:13px; opacity:.9; margin:6px 0; }
+.auditSystem{ text-align:center; opacity:.75; }
+.msgRow{ display:flex; margin:6px 0; }
+.msgRow.left{ justify-content:flex-start; }
+.msgRow.right{ justify-content:flex-end; }
+.msgRow.center{ justify-content:center; }
+.msgPill{
+  max-width: 85%;
+  padding:10px 12px;
+  border-radius: 14px;
+  font-size:13px;
+  line-height:1.25;
+  box-shadow: var(--shadow-sm, 0 6px 18px rgba(0,0,0,.2));
+}
+.msgAudit{
+  background: color-mix(in srgb, var(--dash-panel-bg) 65%, transparent);
+  border: 1px solid color-mix(in srgb, var(--dash-panel-border) 65%, transparent);
+  color: var(--text-strong, #fff);
+}
+.msgChat{
+  background: color-mix(in srgb, var(--accent) 26%, var(--dash-panel-bg));
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--dash-panel-border));
+  color: var(--text-strong, #fff);
+}
+.auditChatComposer{
+  display:flex;
+  gap:10px;
+  align-items:flex-end;
+}
+.auditChatInput{
+  flex:1;
+  resize:none;
+  min-height:30px;
+  max-height:140px;
+  padding:10px 12px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--dash-panel-bg) 60%, transparent);
+  border: 1px solid color-mix(in srgb, var(--dash-panel-border) 75%, transparent);
+  color: var(--text-strong, #fff);
+  outline:none;
+}
+.auditChatInput:focus{
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--dash-panel-border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.auditChatSend{ white-space:nowrap; }
+
+/* Mobile overlay: ensure above game */
+@media (max-width: 780px){
+  .gameChatWrap{ display:block; padding:0; }
+  .gameChatWrap > .card{ margin: 0 auto; }
+
+  /* When open on mobile, overlay the panel (so it doesn't sit under the card) */
+  body.auditChatOpen #auditChatPanel{
+    display:flex;
+    position:absolute;
+    top: -25px;
+    padding: 50px 0px !important;
+    width: 100%;
+    height:90vh !important;
+    max-height:50vh !important;
+    z-index:12000;
+  }
+
+  #auditChatPanel{
+    padding:12px;
+    gap:0px;
+  }
+
+  .auditChatInput {
+    width: 180px;
+  }
+
+  .auditChatHeader {
+      display:flex;
+      gap: 140px;
+      padding: 10px 40px;
+      background: #00000050;
+  }
+
+  .auditChatFeed {
+    max-height:50vh;
+    margin-top: 10px;
+    margin-bottom: 10px;
+  }
+
+  .auditChatTitle {
+    width: 125px;
+  }
+
+  .auditChatComposer {
+    padding-bottom: 50px;
+  }
+
+.auditChatComposer.hidden{ display:none !important; }
+
+  #setOpenChatByDefault,
+  label[for="setOpenChatByDefault"]{
+    display:none !important;
+  }
+}
+
+/* Stats History modal */
+.statsHistoryModal{ max-width: 820px; }
+.statsHistHeader{ display:flex; justify-content:space-between; align-items:center; gap:14px; margin-bottom:12px; }
+.statsHistRange{ display:flex; gap:10px; }
+.statsHistRows{ display:flex; flex-direction:column; gap:14px; }
+.statsHistRow{ background: color-mix(in srgb, var(--dash-panel-bg) 55%, transparent); border:1px solid var(--dash-panel-border); border-radius:18px; padding:12px; }
+.statsHistLabel{ font-weight:800; letter-spacing:.08em; text-transform:uppercase; font-size:12px; opacity:.85; margin-bottom:8px; }
+.statsHistCanvas{ width:100%; display:block; border-radius:12px; background: color-mix(in srgb, var(--dash-panel-bg) 35%, transparent); border:1px solid color-mix(in srgb, var(--dash-panel-border) 65%, transparent); }
+
+@media (max-width: 780px){
+  .statsHistoryModal{ max-width: 92vw; }
+  .statsHistHeader{ flex-direction:column; align-items:flex-start; }
+  .shLegendItem { font-size: 10px !important; gap:4px !important;}
+}
+
+#shWeekBtn, #shMonthBtn, #shYearBtn {
+  padding:6px 12px;
+  border-radius:12px;
+  background: var(--card);
+  border:1px solid var(--dash-panel-border);
+  font-size:12px;
+  cursor:pointer;
+}
+
+.statsHistRange {gap:6px;}
+
+.primary { background: var(--accent) !important; color: black; font-weight:700; }
+
+.statsHistLegend{
+  display:flex;
+  gap:14px;
+  margin-bottom:10px;
+  font-size:12px;
+  font-weight:700;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+}
+.statsHistLegend .leg{
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+.statsHistLegend .leg::before{
+  content:"";
+  width:10px;
+  height:10px;
+  border-radius:50%;
+  display:inline-block;
+}
+.statsHistLegend .matches::before{ background: var(--accent); }
+.statsHistLegend .tda::before{ background: var(--accent-2); }
+.statsHistLegend .f9d::before{ background: var(--success); }
+.statsHistLegend .checkout::before{ background: var(--danger); }
+
+/* Stats History master graph */
+.shLegend{ display:flex; flex-wrap:wrap; gap:12px; margin: 20px 0 10px; justify-content:center; }
+.shLegendItem{ display:flex; align-items:center; gap:8px; font-weight:700; font-size:12px; letter-spacing:.06em; text-transform:uppercase; opacity:.9; }
+.shLegendSwatch{ width:12px; height:12px; border-radius:4px; box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 40%, transparent); }
+.statsHistGraphWrap{ display:flex; flex-direction:column; gap:8px; }
+.shXAxisLabels{ display:flex; justify-content:space-between; gap:8px; font-size:11px; opacity:.75; padding: 0 6px; }
+.shXAxisLabels span{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width: 20%; }
+@media (max-width:780px){
+  .shXAxisLabels span{ max-width: 24%; }
+}
+
+
+.winnerWaitingText{ text-align:center; opacity:.8; margin:14px 0; font-size:14px; }
+
+
+/* Audit chat feed scrollbar (theme-friendly) */
+.auditChatFeed{ scrollbar-width: thin; scrollbar-color: var(--accent) transparent; }
+.auditChatFeed::-webkit-scrollbar{ width:8px; }
+.auditChatFeed::-webkit-scrollbar-track{ background: transparent; }
+.auditChatFeed::-webkit-scrollbar-thumb{ background: var(--accent); border-radius: 999px; }

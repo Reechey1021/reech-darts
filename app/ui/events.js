@@ -14,13 +14,14 @@ import {
   leaveMatch,
   restartMatch,
 } from "../actions.js";
-import { applyTheme, initThemeToggle, showError, hideError, setInviteModalVisible, setSetupModalVisible, setLobbyGateVisible, openModal, closeModal } from "./render.js";
+import { applyTheme, initThemeToggle, showError, hideError, setInviteModalVisible, setSetupModalVisible, setLobbyGateVisible, openModal, closeModal, render } from "./render.js";
 import { unlockAudioOnce } from "../audio/audio.js";
 import { initBullUI } from "../bull/ui.js";
+import { initAuditChatUI, isAuditChatInputFocused, addAuditSystem } from "./auditChat.js";
 import { signInWithGoogle, ensureAnonymousSignIn } from "../auth.js";
 import { setGuestDisplayName } from "../profile.js";
-import { openProfileModalForPlayerIndex as openProfileForPlayer} from "./profileModal.js";
-import { initProfileModalUI as wireProfileModalClose} from "./profileModal.js";
+import { openProfileModalForPlayerIndex as openProfileForPlayer } from "./profileModal.js";
+import { initProfileModalUI as wireProfileModalClose } from "./profileModal.js";
 import {
   setInputMode,
   setMult,
@@ -64,6 +65,18 @@ export function wireUI() {
   const joinGameBtn = document.getElementById("joinGameBtn");
   const googleLoginBtn = document.getElementById("googleLoginBtn");
   const playOfflineBtn = document.getElementById("playOfflineBtn");
+
+  // Host-left modal
+  const hostLeftLeaveBtn = document.getElementById("hostLeftLeaveBtn");
+  if (hostLeftLeaveBtn) {
+    hostLeftLeaveBtn.addEventListener("click", async () => {
+      try {
+        await leaveMatch();
+      } catch (_) {
+        // ignore
+      }
+    });
+  }
 
   const joinGameModal = document.getElementById("joinGameModal");
   const joinGameLink = document.getElementById("joinGameLink");
@@ -120,26 +133,26 @@ export function wireUI() {
   }
 
   if (joinGameGateBtn) {
-  joinGameGateBtn.addEventListener("click", () => {
-    // If not logged in, require guest display name before joining
-    const isLoggedIn = !!(app.user && !app.user.isAnonymous);
-    if (!isLoggedIn) {
-      const name = (guestNameInput?.value || "").trim().slice(0, 12);
+    joinGameGateBtn.addEventListener("click", () => {
+      // If not logged in, require guest display name before joining
+      const isLoggedIn = !!(app.user && !app.user.isAnonymous);
+      if (!isLoggedIn) {
+        const name = (guestNameInput?.value || "").trim().slice(0, 12);
 
-      if (!name) {
-        showError("Enter guest name");
-        return;
+        if (!name) {
+          showError("Enter guest name");
+          return;
+        }
+
+        // Make sure the app knows this guest name
+        setGuestDisplayName(name);
       }
 
-      // Make sure the app knows this guest name
-      setGuestDisplayName(name);
-    }
-
-    // Open the join modal (animated)
-    const modal = document.getElementById("joinGameModal");
-    if (modal) openModal(modal);
-  });
-}
+      // Open the join modal (animated)
+      const modal = document.getElementById("joinGameModal");
+      if (modal) openModal(modal);
+    });
+  }
 
   // Join modal cancel should work (return to gate)
   if (joinGameCancelBtn) {
@@ -162,7 +175,7 @@ export function wireUI() {
       }
       if (joinGameLink) joinGameLink.value = "";
       if (joinGameModal) openModal(joinGameModal);
-      try { joinGameLink?.focus(); } catch {}
+      try { joinGameLink?.focus(); } catch { }
     });
   }
 
@@ -264,7 +277,7 @@ export function wireUI() {
   if (copyInviteBtn) {
     copyInviteBtn.addEventListener("click", async () => {
       const text = document.getElementById("inviteLinkText")?.textContent || "";
-      try { await navigator.clipboard.writeText(text); } catch {}
+      try { await navigator.clipboard.writeText(text); } catch { }
 
       const msg = document.getElementById("inviteCopyMsg");
       if (msg) {
@@ -304,6 +317,7 @@ export function wireUI() {
   const gsRestartBtn = document.getElementById("gsRestartGameBtn");
   const gsLeaveBtn = document.getElementById("gsLeaveMatchBtn");
   const gsCloseBtn = document.getElementById("gsCloseBtn");
+  const abortBullBtn = document.getElementById("abortBullBtn");
 
   const confirmRestartMatchModal = document.getElementById("confirmRestartMatchModal");
   const confirmRestartMatchCancelBtn = document.getElementById("confirmRestartMatchCancelBtn");
@@ -317,7 +331,7 @@ export function wireUI() {
   const inputModeBtn = document.getElementById("inputModeBtn");
   // Legacy mobile menu refs (no longer used)
 
-    // ----------------------------
+  // ----------------------------
   // Input mode init + toggle
   // ----------------------------
   setInputMode(app.inputMode); // restore last mode on load
@@ -427,9 +441,22 @@ export function wireUI() {
 
   // Game Settings menu
   const openGameSettings = () => {
-    // Host-only. No popup; the UI will hide the button for player 2.
-    if (!isHost(app.latestState)) return;
-    if (gameSettingsModal) openModal(gameSettingsModal);
+    if (!gameSettingsModal) return;
+
+    // Role-based menu: host gets full settings; non-host gets Chat/Audits + Leave only
+    const st = app.latestState;
+    const host = isHost(st);
+
+    if (gsNewGameBtn) gsNewGameBtn.classList.toggle("hidden", !host);
+    if (gsRestartBtn) gsRestartBtn.classList.toggle("hidden", !host);
+
+    // Open Chat/Audits always available
+    const gsOpenAuditChatBtn = document.getElementById("gsOpenAuditChatBtn");
+    if (gsOpenAuditChatBtn) gsOpenAuditChatBtn.classList.toggle("hidden", false);
+
+    if (gsLeaveBtn) gsLeaveBtn.classList.toggle("hidden", false);
+
+    openModal(gameSettingsModal);
   };
 
   const closeGameSettings = () => {
@@ -489,6 +516,14 @@ export function wireUI() {
     confirmLeaveOkBtn.addEventListener("click", (e) => {
       e.preventDefault();
       doLeaveMatchWithHandling();
+    });
+  }
+
+  // Bull throw: Abort game (uses the same leave confirmation + leave logic)
+  if (abortBullBtn) {
+    abortBullBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      confirmLeaveMatch();
     });
   }
 
@@ -585,14 +620,67 @@ export function wireUI() {
     if (modal) closeModal(modal);
   });
 
+
+  // V4 Stage 1 - Setup presets/rules plumbing (no behavior change yet)
+  const setupPresetEl = document.getElementById("setupPreset");
+  const setupCustomRulesEl = document.getElementById("setupCustomRules");
+  const setupPresetDescEl = document.getElementById("setupPresetDescription");
+  const setupCheckInEl = document.getElementById("setupCheckIn");
+  const setupCheckOutEl = document.getElementById("setupCheckOut");
+
+  function applySetupPreset(preset) {
+    if (!setupPresetEl || !setupCheckInEl || !setupCheckOutEl) return;
+
+    const setVals = (checkIn, checkOut) => {
+      setupCheckInEl.value = checkIn;
+      setupCheckOutEl.value = checkOut;
+    };
+
+    if (preset === "custom") {
+      if (setupCustomRulesEl) setupCustomRulesEl.classList.remove("hidden");
+      if (setupPresetDescEl) {
+        setupPresetDescEl.classList.add("hidden");
+        setupPresetDescEl.textContent = "";
+      }
+      return;
+    }
+
+    if (setupCustomRulesEl) setupCustomRulesEl.classList.add("hidden");
+    if (setupPresetDescEl) setupPresetDescEl.classList.remove("hidden");
+
+    if (preset === "grand_prix") {
+      setVals("double", "double");
+      if (setupPresetDescEl) setupPresetDescEl.textContent = "Grand Prix preset: Double In + Double Out.";
+    } else if (preset === "x01") {
+      setVals("straight", "double");
+      if (setupPresetDescEl) setupPresetDescEl.textContent = "X01 preset: Straight In + Double Out.";
+    } else if (preset === "straight_in_out") {
+      setVals("straight", "straight");
+      if (setupPresetDescEl) setupPresetDescEl.textContent = "Straight preset: Straight In + Straight Out.";
+    } else {
+      // Unknown preset: fall back safely
+      setVals("straight", "double");
+      if (setupPresetDescEl) setupPresetDescEl.textContent = "Preset loaded.";
+    }
+  }
+
+  if (setupPresetEl) {
+    setupPresetEl.addEventListener("change", () => applySetupPreset(setupPresetEl.value));
+    // Initialize once on page load
+    applySetupPreset(setupPresetEl.value || "x01");
+  }
+
   if (setupStartBtn) setupStartBtn.addEventListener("click", startMatchFromSetup);
 
   // Checkout modal
   const checkoutCancelBtn = document.getElementById("checkoutCancelBtn");
   const checkoutConfirmBtn = document.getElementById("checkoutConfirmBtn");
   const dartsBtns = Array.from(document.querySelectorAll(".dartsBtn"));
+  const doubleDartsBtns = Array.from(document.querySelectorAll(".doubleDartsBtn"));
 
   window.__selectedCheckoutDarts = null;
+  window.__selectedCheckoutDoubleDarts = null;
+  window.__checkoutRequireDoubleDarts = false;
 
   for (const b of dartsBtns) {
     b.addEventListener("click", () => {
@@ -600,7 +688,23 @@ export function wireUI() {
       b.classList.add("selected");
       const d = Number(b.getAttribute("data-darts"));
       window.__selectedCheckoutDarts = d;
-      if (checkoutConfirmBtn) checkoutConfirmBtn.disabled = false;
+      const needDouble = window.__checkoutRequireDoubleDarts === true;
+      const doubleOk = !needDouble || [1, 2, 3].includes(window.__selectedCheckoutDoubleDarts);
+      if (checkoutConfirmBtn) checkoutConfirmBtn.disabled = !doubleOk;
+    });
+  }
+
+
+  for (const b of doubleDartsBtns) {
+    b.addEventListener("click", () => {
+      doubleDartsBtns.forEach(btn => btn.classList.remove("selected"));
+      b.classList.add("selected");
+      const d = Number(b.getAttribute("data-darts"));
+      window.__selectedCheckoutDoubleDarts = d;
+      const needDouble = window.__checkoutRequireDoubleDarts === true;
+      const totalOk = [1, 2, 3].includes(window.__selectedCheckoutDarts);
+      const doubleOk = !needDouble || [1, 2, 3].includes(window.__selectedCheckoutDoubleDarts);
+      if (checkoutConfirmBtn) checkoutConfirmBtn.disabled = !(totalOk && doubleOk);
     });
   }
 
@@ -613,7 +717,16 @@ export function wireUI() {
         showError("Select 1, 2 or 3 darts");
         return;
       }
-      confirmCheckout(d);
+      const needDouble = window.__checkoutRequireDoubleDarts === true;
+      if (needDouble) {
+        const dd = window.__selectedCheckoutDoubleDarts;
+        if (![1, 2, 3].includes(dd)) {
+          showError("Select darts used on double");
+          return;
+        }
+      }
+
+      confirmCheckout(d, window.__selectedCheckoutDoubleDarts);
     });
   }
 
@@ -663,6 +776,8 @@ export function wireUI() {
     confirmRestartOkBtn.addEventListener("click", async () => {
       const modal = document.getElementById("confirmRestartMatchModal");
       if (modal) closeModal(modal);
+      // Audit: game restarted
+      try { addAuditSystem("Game Restarted"); } catch (_) {}
       try {
         const res = await restartMatch();
         if (!res?.ok) showError(res?.msg || "Could not restart match.");
@@ -682,14 +797,16 @@ export function wireUI() {
 
   // Bull throw UI
   initBullUI();
+  initAuditChatUI();
   wireProfileModalClose();
 
-  // Player profile modal (click player name) — only if that player is logged in
-  const p1NameEl = document.getElementById("p1Name");
-  const p2NameEl = document.getElementById("p2Name");
+  // Player profile modal (click player name pill) — only if that player is logged in
+  const p1NameRow = document.querySelector("#p1Box .nameRow");
+  const p2NameRow = document.querySelector("#p2Box .nameRow");
 
   const wireProfileClick = (idx, el) => {
     if (!el) return;
+    el.style.cursor = "pointer";
     el.addEventListener("click", (e) => {
       const st = app.latestState;
       // Online games only, and viewer must be logged in (guests can't browse profiles)
@@ -703,18 +820,24 @@ export function wireUI() {
       e.preventDefault();
       e.stopPropagation();
       openProfileForPlayer(idx);
-      try { el.blur(); } catch {}
+      try { el.blur(); } catch { }
     });
   };
 
-  wireProfileClick(0, p1NameEl);
-  wireProfileClick(1, p2NameEl);
+  wireProfileClick(0, p1NameRow);
+  wireProfileClick(1, p2NameRow);
 
-  // Input mode toggle (if you still use it)
-  if (inputModeBtn) {
-    inputModeBtn.addEventListener("click", () => {
-      // your existing toggle logic lives elsewhere; keep this as-is if already implemented
-      // (leaving intentionally blank here to avoid changing behaviour)
+
+
+  // Winner modal match stats tabs
+  const matchStatsTabs = document.getElementById("matchStatsTabs");
+  if (matchStatsTabs) {
+    matchStatsTabs.addEventListener("click", (e) => {
+      const btn = e.target && e.target.closest ? e.target.closest("button.msTabBtn") : null;
+      if (!btn) return;
+      const tab = btn.getAttribute("data-tab") || "final";
+      app.matchStatsTab = tab;
+      if (app.latestState) render(app.latestState);
     });
   }
 }

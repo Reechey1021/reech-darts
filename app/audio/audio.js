@@ -115,10 +115,17 @@ export function requireClipForName(name) {
 }
 
 // Whether someone is "on a possible checkout" (your current rules)
-export function isPossibleCheckout(remaining) {
+export function isPossibleCheckout(remaining, checkOutRule = "double") {
   const r = Number(remaining);
   if (!Number.isFinite(r)) return false;
   if (r <= 1) return false;
+
+  if (checkOutRule === "straight") {
+    if (r > 180) return false;
+    if (BOGEY_NUMBERS.has(r)) return false;
+    return true;
+  }
+
   if (r > 170) return false;
   if (r >= 171 && r <= 180) return false;
   if (BOGEY_NUMBERS.has(r)) return false;
@@ -126,7 +133,7 @@ export function isPossibleCheckout(remaining) {
 }
 
 // Build “Score. (Optional) Require + remaining.”
-export function buildVisitClips({ scoreCallType, entered, nextPlayerName, nextRemaining }) {
+export function buildVisitClips({ scoreCallType, entered, nextPlayerName, nextRemaining, checkOutRule = "double" }) {
   const clips = [];
 
   // score call
@@ -137,7 +144,7 @@ export function buildVisitClips({ scoreCallType, entered, nextPlayerName, nextRe
   }
 
   // require call if next player is on a checkout
-  if (isPossibleCheckout(nextRemaining)) {
+  if (isPossibleCheckout(nextRemaining, checkOutRule)) {
     clips.push(requireClipForName(nextPlayerName));
     clips.push(`./audio/numbers/${pad3(nextRemaining)}.mp3`);
   }

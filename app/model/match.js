@@ -1,14 +1,21 @@
 // app/model/match.js
 
-export function makeFreshLeg(mode, starterPlayer) {
+export function makeFreshLeg(mode, starterPlayer, rules = {}) {
+  const checkInRule = rules?.checkIn || "straight";
+  const checkedIn = checkInRule !== "double";
+
   return {
-    players: [{ score: mode }, { score: mode }],
+    players: [
+      { score: mode, checkedIn },
+      { score: mode, checkedIn },
+    ],
     currentPlayer: starterPlayer,
     status: "in_progress", // "finished"
     winner: null,
     history: [],
   };
 }
+
 
 export function makeNewMatch({ mode, bestOf, p1Name, p2Name }) {
   const starter = Math.random() < 0.5 ? 0 : 1;
@@ -24,6 +31,15 @@ export function makeNewMatch({ mode, bestOf, p1Name, p2Name }) {
       status: "in_progress",
       winner: null,
       createdAt: new Date(),
+
+      // V4 Stage 1 defaults (V3-compatible): Straight In + Double Out
+      rules: {
+        preset: "x01",
+        checkIn: "straight",
+        checkOut: "double",
+        trackCheckoutStats: true,
+      },
+
 
       // online stuff
       hostId: null,

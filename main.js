@@ -1,5 +1,6 @@
 // /main.js
 import { app } from "./app/state.js";
+import { applyBuildTag, logBuildInfo } from "./app/ui/buildInfo.js";
 import { initFirebase } from "./app/firebase.js";
 import { getGameIdFromUrl } from "./app/routing.js";
 import { bindGameListener } from "./app/realtime.js";
@@ -9,7 +10,9 @@ import { setLobbyGateVisible } from "./app/ui/render.js";
 import { openInviteModalForCurrentGame } from "./app/actions.js";
 import { getGuestDisplayName, setGuestDisplayName } from "./app/profile.js";
 
+logBuildInfo();
 console.log("Reech Darts loaded");
+applyBuildTag();
 window.onerror = (m, s, l, c, e) => console.log("JS ERROR:", m, l, c, e);
 
 app.db = initFirebase();

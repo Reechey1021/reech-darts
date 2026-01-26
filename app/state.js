@@ -2,6 +2,11 @@
 // Single shared runtime state so modules stay simple and avoid circular imports.
 
 export const app = {
+  // build
+  buildVersion: "V4 Step F (match stats tabs)",
+  buildCodename: "v4-stepF",
+  buildDate: "2026-01-20",
+
   db: null,
   gameId: null,
   gameRef: null,

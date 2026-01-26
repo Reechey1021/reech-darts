@@ -21,6 +21,13 @@ export async function ensureUserProfile() {
       equipment: "",
       createdAt: new Date(),
       updatedAt: new Date(),
+      openAuditChatByDefault: false,
+      // Friends (Phase 1)
+      friends: {}, // map of uid -> { uid, displayName, photoURL, since }
+      friendRequests: {
+        incoming: {}, // map of uid -> { uid, displayName, photoURL, sentAt }
+        outgoing: {}, // map of uid -> { uid, displayName, photoURL, sentAt }
+      },
       stats: {
         matches: 0,
         wins: 0,
@@ -33,7 +40,7 @@ export async function ensureUserProfile() {
         hundredPlus: 0,
         oneFortyPlus: 0,
         oneEighty: 0,
-        // counts darts thrown in ALL modes (casual + competitive)
+        // counts darts thrown in ALL modes (casual + )
         lifetimeDarts: 0,
       },
       recent: [], // last 5: "W"/"L"

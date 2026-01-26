@@ -1,8 +1,9 @@
 // app/ui/render.js
 import { app } from "../state.js";
 import { canScoreNow, canUndoNow, canEditScores, mySeatIndex } from "../permissions.js";
-import { checkoutSuggestion, minDartsForCheckout } from "../model/rules.js";
+import { checkoutSuggestion, minDartsForCheckout, isPossibleCheckout } from "../model/rules.js";
 import { calcLegStats, calcMatchStats, formatPills } from "../model/stats.js";
+import { renderBullMarkersFromState } from "../bull/ui.js";
 import { getActorId } from "../auth.js";
 import { isHost } from "../permissions.js";
 
@@ -101,6 +102,91 @@ export function hideError() {
   if (el) el.classList.add("hidden");
 }
 
+// -----------------------------
+// Lightweight top toast (used for online join notifications)
+// -----------------------------
+let __seatToastTimer = null;
+export function showSeatJoinToast(message, durationMs = 5000) {
+  try {
+    const el = document.getElementById("seatJoinToast");
+    const text = document.getElementById("seatJoinToastText");
+    if (!el) return;
+    el.classList.remove("danger");
+    if (text) text.textContent = String(message || "");
+
+    if (__seatToastTimer) {
+      clearTimeout(__seatToastTimer);
+      __seatToastTimer = null;
+    }
+
+    el.classList.remove("hidden");
+    // trigger transition
+    requestAnimationFrame(() => el.classList.add("show"));
+
+    __seatToastTimer = setTimeout(() => {
+      el.classList.remove("show");
+      // allow slide-out transition to finish
+      setTimeout(() => el.classList.add("hidden"), 260);
+    }, Math.max(1200, Number(durationMs) || 5000));
+  } catch (_) {
+    // non-fatal
+  }
+}
+
+export function showSeatLeaveToast(message, durationMs = 5000) {
+  try {
+    const el = document.getElementById("seatJoinToast");
+    const text = document.getElementById("seatJoinToastText");
+    if (!el) return;
+    el.classList.add("danger");
+    if (text) text.textContent = String(message || "Player left the game");
+
+    if (__seatToastTimer) {
+      clearTimeout(__seatToastTimer);
+      __seatToastTimer = null;
+    }
+
+    el.classList.remove("hidden");
+    requestAnimationFrame(() => el.classList.add("show"));
+
+    __seatToastTimer = setTimeout(() => {
+      el.classList.remove("show");
+      setTimeout(() => el.classList.add("hidden"), 260);
+    }, Math.max(1200, Number(durationMs) || 5000));
+  } catch (_) {
+    // non-fatal
+  }
+}
+
+export function setNameRowDanger(playerIndex, enabled) {
+  const sel = Number(playerIndex) === 0 ? "#p1Box .nameRow" : "#p2Box .nameRow";
+  const el = document.querySelector(sel);
+  if (el) el.classList.toggle("danger", !!enabled);
+}
+
+
+
+// --------------------------
+// Host-left modal (shown to remaining player when host exits an online lobby/match)
+// --------------------------
+export function showHostLeftModal(hostName) {
+  try {
+    const modal = document.getElementById("hostLeftModal");
+    const text = document.getElementById("hostLeftText");
+    if (text) {
+      const name = hostName ? String(hostName) : "Host";
+      text.textContent = `${name} has left the game. This lobby is no longer available.`;
+    }
+    if (modal) openModal(modal);
+  } catch (_) {}
+}
+
+export function setHostLeftModalVisible(visible) {
+  const modal = document.getElementById("hostLeftModal");
+  if (!modal) return;
+  visible ? openModal(modal) : closeModal(modal);
+}
+
 
 export function setLobbyGateVisible(visible) {
   const card = document.querySelector(".card");
@@ -145,6 +231,18 @@ export function setSetupModalVisible(visible) {
 export function setCheckoutModalVisible(visible) {
   const modal = document.getElementById("checkoutModal");
   if (!modal) return;
+  // When closing, ensure any transient UI state is reset so selections don't
+  // persist if the user cancels / closes the modal.
+  if (!visible) {
+    try {
+      document.querySelectorAll(".dartsBtn").forEach((b) => b.classList.remove("selected"));
+      document.querySelectorAll(".doubleDartsBtn").forEach((b) => b.classList.remove("selected"));
+      window.__selectedCheckoutDarts = null;
+      window.__selectedCheckoutDoubleDarts = null;
+      const confirmBtn = document.getElementById("checkoutConfirmBtn");
+      if (confirmBtn) confirmBtn.disabled = true;
+    } catch (_) {}
+  }
   visible ? openModal(modal) : closeModal(modal);
 }
 
@@ -169,12 +267,14 @@ export function safeFocusScoreInput() {
   el.focus();
 }
 
+const DEFAULT_THEME = "cyan";
+
 export function applyTheme(theme) {
   document.body.setAttribute("data-theme", theme);
   localStorage.setItem("theme", theme);
 
   const btn = document.getElementById("themeToggleBtn");
-  if (btn) btn.textContent = theme === "dark" ? "☀️" : "🌙";
+  if (btn) btn.textContent = "🎨";
 }
 
 export function initThemeToggle() {
@@ -183,14 +283,10 @@ export function initThemeToggle() {
   const isSignedIn = !!(app.user && !app.user.isAnonymous);
 
   if (!isSignedIn) {
-    applyTheme("dark");
+    applyTheme(DEFAULT_THEME);
   } else {
     const saved = localStorage.getItem("theme");
-    const preferred =
-      saved ||
-      (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
-        ? "dark"
-        : "light");
+    const preferred = saved || DEFAULT_THEME;
     applyTheme(preferred);
   }
 
@@ -205,6 +301,13 @@ export function render(state) {
   const overlayText = document.getElementById("turnOverlayText");
   const overlayUndoBtn = document.getElementById("overlayUndoBtn");
   const overlayStartBtn = document.getElementById("overlayStartBtn");
+  const gsOpenAuditChatBtn = document.getElementById("gsOpenAuditChatBtn");
+
+  if (gsOpenAuditChatBtn) {
+    const isOnline = state?.match?.gameType === "online";
+    gsOpenAuditChatBtn.textContent = isOnline ? "Open Chat and Audits" : "Open Audits";
+  }
+;
   const abortBullBtn = document.getElementById("abortBullBtn");
 
   // --- Throw for bull UI ---
@@ -220,8 +323,8 @@ export function render(state) {
   const host = isHost(state);
 
   if (online) {
-    if (settingsBtn) settingsBtn.classList.toggle("hidden", !host);
-    if (leaveBtn) leaveBtn.classList.toggle("hidden", host);
+    if (settingsBtn) settingsBtn.classList.toggle("hidden", false);
+    if (leaveBtn) leaveBtn.classList.toggle("hidden", true);
   } else {
     // non-online: keep original behaviour
     if (settingsBtn) settingsBtn.classList.remove("hidden");
@@ -278,7 +381,7 @@ export function render(state) {
   const bullModalShouldShow =
     state?.match?.starting === "bull" &&
     state?.match?.bull &&
-    !state.match.bull.resolved;
+    !state.match.bull.finalized;
 
   if (bullModalShouldShow) {
     const promptEl = document.getElementById("bullPrompt");
@@ -297,7 +400,8 @@ export function render(state) {
     const iAmThrower = !isOnline ? true : (mySeat !== null && mySeat === neededPlayer);
 
     if (promptEl) {
-      if (neededPlayer === null) promptEl.textContent = "Calculating starter…";
+      if (bull.resolved) promptEl.textContent = "Result";
+      else if (neededPlayer === null) promptEl.textContent = "Calculating starter…";
       else if (iAmThrower) promptEl.textContent = `You: tap where your dart landed, then confirm.`;
       else promptEl.textContent = "";
     }
@@ -313,9 +417,45 @@ export function render(state) {
 
     const shouldHideControls = isOnline && neededPlayer !== null && !iAmThrower;
 
+    const bullResolved = !!bull.resolved;
+    const bullResultPanel = document.getElementById("bullResultPanel");
+    const bullResultText = document.getElementById("bullResultText");
+    const bullStartBtn = document.getElementById("bullStartBtn");
+    const bullRethrowBtn = document.getElementById("bullRethrowBtn");
+    const bullControlsRow = bullResetBtn ? bullResetBtn.closest(".row") : null;
+
+
+    // When bull is resolved: show result screen, hide pick controls
+    if (bullResultPanel) bullResultPanel.classList.toggle("hidden", !bullResolved);
+
+    // Host-only actions (online): only the host should be able to Start Game / Rethrow.
+    const hideBullResultActions = (state?.match?.gameType === "online") && !isHost(state);
+    if (bullStartBtn) bullStartBtn.classList.toggle("hidden", hideBullResultActions);
+    if (bullRethrowBtn) bullRethrowBtn.classList.toggle("hidden", hideBullResultActions);
+
+    // Hide/show the whole controls row (Reset + Confirm) based on result panel visibility
+    if (bullControlsRow) bullControlsRow.classList.toggle("hidden", bullResolved || shouldHideControls);
+
+    // Keep button-level visibility driven ONLY by online "your turn" rules
+    if (bullResetBtn) bullResetBtn.classList.toggle("hidden", shouldHideControls);
+    if (bullConfirmBtn) bullConfirmBtn.classList.toggle("hidden", shouldHideControls);
+
+    if (bullBoard) bullBoard.style.pointerEvents = (shouldHideControls || bullResolved) ? "none" : "auto";
+
+
     if (bullResetBtn) bullResetBtn.classList.toggle("hidden", shouldHideControls);
     if (bullConfirmBtn) bullConfirmBtn.classList.toggle("hidden", shouldHideControls);
     if (bullBoard) bullBoard.style.pointerEvents = shouldHideControls ? "none" : "auto";
+
+
+        if (bull.resolved) {
+      const winnerSeat = bull.winner;
+      const winnerName = state.match.players?.[winnerSeat]?.name || (winnerSeat === 0 ? "Player 1" : "Player 2");
+      if (bullResultText) bullResultText.textContent = `${winnerName} is closer, they will start.`;
+    }
+
+    // Show confirmed bull markers for all players
+    try { renderBullMarkersFromState(state, mySeatIndex(state)); } catch (_) {}
 
     setBullModalVisible(true);
   } else {
@@ -356,6 +496,7 @@ export function render(state) {
   const p1StatsEl = document.getElementById("p1Stats");
   const p2StatsEl = document.getElementById("p2Stats");
   const matchStatsGrid = document.getElementById("matchStatsGrid");
+  const matchStatsTabs = document.getElementById("matchStatsTabs");
   const winnerNewGameBtn = document.getElementById("winnerNewGameBtn");
 
   if (!state || !state.match || !state.leg) {
@@ -457,7 +598,8 @@ export function render(state) {
       const remaining = typeof leg?.players?.[leg?.currentPlayer]?.score === "number"
         ? leg.players[leg.currentPlayer].score
         : null;
-      const hasFinish = typeof remaining === "number" && !!checkoutSuggestion(remaining);
+      const checkOutRule = state?.match?.rules?.checkOut ?? "double";
+      const hasFinish = typeof remaining === "number" && isPossibleCheckout(remaining, checkOutRule);
       quickCheckoutBtn.classList.toggle("hidden", !hasFinish);
       quickCheckoutBtn.disabled = !scoreAllowed;
 
@@ -513,7 +655,16 @@ export function render(state) {
   const match = state.match;
   const leg = state.leg;
 
-  if (gameMetaEl) gameMetaEl.innerText = `${match.mode} • BO${match.bestOf}`;
+  if (gameMetaEl) {
+    // Match setup stores presets as keys (e.g. "grand_prix"), so map them to the
+    // short UI label consistently.
+    const p = String(match?.rules?.preset || "custom").toLowerCase();
+    let label = "Custom";
+    if (p === "grand_prix" || p === "gp") label = "GP";
+    else if (p === "x01") label = "X01";
+    else if (p === "straight_in_out" || p === "siso") label = "SISO";
+    gameMetaEl.innerText = `${label} • ${match.mode} • BO${match.bestOf}`;
+  }
 
   const showLegs = Number(match.bestOf) > 1;
   document.querySelectorAll(".legsBadge").forEach((b) => {
@@ -550,12 +701,17 @@ export function render(state) {
   const p2LegsEl = document.getElementById("p2Legs");
   if (p1LegsEl) p1LegsEl.innerText = String(match.legsWon?.[0] ?? 0);
   if (p2LegsEl) p2LegsEl.innerText = String(match.legsWon?.[1] ?? 0);
-
   // Checkout suggestions
-  const sug1 = typeof s1 === "number" ? checkoutSuggestion(s1) : null;
-  const sug2 = typeof s2 === "number" ? checkoutSuggestion(s2) : null;
-  if (p1CheckoutEl) p1CheckoutEl.innerHTML = sug1 ? `<span class="pill">${sug1}</span>` : "";
-  if (p2CheckoutEl) p2CheckoutEl.innerHTML = sug2 ? `<span class="pill">${sug2}</span>` : "";
+  const checkOutRule = match?.rules?.checkOut ?? "double";
+  if (checkOutRule === "straight") {
+    if (p1CheckoutEl) p1CheckoutEl.innerHTML = "";
+    if (p2CheckoutEl) p2CheckoutEl.innerHTML = "";
+  } else {
+    const sug1 = typeof s1 === "number" ? checkoutSuggestion(s1) : null;
+    const sug2 = typeof s2 === "number" ? checkoutSuggestion(s2) : null;
+    if (p1CheckoutEl) p1CheckoutEl.innerHTML = sug1 ? `<span class="pill">${sug1}</span>` : "";
+    if (p2CheckoutEl) p2CheckoutEl.innerHTML = sug2 ? `<span class="pill">${sug2}</span>` : "";
+  }
 
   // Leg stats pills
   const st1 = formatPills(calcLegStats(leg, 0));
@@ -596,6 +752,28 @@ export function render(state) {
     const dartsBtns = Array.from(document.querySelectorAll(".dartsBtn"));
     const confirmBtn = document.getElementById("checkoutConfirmBtn");
 
+    const rules = match.rules || {};
+    const needDouble = rules.checkOut === "double" && rules.trackCheckoutStats === true;
+
+    const doubleBody = document.getElementById("checkoutDoubleBody");
+    const doubleRow = document.getElementById("checkoutDoubleRow");
+    const doubleBtns = Array.from(document.querySelectorAll(".doubleDartsBtn"));
+
+    // Default: hide double question
+    if (doubleBody) doubleBody.style.display = "none";
+    if (doubleRow) doubleRow.style.display = "none";
+    for (const b of doubleBtns) {
+      b.style.display = "";
+      b.classList.remove("selected");
+    }
+
+    // Also clear any lingering selection on the primary darts buttons.
+    for (const b of dartsBtns) b.classList.remove("selected");
+
+    window.__checkoutRequireDoubleDarts = false;
+    window.__selectedCheckoutDoubleDarts = null;
+
+
     for (const b of dartsBtns) b.style.display = "";
 
     if (minDarts === 2) {
@@ -606,10 +784,31 @@ export function render(state) {
     if (minDarts === 3) {
       for (const b of dartsBtns) b.style.display = "none";
       window.__selectedCheckoutDarts = 3;
+
+      // In double-out with tracking, we assume 1 dart was thrown at the double when minDarts is 3.
+      if (needDouble) {
+        window.__selectedCheckoutDoubleDarts = 1;
+        window.__checkoutRequireDoubleDarts = false;
+      }
+
       if (confirmBtn) confirmBtn.disabled = false;
       if (body) body.innerText = `${who} is checking out. Confirm?`;
     } else {
       window.__selectedCheckoutDarts = null;
+
+      // If we need doubles tracking, show the extra question and require a selection.
+      if (needDouble) {
+        window.__checkoutRequireDoubleDarts = true;
+        if (doubleBody) doubleBody.style.display = "";
+        if (doubleRow) doubleRow.style.display = "";
+
+        // Hide impossible options based on minimum darts needed.
+        if (minDarts === 2) {
+          const db1 = document.querySelector('.doubleDartsBtn[data-darts="1"]');
+          if (db1) db1.style.display = "none";
+        }
+      }
+
       if (confirmBtn) confirmBtn.disabled = true;
     }
 
@@ -627,145 +826,311 @@ export function render(state) {
     setCheckoutModalVisible(false);
   }
 
-  // Winner modal
-  if (leg.status === "finished") {
-    const winnerIdx = typeof leg.winner === "number" ? leg.winner : 0;
-    const winnerName = match.players[winnerIdx].name;
+  
+// Winner modal
+if (leg.status === "finished") {
+  const winnerIdx = typeof leg.winner === "number" ? leg.winner : 0;
+  const winnerName = match.players[winnerIdx].name;
 
-    const totals = calcMatchStats(match);
-    const p1m = formatPills(totals[0]);
-    const p2m = formatPills(totals[1]);
+  const totals = calcMatchStats(match);
+  const p1m = formatPills(totals[0]);
+  const p2m = formatPills(totals[1]);
 
-    // Highest checkout per player (requires checkoutScore stored on each leg summary)
-    const maxCheckout = [0, 0];
-    for (const legSum of match.legs || []) {
-      const w = typeof legSum.winner === "number" ? legSum.winner : null;
-      const cs = Number(legSum.checkoutScore || 0);
-      if (w === 0 || w === 1) maxCheckout[w] = Math.max(maxCheckout[w], cs);
-    }
+  // Highest checkout per player (requires checkoutScore stored on each leg summary)
+  const maxCheckout = [0, 0];
+  for (const legSum of match.legs || []) {
+    const w = typeof legSum.winner === "number" ? legSum.winner : null;
+    const cs = Number(legSum.checkoutScore || 0);
+    if (w === 0 || w === 1) maxCheckout[w] = Math.max(maxCheckout[w], cs);
+  }
 
-    // Optional checkout tracking (future feature). Only render if present.
-    const trackingOn = Boolean(match.checkoutTrackingEnabled);
-    const p1CheckoutPct = trackingOn ? (match.checkoutPct?.[0] ?? null) : null;
-    const p2CheckoutPct = trackingOn ? (match.checkoutPct?.[1] ?? null) : null;
+  // V4 rules + tracking flags
+  const rules = match.rules || {};
+  const trackingOn = rules.trackCheckoutStats === true;
+  const checkInRule = rules.checkIn || "straight";
+  const checkOutRule = rules.checkOut || "double";
 
-    // Only show avatars in ONLINE games. Local games should never show Google/profile photos.
-    const showMatchAvatars = match.gameType === "online";
-    const p1Photo = showMatchAvatars ? (match.players?.[0]?.photoURL || match.seat1PhotoURL || "") : "";
-    const p2Photo = showMatchAvatars ? (match.players?.[1]?.photoURL || match.seat2PhotoURL || "") : "";
+  // Only show avatars in ONLINE games. Local games should never show Google/profile photos.
+  const showMatchAvatars = match.gameType === "online";
+  const p1Photo = showMatchAvatars ? (match.players?.[0]?.photoURL || match.seat1PhotoURL || "") : "";
+  const p2Photo = showMatchAvatars ? (match.players?.[1]?.photoURL || match.seat2PhotoURL || "") : "";
 
-    if (matchStatsGrid) {
-      matchStatsGrid.innerHTML = `
-        <div class="msHead left">
-          ${p1Photo ? `<img class="msAvatar" src="${p1Photo}" alt="${match.players[0].name}" />` : ``}
-          <div class="msName">${match.players[0].name}</div>
-        </div>
-        <div></div>
-        <div class="msHead right">
-          ${p2Photo ? `<img class="msAvatar" src="${p2Photo}" alt="${match.players[1].name}" />` : ``}
-          <div class="msName">${match.players[1].name}</div>
-        </div>
+  // Aggregate tracking summaries from per-leg summaries (added in Step E)
+  const agg = {
+    checkInThrown: [0, 0],
+    checkInHit: [0, 0],
+    checkoutOpp: [0, 0],
+    checkoutThrown: [0, 0],
+    checkoutHit: [0, 0],
+  };
 
-        <div class="msCell msVal">${match.legsWon?.[0] ?? 0}</div>
-        <div class="msCell msLabel">Legs won</div>
-        <div class="msCell msVal">${match.legsWon?.[1] ?? 0}</div>
-
-        <div class="msCell msVal">${p1m.tda}</div>
-        <div class="msCell msLabel">3 dart avg</div>
-        <div class="msCell msVal">${p2m.tda}</div>
-
-        <div class="msCell msVal">${p1m.f9d}</div>
-        <div class="msCell msLabel">First 9 avg</div>
-        <div class="msCell msVal">${p2m.f9d}</div>
-
-        ${trackingOn ? `
-          <div class="msCell msVal">${p1CheckoutPct == null ? "—" : `${p1CheckoutPct}%`}</div>
-          <div class="msCell msLabel">Checkout %</div>
-          <div class="msCell msVal">${p2CheckoutPct == null ? "—" : `${p2CheckoutPct}%`}</div>
-        ` : ``}
-
-        <div class="msCell msVal">${maxCheckout[0] || "—"}</div>
-        <div class="msCell msLabel">Highest checkout</div>
-        <div class="msCell msVal">${maxCheckout[1] || "—"}</div>
-
-        <div class="msCell msVal">${totals[0].c100 || 0}</div>
-        <div class="msCell msLabel">100+</div>
-        <div class="msCell msVal">${totals[1].c100 || 0}</div>
-
-        <div class="msCell msVal">${totals[0].c140 || 0}</div>
-        <div class="msCell msLabel">140+</div>
-        <div class="msCell msVal">${totals[1].c140 || 0}</div>
-
-        <div class="msCell msVal">${totals[0].c180 || 0}</div>
-        <div class="msCell msLabel">180</div>
-        <div class="msCell msVal">${totals[1].c180 || 0}</div>
-
-        <div class="msCell msVal">${totals[0].darts || 0}</div>
-        <div class="msCell msLabel">Darts thrown</div>
-        <div class="msCell msVal">${totals[1].darts || 0}</div>
-      `;
-    }
-
-    function applyMatchEndStatColors() {
-  const grid = document.querySelector(".matchEndStats");
-  if (!grid) return;
-
-  const cells = Array.from(grid.querySelectorAll(".msCell"));
-  if (cells.length < 3) return;
-
-  // Cells are laid out as repeating triplets:
-  // [p1Val] [label] [p2Val] [p1Val] [label] [p2Val] ...
-  for (let i = 0; i <= cells.length - 3; i += 3) {
-    const p1El = cells[i];
-    const labelEl = cells[i + 1];
-    const p2El = cells[i + 2];
-
-    if (!p1El.classList.contains("msVal")) continue;
-    if (!labelEl.classList.contains("msLabel")) continue;
-    if (!p2El.classList.contains("msVal")) continue;
-
-    // Reset
-    p1El.classList.remove("msWin", "msLose", "msTie");
-    p2El.classList.remove("msWin", "msLose", "msTie");
-
-    const raw1 = (p1El.textContent || "").trim();
-    const raw2 = (p2El.textContent || "").trim();
-
-    // Treat "-" as 0 (for highest checkout, etc.)
-    const v1 = raw1 === "—" ? 0 : Number(raw1);
-    const v2 = raw2 === "—" ? 0 : Number(raw2);
-
-    if (!Number.isFinite(v1) || !Number.isFinite(v2)) continue;
-
-
-    const label = (labelEl.textContent || "").trim().toLowerCase();
-
-    // Rows where LOWER is better
-    const lowerIsBetter =
-      label.includes("darts") || label.includes("bust"); // keep darts as "lower wins"
-
-    if (v1 === v2) {
-      p1El.classList.add("msTie");
-      p2El.classList.add("msTie");
-      continue;
-    }
-
-    const p1Wins = lowerIsBetter ? v1 < v2 : v1 > v2;
-
-    if (p1Wins) {
-      p1El.classList.add("msWin");
-      p2El.classList.add("msLose");
-    } else {
-      p2El.classList.add("msWin");
-      p1El.classList.add("msLose");
+  for (const legSum of match.legs || []) {
+    const pls = legSum.players || [];
+    for (let p = 0; p < 2; p++) {
+      const s = pls[p] || {};
+      agg.checkInThrown[p] += Number(s.checkInDoublesThrown || 0);
+      agg.checkInHit[p] += Number(s.checkInDoublesHit || 0);
+      agg.checkoutOpp[p] += Number(s.checkoutOpp || 0);
+      agg.checkoutThrown[p] += Number(s.checkoutDoublesThrown || 0);
+      agg.checkoutHit[p] += Number(s.checkoutDoublesHit || 0);
     }
   }
-}
 
-applyMatchEndStatColors();
+  const pctStr = (hit, thrown) => {
+    const h = Number(hit || 0);
+    const t = Number(thrown || 0);
+    if (!t) return "—";
+    return `${Math.round((h / t) * 100)}%`;
+  };
 
+  const checkInPct = [pctStr(agg.checkInHit[0], agg.checkInThrown[0]), pctStr(agg.checkInHit[1], agg.checkInThrown[1])];
+  const checkoutPct = [pctStr(agg.checkoutHit[0], agg.checkoutThrown[0]), pctStr(agg.checkoutHit[1], agg.checkoutThrown[1])];
+
+if (matchStatsGrid) {
+    const matchFinished = match.status === "finished";
+    const legs = match.legs || [];
+    const lastLegIndex = legs.length; // 1-based
+    // Determine selected tab
+    let selectedTab = app.matchStatsTab || "final";
+    if (!matchFinished) {
+      // Between legs: show only the most recent leg and hide tabs.
+      selectedTab = `leg-${lastLegIndex}`;
+      app.matchStatsTab = selectedTab;
+      if (matchStatsTabs) {
+        matchStatsTabs.classList.add("hidden");
+        matchStatsTabs.innerHTML = "";
+      }
+    } else {
+      // Match finished: render tabs for each leg + final
+      if (matchStatsTabs) {
+        matchStatsTabs.classList.remove("hidden");
+        const tabKeys = [];
+        for (let i = 1; i <= lastLegIndex; i++) tabKeys.push(`leg-${i}`);
+        tabKeys.push("final");
+
+        if (!tabKeys.includes(selectedTab)) selectedTab = "final";
+        app.matchStatsTab = selectedTab;
+
+        matchStatsTabs.innerHTML = tabKeys
+          .map((k) => {
+            const label = k === "final" ? "Final" : `Leg ${k.split("-")[1]}`;
+            const active = k === selectedTab ? "active" : "";
+            return `<button class="msTabBtn ${active}" data-tab="${k}" type="button">${label}</button>`;
+          })
+          .join("");
+      }
+    }
+
+    const isFinal = selectedTab === "final";
+    const legNum = !isFinal ? Number((selectedTab.split("-")[1] || "0")) : 0;
+    const legSum = !isFinal ? legs[Math.max(0, legNum - 1)] : null;
+
+    // Pick stats scope: final (whole match) vs a specific leg
+    const scopeTotals = isFinal ? calcMatchStats(match) : [
+      { ...(legSum?.players?.[0] || {}) },
+      { ...(legSum?.players?.[1] || {}) },
+    ];
+    const p1mScoped = formatPills(scopeTotals[0]);
+    const p2mScoped = formatPills(scopeTotals[1]);
+
+    // Highest checkout in scope
+    const maxCheckoutScoped = [0, 0];
+    if (isFinal) {
+      for (const ls of legs) {
+        const w = typeof ls.winner === "number" ? ls.winner : null;
+        const cs = Number(ls.checkoutScore || 0);
+        if (w === 0 || w === 1) maxCheckoutScoped[w] = Math.max(maxCheckoutScoped[w], cs);
+      }
+    } else if (legSum) {
+      const w = typeof legSum.winner === "number" ? legSum.winner : null;
+      const cs = Number(legSum.checkoutScore || 0);
+      if (w === 0 || w === 1) maxCheckoutScoped[w] = Math.max(maxCheckoutScoped[w], cs);
+    }
+
+    // Tracking aggregates in scope (for Step E stats)
+    const aggScoped = {
+      checkInThrown: [0, 0],
+      checkInHit: [0, 0],
+      checkoutOpp: [0, 0],
+      checkoutThrown: [0, 0],
+      checkoutHit: [0, 0],
+      legsWon: [0, 0],
+    };
+
+    const addLegToAgg = (ls) => {
+      if (!ls || !ls.players) return;
+      const w = typeof ls.winner === "number" ? ls.winner : null;
+      if (w === 0 || w === 1) aggScoped.legsWon[w] += 1;
+
+      for (let p = 0; p < 2; p++) {
+        const s = ls.players[p] || {};
+        aggScoped.checkInThrown[p] += Number(s.checkInDoublesThrown || 0);
+        aggScoped.checkInHit[p] += Number(s.checkInDoublesHit || 0);
+        aggScoped.checkoutOpp[p] += Number(s.checkoutOpp || 0);
+        aggScoped.checkoutThrown[p] += Number(s.checkoutDoublesThrown || 0);
+        aggScoped.checkoutHit[p] += Number(s.checkoutDoublesHit || 0);
+      }
+    };
+
+    if (isFinal) {
+      for (const ls of legs) addLegToAgg(ls);
+    } else {
+      addLegToAgg(legSum);
+    }
+
+    const pctStr = (hit, thrown) => {
+      const h = Number(hit || 0);
+      const t = Number(thrown || 0);
+      if (!t) return "—";
+      return `${Math.round((h / t) * 100)}%`;
+    };
+
+    const checkInPctScoped = [
+      pctStr(aggScoped.checkInHit[0], aggScoped.checkInThrown[0]),
+      pctStr(aggScoped.checkInHit[1], aggScoped.checkInThrown[1]),
+    ];
+    const checkoutPctScoped = [
+      pctStr(aggScoped.checkoutHit[0], aggScoped.checkoutThrown[0]),
+      pctStr(aggScoped.checkoutHit[1], aggScoped.checkoutThrown[1]),
+    ];
+
+    // Checkout success = legs finished / checkout opportunities, within the scope.
+    const checkoutSuccessScoped = [
+      `${aggScoped.legsWon[0]}/${aggScoped.checkoutOpp[0] ?? 0}`,
+      `${aggScoped.legsWon[1]}/${aggScoped.checkoutOpp[1] ?? 0}`,
+    ];
+
+    const rows = [];
+    const addRow = (label, v1, v2) => {
+      rows.push(`
+        <div class="msCell msVal">${v1}</div>
+        <div class="msCell msLabel">${label}</div>
+        <div class="msCell msVal">${v2}</div>
+      `);
+    };
+
+    // Between legs + per-leg tabs: hide "Legs won"
+    if (isFinal) {
+      addRow("Legs won", match.legsWon?.[0] ?? 0, match.legsWon?.[1] ?? 0);
+    }
+
+    addRow("3 dart avg", p1mScoped.tda, p2mScoped.tda);
+    addRow("First 9 avg", p1mScoped.f9d, p2mScoped.f9d);
+    addRow("Highest checkout", maxCheckoutScoped[0] || "—", maxCheckoutScoped[1] || "—");
+
+    if (trackingOn && checkInRule === "double") {
+      addRow("Check-in success", checkInPctScoped[0], checkInPctScoped[1]);
+    }
+
+    if (trackingOn && checkOutRule === "double") {
+      addRow("Checkout %", checkoutPctScoped[0], checkoutPctScoped[1]);
+      addRow("Checkout success", checkoutSuccessScoped[0], checkoutSuccessScoped[1]);
+    }
+
+    addRow("100+", scopeTotals[0].c100 || 0, scopeTotals[1].c100 || 0);
+    addRow("140+", scopeTotals[0].c140 || 0, scopeTotals[1].c140 || 0);
+    addRow("180", scopeTotals[0].c180 || 0, scopeTotals[1].c180 || 0);
+    addRow("Darts thrown", scopeTotals[0].darts || 0, scopeTotals[1].darts || 0);
+
+    matchStatsGrid.innerHTML = `
+      <div class="msHeader msCell msName">${match.players[0].name}</div>
+      <div class="msHeader msCell"></div>
+      <div class="msHeader msCell msName">${match.players[1].name}</div>
+      ${rows.join("")}
+    `;
+  }
+
+  function applyMatchEndStatColors() {
+    const grid = document.querySelector(".matchEndStats");
+    if (!grid) return;
+
+    const cells = Array.from(grid.querySelectorAll(".msCell"));
+    if (cells.length < 3) return;
+
+    // Cells are laid out as repeating triplets:
+    // [p1Val] [label] [p2Val] [p1Val] [label] [p2Val] ...
+    for (let i = 0; i <= cells.length - 3; i += 3) {
+      const p1El = cells[i];
+      const labelEl = cells[i + 1];
+      const p2El = cells[i + 2];
+
+      if (!p1El.classList.contains("msVal")) continue;
+      if (!labelEl.classList.contains("msLabel")) continue;
+      if (!p2El.classList.contains("msVal")) continue;
+
+      const label = (labelEl.textContent || "").trim().toLowerCase();
+
+      // Never color "Darts thrown" (misleading for who started/won).
+      if (label.includes("darts thrown")) continue;
+
+      // Reset
+      p1El.classList.remove("msWin", "msLose", "msTie");
+      p2El.classList.remove("msWin", "msLose", "msTie");
+
+      const raw1 = (p1El.textContent || "").trim();
+      const raw2 = (p2El.textContent || "").trim();
+
+      const parseStat = (label, raw) => {
+        const s = String(raw || "").trim();
+        if (!s || s === "—") return 0;
+
+        // Percentages: "33%"
+        if (s.endsWith("%")) {
+          const n = parseFloat(s.replace("%",""));
+          return Number.isFinite(n) ? n : 0;
+        }
+
+        // Fractions: "2/5" (checkout success). Compare as ratio.
+        if (s.includes("/")) {
+          const parts = s.split("/").map((x) => Number(String(x).trim()));
+          const a = parts[0], b = parts[1];
+          if (Number.isFinite(a) && Number.isFinite(b) && b > 0) return a / b;
+          if (Number.isFinite(a)) return a;
+          return 0;
+        }
+
+        // Plain number
+        const n = Number(s);
+        return Number.isFinite(n) ? n : 0;
+      };
+
+      const v1 = parseStat(label, raw1);
+      const v2 = parseStat(label, raw2);
+
+      // Rows where LOWER is better (keep existing behavior for any future stats)
+      const lowerIsBetter = label.includes("bust");
+
+      if (v1 === v2) {
+        p1El.classList.add("msTie");
+        p2El.classList.add("msTie");
+        continue;
+      }
+
+      const p1Wins = lowerIsBetter ? v1 < v2 : v1 > v2;
+
+      if (p1Wins) {
+        p1El.classList.add("msWin");
+        p2El.classList.add("msLose");
+      } else {
+        p2El.classList.add("msWin");
+        p1El.classList.add("msLose");
+      }
+    }
+  }
+
+  applyMatchEndStatColors();
 
     const winnerLeaveBtn = document.getElementById("winnerLeaveBtn");
+
+    // Seat-2 UX: show "Waiting for Host..." when Continue is hidden.
+    let winnerWaitingText = document.getElementById("winnerWaitingText");
+    if (!winnerWaitingText && winnerNewGameBtn && winnerNewGameBtn.parentElement) {
+      winnerWaitingText = document.createElement("div");
+      winnerWaitingText.id = "winnerWaitingText";
+      winnerWaitingText.className = "winnerWaitingText hidden";
+      winnerWaitingText.innerText = "Waiting for Host to continue…";
+      winnerNewGameBtn.parentElement.insertBefore(winnerWaitingText, winnerNewGameBtn.nextSibling);
+    }
 
     // Between legs: only show Continue.
     // End of match: host gets New Match; everyone gets Leave.
@@ -776,13 +1141,23 @@ applyMatchEndStatColors();
         // In online games, only the host can start a new match.
         if (match.gameType === "online" && !isHost(state)) {
           winnerNewGameBtn.classList.add("hidden");
+          if (winnerWaitingText) winnerWaitingText.classList.add("hidden");
         } else {
           winnerNewGameBtn.classList.remove("hidden");
+          if (winnerWaitingText) winnerWaitingText.classList.add("hidden");
           winnerNewGameBtn.innerText = "New Match";
         }
       } else {
-        winnerNewGameBtn.classList.remove("hidden");
-        winnerNewGameBtn.innerText = "Continue (Next Leg)";
+        // In online games, only the host can advance to the next leg.
+        if (match.gameType === "online" && !isHost(state)) {
+          winnerNewGameBtn.classList.add("hidden");
+          if (winnerWaitingText) winnerWaitingText.classList.remove("hidden");
+        } else {
+          if (winnerWaitingText) winnerWaitingText.classList.add("hidden");
+          winnerNewGameBtn.classList.remove("hidden");
+          if (winnerWaitingText) winnerWaitingText.classList.add("hidden");
+          winnerNewGameBtn.innerText = "Continue (Next Leg)";
+        }
       }
     }
 

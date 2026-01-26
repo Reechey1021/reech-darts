@@ -26,15 +26,60 @@ function emptyAgg() {
     total140s: 0,
     total180s: 0,
     lifetimeDarts: 0,
+    checkoutDoublesThrown: 0,
+    checkoutDoublesHit: 0,
     recentResults: [], // "W" / "L"
   };
 }
 
+
+function dayKey(ts) {
+  const d = new Date(ts || Date.now());
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function bumpDailyAgg(daily, key, delta) {
+  const next = daily ? { ...daily } : {};
+  const cur = next[key] || { matches: 0, tdaSum: 0, tdaCount: 0, f9dSum: 0, f9dCount: 0, checkoutPctSum: 0, checkoutPctCount: 0 };
+  next[key] = {
+    matches: (cur.matches || 0) + (delta.matches || 0),
+    tdaSum: (cur.tdaSum || 0) + (delta.tdaSum || 0),
+    tdaCount: (cur.tdaCount || 0) + (delta.tdaCount || 0),
+    f9dSum: (cur.f9dSum || 0) + (delta.f9dSum || 0),
+    f9dCount: (cur.f9dCount || 0) + (delta.f9dCount || 0),
+    checkoutPctSum: (cur.checkoutPctSum || 0) + (delta.checkoutPctSum || 0),
+    checkoutPctCount: (cur.checkoutPctCount || 0) + (delta.checkoutPctCount || 0),
+  };
+  // trim to last ~400 days
+  const keys = Object.keys(next).sort();
+  if (keys.length > 420) {
+    for (let i = 0; i < keys.length - 420; i++) delete next[keys[i]];
+  }
+  return next;
+}
 function pushRecent(arr, val, max = 5) {
   const next = Array.isArray(arr) ? arr.slice() : [];
   next.unshift(val);
   return next.slice(0, max);
 }
+
+
+function sumCheckoutFromLegs(match, pIndex) {
+  const legs = Array.isArray(match?.legs) ? match.legs : [];
+  let thrown = 0;
+  let hit = 0;
+  for (const leg of legs) {
+    const ps = leg?.players?.[pIndex];
+    if (!ps) continue;
+    thrown += Number(ps.checkoutDoublesThrown || 0);
+    hit += Number(ps.checkoutDoublesHit || 0);
+  }
+  return { thrown, hit };
+}
+
 
 export async function applyCompetitiveMatchToProfilesTx(tx, db, match) {
   if (!match || match.status !== "finished") return;
@@ -229,6 +274,49 @@ function tsToKey(ts) {
 //
 // This function is designed to be called by the realtime listener when
 // it observes match.status === "finished".
+function presetLabelFromRules(rules) {
+  const p = (rules && rules.preset) ? String(rules.preset) : "custom";
+  switch (p) {
+    case "grand_prix": return "GP";
+    case "x01": return "X01";
+    case "straight_in_out": return "SISO";
+    default: return "Custom";
+  }
+}
+
+
+function computeFirst9AvgFromTotals(tot) {
+  const p = Number(tot.first9Points || 0);
+  const d = Number(tot.first9Darts || 0);
+  if (!d) return 0;
+  return Math.round((p / d) * 3);
+}
+
+function computeCheckoutPctFromLegs(match, playerIndex) {
+  const legs = Array.isArray(match?.legs) ? match.legs : [];
+  let thrown = 0;
+  let hit = 0;
+  for (const leg of legs) {
+    const ps = leg?.players?.[playerIndex];
+    if (!ps) continue;
+    thrown += Number(ps.checkoutDoublesThrown || 0);
+    hit += Number(ps.checkoutDoublesHit || 0);
+  }
+  return thrown ? Math.round((hit / thrown) * 100) : 0;
+}
+function computeThreeDartAvgFromTotals(t) {
+  const darts = Number(t?.darts || 0);
+  const points = Number(t?.points || 0);
+  if (!darts) return 0;
+  return (points / darts) * 3;
+}
+
+// Apply finished-match profile stats for the CURRENT signed-in user only.
+// This is necessary because Firestore rules typically only allow a user to
+// write their own /users/{uid} document.
+//
+// This function is designed to be called by the realtime listener when
+// it observes match.status === "finished".
 export async function applyFinishedMatchProfileUpdatesForMe(db, uid, gameId, match) {
   if (!uid) return; // guests
   if (!match || match.status !== "finished") return;
@@ -267,14 +355,17 @@ export async function applyFinishedMatchProfileUpdatesForMe(db, uid, gameId, mat
     const existing = snap.exists ? snap.data() : {};
     const stats = existing.stats || emptyAgg();
 
+    // Always track lifetime darts across ALL modes
     let next = {
       ...stats,
       lifetimeDarts: (stats.lifetimeDarts || 0) + (t.darts || 0),
     };
 
+    // Competitive-only aggregates (your existing rule)
     if (isCompetitive) {
       const won = match.winner === pIndex;
       const opp = 1 - pIndex;
+
       next = {
         ...next,
         matches: (next.matches || 0) + 1,
@@ -292,9 +383,72 @@ export async function applyFinishedMatchProfileUpdatesForMe(db, uid, gameId, mat
         total180s: (next.total180s || 0) + (t.c180 || 0),
         recentResults: pushRecent(next.recentResults, won ? "W" : "L"),
       };
+
+      // Checkout % support (tracked double-out matches only, competitive only)
+      const rules = match.rules || {};
+      const trackCheckout = !!rules.trackCheckoutStats && rules.checkOut === "double";
+      if (trackCheckout) {
+        const sums = sumCheckoutFromLegs(match, pIndex);
+        next.checkoutDoublesThrown = (next.checkoutDoublesThrown || 0) + sums.thrown;
+        next.checkoutDoublesHit = (next.checkoutDoublesHit || 0) + sums.hit;
+      }
     }
 
-    logStats("Write my stats", {
+    // Match history: store for BOTH casual + competitive so the dashboard list works.
+    // This is lightweight (10 rows) and uses the same single user-doc write as above.
+    const oppIndex = 1 - pIndex;
+    const oppPlayer = match.players?.[oppIndex] || {};
+    const wonNow = match.winner === pIndex;
+
+    const legsMe = Number(match.legsWon?.[pIndex] || 0);
+    const legsOpp = Number(match.legsWon?.[oppIndex] || 0);
+    const scoreline = `${legsMe}-${legsOpp}`;
+
+    const rules = match.rules || {};
+    const mode = (match.gameMeta && String(match.gameMeta).trim())
+      ? String(match.gameMeta).trim()
+      : presetLabelFromRules(rules);
+
+    const entry = {
+      matchKey,
+      result: wonNow ? "W" : "L",
+      scoreline,
+      mode,
+      competition: isCompetitive ? "Competitive" : "Casual",
+      opponentUid: oppPlayer.uid || null,
+      opponentName: oppPlayer.name || "Opponent",
+      // Avatars: follow the same fallback chain used in-game.
+      // Some matches store avatars on seat1PhotoURL/seat2PhotoURL rather than players[].photoURL.
+      opponentAvatar:
+        (oppPlayer.photoURL || oppPlayer.photoUrl || oppPlayer.photo || null) ||
+        (oppIndex === 0 ? (match.seat1PhotoURL || null) : (match.seat2PhotoURL || null)) ||
+        null,
+      threeDartAvg: computeThreeDartAvgFromTotals(t),
+      first9Avg: computeFirst9AvgFromTotals(t),
+      checkoutPct: computeCheckoutPctFromLegs(match, pIndex),
+      finishedAt: Date.now(),
+    };
+
+    const hist = Array.isArray(next.matchHistory) ? next.matchHistory.slice() : [];
+    // De-dupe by matchKey
+    const filtered = hist.filter((x) => x && x.matchKey !== matchKey);
+    filtered.unshift(entry);
+    next.matchHistory = filtered.slice(0, 10);
+
+    // Daily aggregates for Stats History (small, long-lived; avoids storing full match logs)
+    const kDay = dayKey(entry.finishedAt);
+    next.dailyAgg = bumpDailyAgg(next.dailyAgg, kDay, {
+      matches: 1,
+      tdaSum: Number(entry.threeDartAvg || 0),
+      tdaCount: 1,
+      f9dSum: Number(entry.first9Avg || 0),
+      f9dCount: 1,
+      checkoutPctSum: Number(entry.checkoutPct || 0),
+      checkoutPctCount: 1,
+    });
+
+
+    logStats("Write my stats + matchHistory", {
       uid,
       gameId,
       matchKey,
@@ -303,6 +457,7 @@ export async function applyFinishedMatchProfileUpdatesForMe(db, uid, gameId, mat
       matches: next.matches,
       wins: next.wins,
       losses: next.losses,
+      historyLen: next.matchHistory.length,
     });
 
     tx.set(ref, { stats: next, updatedAt: new Date() }, { merge: true });

@@ -11,6 +11,7 @@ export function initBullState() {
   return {
     enabled: true,
     resolved: false,
+    finalized: false,
     p1: null,
     p2: null,
     winner: null,
@@ -40,6 +41,14 @@ export function tryResolveBull(state) {
   state.match.starterLeg1 = winner;
   if (state.leg) state.leg.currentPlayer = winner;
 
-  // "Game on" / match start is now after bull is resolved
+}
+
+
+export function finalizeBull(state) {
+  const bull = state?.match?.bull;
+  if (!bull || !bull.resolved) return;
+  if (bull.finalized) return;
+  bull.finalized = true;
+  // "Game on" / match start after player acknowledges result
   setAudioEvent(state, ["./audio/phrases/match_start.mp3"]);
 }
