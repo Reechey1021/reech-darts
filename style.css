@@ -1382,7 +1382,7 @@ body.dashboardPage {
   transform: translateY(-1px) scale(0.99);
 }
 
-.dashMilestone.dashStatTile--glow:hover {
+.dashMilestone.historybtn.dashStatTile--glow:hover {
   transform: translateY(-2px);
   border-color: color-mix(in srgb, var(--dash-panel-border), var(--accent) 35%);
   box-shadow:
@@ -1390,11 +1390,11 @@ body.dashboardPage {
     0 18px 44px var(--shadow-strong, var(--shadow-md));
 }
 
-.dashMilestone.dashStatTile--glow:hover::before {
+.dashMilestone.historybtn.dashStatTile--glow:hover::before {
   opacity: 0.95;
 }
 
-.dashMilestone.dashStatTile--glow:hover::after {
+.dashMilestone.historybtn.dashStatTile--glow:hover::after {
   opacity: 0.92;
 }
 
@@ -1603,10 +1603,6 @@ button:hover {
   color: var(--btn-text) !important;
 }
 
-#setupP1, #setupP2 {
-  font-size: 16px !important;
-  text-align: left;
-}
 
 input {
   border-color: transparent;
@@ -1967,12 +1963,20 @@ h1 {
 .checkInDartsBtn {
   transition: background-color 0.15s ease, transform 0.1s ease;
 }
-.dartsBtn.selected {
+.dartsBtn.selected  {
   background-color: var(--accent);
   background: var(--accent);
   color:var(--c_ad31ce);
   box-shadow: 0 0 0 3px var(--active-glow);
 }
+
+ .setupBtn.selected {
+  background-color: var(--accent);
+  background: var(--accent);
+  color: black;
+  font-weight: 700;
+  box-shadow: 0 0 0 3px var(--active-glow);
+ }
 
 .doubleDartsBtn {
   transition: background-color 0.15s ease, transform 0.1s ease;
@@ -2430,6 +2434,246 @@ button.iconOnly {
   margin: 10px 0;
 }
 
+/* Setup modal (button-driven controls) */
+.setupGrid {
+  display: grid;
+  gap: 12px;
+  margin: 10px 0;
+}
+
+.setupGridTwo {
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 520px) {
+  .setupGridTwo {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.setupField {
+  min-width: 0;
+}
+
+.setupTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px 0;
+}
+
+.setupTitle {
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.setupGridTwo {
+  grid-template-columns: 1fr 1fr;
+}
+
+.setupBtnRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+@media (min-width: 520px) {
+  .setupBtnRow {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+
+/* Stepper (Score / Legs) */
+.setupStepper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 2px 2px;
+  border-radius: 12px;
+  border: 1px solid var(--panel-border);
+  background: var(--panel);
+  width: 125px;
+  box-sizing: border-box;
+  user-select: none;
+  -webkit-user-select: none; /* Safari */
+  -ms-user-select: none;     /* old Edge */
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content:space-between;
+  padding-bottom:5px;
+}
+
+.setupStepBtn {
+  width: 34px;
+  min-width: 34px;
+  height: 32px;
+  padding: 0;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+}
+
+.setupStepBtn.isDisabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.setupStepValue {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+}
+
+
+/* Slightly tighter rows that naturally have 2 buttons */
+.setupBtnRow[data-setup-toggle],
+.setupBtnRow[data-target="setupCompetition"],
+.setupBtnRow[data-target="setupAllowMutualControl"] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.setupthreegrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.setupblock {
+  background: var(--card);
+  border-radius: 12px;
+  padding: 12px;
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  justify-content:center;
+}
+
+.setupTitle.smaller {
+  font-size:15px;
+}
+
+.twogrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+
+#setupP1, #setupP2 {
+  font-size: 16px !important;
+  text-align: center;
+  width:180px;
+  margin-top: 6px;
+}
+
+.setupnameinput {
+  padding: 10px 14px;
+  border-radius: 12px;
+  color: var(--text);
+  font-size: 16px;
+}
+
+.gap2 {
+  gap:2px !important;
+}
+
+.setupBtnRow[data-target="setupCheckIn"],
+.setupBtnRow[data-target="setupCheckOut"],
+.setupBtnRow[data-target="setupTrackCheckoutStats"] {
+  width: 100%;
+  display:flex;
+  flex-direction:column;
+}
+
+.setupBtn {
+  width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 6px 0px;
+}
+
+.setupTitleRow.midalign {
+  justify-content: center;
+}
+
+.setupBtn.selected {
+  border-color: var(--active-border);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--active-glow) 70%, transparent);
+  filter: saturate(1.08);
+}
+
+.setupField.isDisabled {
+  opacity: 0.45;
+}
+
+.setupField.isDisabled .setupBtnRow {
+  pointer-events: none;
+}
+
+.setupHiddenControl {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+/* Tooltip (?) */
+.helpIcon {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.helpIcon .tipBubble {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 8px);
+  transform: translateX(-50%);
+  width: min(260px, 70vw);
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--modal-card) 92%, black);
+  border: 1px solid var(--panel-border);
+  box-shadow: var(--shadow-lg);
+  font-size: 12px;
+  line-height: 1.35;
+  text-align: left;
+  z-index: 20;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.helpIcon.showTip .tipBubble {
+  opacity: 1;
+  z-index: 99999;
+}
+
+.showTip {
+  z-index: 99999;
+}
+
 /* Prevent grid children from forcing overflow on mobile */
 .formRow > * {
   min-width: 0;
@@ -2668,6 +2912,49 @@ button.iconOnly {
   .mhOppAvatar, .mhOppAvatarFallback {min-width: 14px; min-height:14px; max-width:14px; max-height:14px;}
 
 
+  .setupTitle {
+    font-size:14px;
+  }
+
+  .setupTitle.smaller {
+    font-size:10px;
+  }
+
+  .setupBtn {
+    font-size: 12px;
+  }
+
+  .helpIcon {
+    display:none;
+    width: 14px;
+    height: 14px;
+    font-size: 10px;
+    line-height: 14px;
+  }
+
+  .setupthreegrid {
+    gap: 3px;
+  }
+
+  .setupStepBtn {
+  width:16px;
+  max-width:16px;
+  min-width: 16px;
+  height: 24px;
+  min-height: 24px;
+  max-height: 24px;
+}
+
+  .setupStepper {
+    width: 80px;
+    font-size:14px;
+  }
+
+  .setupGridTwo {
+    gap: 6px;
+    grid-template-columns: 0.5fr 1fr;
+  }
+
   .avatar {
     width: 16px;
     height: 16px;
@@ -2734,6 +3021,7 @@ body.dashboardPage {
 
 .dashMilestone {
   font-size: 12px;
+  padding: 4px 10px;
 }
 
 
@@ -2785,7 +3073,7 @@ body.dashboardPage {
 
   .dashStatsCard {
     border-radius: 16px;
-    gap: 12px;
+    gap: 8px;
     justify-content: space-between;
   }
 
@@ -2830,7 +3118,8 @@ body.dashboardPage {
   }
 
   .modal-card.mobilepad {
-    padding:6px;
+    padding: 20px 6px 16px 6px;
+    margin-bottom:30px;
   }
 
   .topToast {font-size:12px; text-align:center;}
@@ -2949,7 +3238,7 @@ body.dashboardPage {
   }
 
   .keypad, .dartPad {
-    height: 350px;
+    height: 320px;
 }
 
   .key {
@@ -3026,8 +3315,10 @@ body.dashboardPage {
   }
 
   #setupP1, #setupP2 {
-    width: 100%;
-    max-width: 100%;
+    width: 120px;
+    max-width: 120px;
+    padding: 6px;
+    font-size: 14px !important;
   }
 
   .dashHeader {

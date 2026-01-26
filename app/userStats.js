@@ -320,6 +320,9 @@ function computeThreeDartAvgFromTotals(t) {
 export async function applyFinishedMatchProfileUpdatesForMe(db, uid, gameId, match) {
   if (!uid) return; // guests
   if (!match || match.status !== "finished") return;
+  // Only log ONLINE games (exclude local/AI/offline)
+  if (match.gameType && String(match.gameType) !== "online") return;
+
 
   const pIndex = match.players?.findIndex((p) => p?.uid === uid);
   if (pIndex == null || pIndex < 0) {

@@ -621,54 +621,260 @@ export function wireUI() {
   });
 
 
-  // V4 Stage 1 - Setup presets/rules plumbing (no behavior change yet)
+  // Setup modal controls (button-driven UI with hidden canonical form controls)
   const setupPresetEl = document.getElementById("setupPreset");
-  const setupCustomRulesEl = document.getElementById("setupCustomRules");
-  const setupPresetDescEl = document.getElementById("setupPresetDescription");
   const setupCheckInEl = document.getElementById("setupCheckIn");
   const setupCheckOutEl = document.getElementById("setupCheckOut");
+  const setupCompetitionEl = document.getElementById("setupCompetition");
+  const setupAllowMutualControlEl = document.getElementById("setupAllowMutualControl");
+  const setupTrackCheckoutStatsEl = document.getElementById("setupTrackCheckoutStats");
+
+  const setupCheckInFieldEl = document.getElementById("setupCheckInField");
+  const setupCheckOutFieldEl = document.getElementById("setupCheckOutField");
+  const setupMutualControlFieldEl = document.getElementById("setupMutualControlField");
+
+  const setupBtnRows = Array.from(document.querySelectorAll(".setupBtnRow[data-setup-group]"));
+  const setupToggleRows = Array.from(document.querySelectorAll(".setupBtnRow[data-setup-toggle]"));
+  const helpIcons = Array.from(document.querySelectorAll(".helpIcon[data-tip]"));
+
+
+// Stepper controls (Score / Legs): UI steppers synced to hidden canonical <select>s
+const setupSteppers = Array.from(document.querySelectorAll("[data-setup-stepper][data-target]"));
+
+const syncStepperFromControl = (targetId) => {
+  const stepper = document.querySelector(`[data-setup-stepper][data-target="${targetId}"]`);
+  const ctrl = document.getElementById(targetId);
+  if (!stepper || !ctrl) return;
+
+  const values = String(stepper.getAttribute("data-values") || "")
+    .split(",")
+    .map((x) => String(x).trim())
+    .filter(Boolean);
+
+  const cur = String(ctrl.value);
+  const idx = Math.max(0, values.indexOf(cur));
+  const display = stepper.querySelector("[data-stepper-value]");
+  if (display) display.textContent = values[idx] || cur || "—";
+
+  const decBtn = stepper.querySelector('.setupStepBtn[data-step="dec"]');
+  const incBtn = stepper.querySelector('.setupStepBtn[data-step="inc"]');
+  if (decBtn) decBtn.classList.toggle("isDisabled", idx <= 0);
+  if (incBtn) incBtn.classList.toggle("isDisabled", idx >= values.length - 1);
+};
+
+for (const stepper of setupSteppers) {
+  const targetId = stepper.getAttribute("data-target");
+  if (!targetId) continue;
+  const ctrl = document.getElementById(targetId);
+  if (!ctrl) continue;
+
+  const values = String(stepper.getAttribute("data-values") || "")
+    .split(",")
+    .map((x) => String(x).trim())
+    .filter(Boolean);
+
+  const setByIndex = (i) => {
+    if (!values.length) return;
+    const idx = Math.max(0, Math.min(values.length - 1, i));
+    ctrl.value = values[idx];
+    ctrl.dispatchEvent(new Event("change", { bubbles: true }));
+    syncStepperFromControl(targetId);
+  };
+
+  const decBtn = stepper.querySelector('.setupStepBtn[data-step="dec"]');
+  const incBtn = stepper.querySelector('.setupStepBtn[data-step="inc"]');
+
+  if (decBtn) {
+    decBtn.addEventListener("click", () => {
+      const cur = String(ctrl.value);
+      const idx = values.indexOf(cur);
+      setByIndex((idx >= 0 ? idx : 0) - 1);
+    });
+  }
+  if (incBtn) {
+    incBtn.addEventListener("click", () => {
+      const cur = String(ctrl.value);
+      const idx = values.indexOf(cur);
+      setByIndex((idx >= 0 ? idx : 0) + 1);
+    });
+  }
+
+  // Keep display in sync with the canonical control
+  ctrl.addEventListener("change", () => syncStepperFromControl(targetId));
+
+  // Initialize
+  syncStepperFromControl(targetId);
+}
+
+  const syncGroupFromControl = (targetId) => {
+    const ctrl = document.getElementById(targetId);
+    if (!ctrl) return;
+    const row = document.querySelector(`.setupBtnRow[data-setup-group][data-target="${targetId}"]`);
+    if (!row) return;
+    const val = String(ctrl.value);
+    Array.from(row.querySelectorAll(".setupBtn")).forEach((b) => {
+      b.classList.toggle("selected", String(b.getAttribute("data-value")) === val);
+    });
+  };
+
+  const syncToggleFromControl = (targetId) => {
+    const ctrl = document.getElementById(targetId);
+    if (!ctrl || ctrl.type !== "checkbox") return;
+    const row = document.querySelector(`.setupBtnRow[data-setup-toggle][data-target="${targetId}"]`);
+    if (!row) return;
+    const on = !!ctrl.checked;
+    Array.from(row.querySelectorAll(".setupBtn")).forEach((b) => {
+      const v = String(b.getAttribute("data-value"));
+      b.classList.toggle("selected", (v === "on" && on) || (v === "off" && !on));
+    });
+  };
+
+  const setFieldDisabled = (fieldEl, disabled) => {
+    if (!fieldEl) return;
+    fieldEl.classList.toggle("isDisabled", !!disabled);
+  };
 
   function applySetupPreset(preset) {
-    if (!setupPresetEl || !setupCheckInEl || !setupCheckOutEl) return;
+    if (!setupCheckInEl || !setupCheckOutEl) return;
 
     const setVals = (checkIn, checkOut) => {
       setupCheckInEl.value = checkIn;
       setupCheckOutEl.value = checkOut;
+      syncGroupFromControl("setupCheckIn");
+      syncGroupFromControl("setupCheckOut");
     };
 
     if (preset === "custom") {
-      if (setupCustomRulesEl) setupCustomRulesEl.classList.remove("hidden");
-      if (setupPresetDescEl) {
-        setupPresetDescEl.classList.add("hidden");
-        setupPresetDescEl.textContent = "";
-      }
+      setFieldDisabled(setupCheckInFieldEl, false);
+      setFieldDisabled(setupCheckOutFieldEl, false);
       return;
     }
 
-    if (setupCustomRulesEl) setupCustomRulesEl.classList.add("hidden");
-    if (setupPresetDescEl) setupPresetDescEl.classList.remove("hidden");
+    // Non-custom presets: lock check-in/out selectors but keep selected state visible.
+    setFieldDisabled(setupCheckInFieldEl, true);
+    setFieldDisabled(setupCheckOutFieldEl, true);
 
     if (preset === "grand_prix") {
       setVals("double", "double");
-      if (setupPresetDescEl) setupPresetDescEl.textContent = "Grand Prix preset: Double In + Double Out.";
     } else if (preset === "x01") {
       setVals("straight", "double");
-      if (setupPresetDescEl) setupPresetDescEl.textContent = "X01 preset: Straight In + Double Out.";
     } else if (preset === "straight_in_out") {
       setVals("straight", "straight");
-      if (setupPresetDescEl) setupPresetDescEl.textContent = "Straight preset: Straight In + Straight Out.";
     } else {
       // Unknown preset: fall back safely
       setVals("straight", "double");
-      if (setupPresetDescEl) setupPresetDescEl.textContent = "Preset loaded.";
     }
   }
 
-  if (setupPresetEl) {
-    setupPresetEl.addEventListener("change", () => applySetupPreset(setupPresetEl.value));
-    // Initialize once on page load
-    applySetupPreset(setupPresetEl.value || "x01");
+  function applyCompetitionRules() {
+    if (!setupCompetitionEl || !setupAllowMutualControlEl) return;
+    const ranked = String(setupCompetitionEl.value) === "competitive";
+    if (ranked) {
+      setupAllowMutualControlEl.value = "no";
+      syncGroupFromControl("setupAllowMutualControl");
+    }
+    setFieldDisabled(setupMutualControlFieldEl, ranked);
   }
+
+  // Wire up button-driven groups to the hidden canonical controls
+  for (const row of setupBtnRows) {
+    const targetId = row.getAttribute("data-target");
+    if (!targetId) continue;
+    const ctrl = document.getElementById(targetId);
+    if (!ctrl) continue;
+    const btns = Array.from(row.querySelectorAll(".setupBtn"));
+    for (const b of btns) {
+      b.addEventListener("click", () => {
+        if (row.closest(".setupField")?.classList.contains("isDisabled")) return;
+        const v = String(b.getAttribute("data-value"));
+        ctrl.value = v;
+        // Keep existing code paths working
+        ctrl.dispatchEvent(new Event("change", { bubbles: true }));
+        syncGroupFromControl(targetId);
+      });
+    }
+    // Initialize selection
+    syncGroupFromControl(targetId);
+  }
+
+  for (const row of setupToggleRows) {
+    const targetId = row.getAttribute("data-target");
+    if (!targetId) continue;
+    const ctrl = document.getElementById(targetId);
+    if (!ctrl || ctrl.type !== "checkbox") continue;
+    const btns = Array.from(row.querySelectorAll(".setupBtn"));
+    for (const b of btns) {
+      b.addEventListener("click", () => {
+        const v = String(b.getAttribute("data-value"));
+        ctrl.checked = (v === "on");
+        ctrl.dispatchEvent(new Event("change", { bubbles: true }));
+        syncToggleFromControl(targetId);
+      });
+    }
+    syncToggleFromControl(targetId);
+  }
+
+  // Preset => locks/unlocks Check-in/out
+  if (setupPresetEl) {
+    setupPresetEl.addEventListener("change", () => {
+      applySetupPreset(String(setupPresetEl.value || "x01"));
+      syncGroupFromControl("setupPreset");
+    });
+    applySetupPreset(String(setupPresetEl.value || "x01"));
+    syncGroupFromControl("setupPreset");
+  }
+
+  // Mode => locks/unlocks mutual control (Ranked forces Off)
+  if (setupCompetitionEl) {
+    setupCompetitionEl.addEventListener("change", () => {
+      applyCompetitionRules();
+      syncGroupFromControl("setupCompetition");
+    });
+    applyCompetitionRules();
+    syncGroupFromControl("setupCompetition");
+  }
+
+  // Keep mutual control in sync (even though the UI is button-driven)
+  if (setupAllowMutualControlEl) {
+    setupAllowMutualControlEl.addEventListener("change", () => syncGroupFromControl("setupAllowMutualControl"));
+    syncGroupFromControl("setupAllowMutualControl");
+  }
+
+  // Keep doubles tracking toggle in sync
+  if (setupTrackCheckoutStatsEl) {
+    setupTrackCheckoutStatsEl.addEventListener("change", () => syncToggleFromControl("setupTrackCheckoutStats"));
+    syncToggleFromControl("setupTrackCheckoutStats");
+  }
+
+  // Tooltips: show bubble while pressed
+  for (const icon of helpIcons) {
+    const tip = String(icon.getAttribute("data-tip") || "").trim();
+    if (!tip) continue;
+    const bubble = document.createElement("span");
+    bubble.className = "tipBubble";
+    bubble.textContent = tip;
+    icon.appendChild(bubble);
+
+    const show = () => icon.classList.add("showTip");
+    const hide = () => icon.classList.remove("showTip");
+
+    icon.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      // Close other tooltips
+      helpIcons.forEach(h => h !== icon && h.classList.remove("showTip"));
+      show();
+    });
+    icon.addEventListener("pointerup", hide);
+    icon.addEventListener("pointercancel", hide);
+    icon.addEventListener("pointerleave", hide);
+  }
+
+  document.addEventListener("pointerdown", (e) => {
+    const t = e.target;
+    if (!(t instanceof Element)) return;
+    if (t.closest && t.closest(".helpIcon")) return;
+    helpIcons.forEach(h => h.classList.remove("showTip"));
+  });
 
   if (setupStartBtn) setupStartBtn.addEventListener("click", startMatchFromSetup);
 

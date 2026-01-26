@@ -367,112 +367,198 @@
   </div>
   
   <div id="setupModal" class="modal hidden">
-    <div class="modal-card">
+    <div class="modal-card mobilepad">
       <h2>New Match</h2>
 
       <!-- Game type is decided by where you started the match (Local vs Online) -->
 
-      <div class="formRow">
-              <label for="setupPreset">Preset</label>
-              <select id="setupPreset">
-                <option value="x01" selected>X01 (Straight In / Double Out)</option>
-                <option value="grand_prix">Grand Prix (Double In / Double Out)</option>
-                <option value="straight_in_out">Straight In / Straight Out</option>
-                <option value="custom">Custom</option>
-              </select>
-            </div>
-      
-            <div id="setupPresetDescription" class="setupPresetDesc hidden"></div>
-      
-            <div id="setupCustomRules" class="setupBlock hidden">
-              <div class="formRow">
-                <label for="setupCheckIn">Check-in</label>
-                <select id="setupCheckIn">
-                  <option value="straight" selected>Straight In</option>
-                  <option value="double">Double In</option>
-                </select>
-              </div>
-      
-              <div class="formRow">
-                <label for="setupCheckOut">Check-out</label>
-                <select id="setupCheckOut">
-                  <option value="double" selected>Double Out</option>
-                  <option value="straight">Straight Out</option>
-                </select>
-              </div>
-            </div>
+      <!-- Setup: Button-driven UI (keeps the original form controls in DOM to preserve parameters) -->
+      <div class="setupGrid">
+        <!-- Preset -->
+        <div class="setupField">
+          <div class="setupTitleRow midalign">
+            <div class="setupTitle">Preset</div>
+            <button type="button" class="helpIcon" data-tip="Choose a default preset from an official Darts ruleset">?</button>
+          </div>
 
+          <div class="setupBtnRow" data-setup-group data-target="setupPreset">
+            <button type="button" class="setupBtn" data-value="x01">X01</button>
+            <button type="button" class="setupBtn" data-value="grand_prix">Grand Prix</button>
+            <button type="button" class="setupBtn" data-value="straight_in_out">SISO</button>
+            <button type="button" class="setupBtn" data-value="custom">Custom</button>
+          </div>
+
+          <!-- Hidden: canonical control used by startMatchFromSetup() -->
+          <select id="setupPreset" class="setupHiddenControl" aria-hidden="true" tabindex="-1">
+            <option value="x01" selected>X01 (Straight In / Double Out)</option>
+            <option value="grand_prix">Grand Prix (Double In / Double Out)</option>
+            <option value="straight_in_out">Straight In / Straight Out</option>
+            <option value="custom">Custom</option>
+          </select>
+        </div>
+        <div class="setupthreegrid">
+        <div class="setupblock">
+        <!-- Check-in -->
+        <div id="setupCheckInField" class="setupField">
+          <div class="setupTitleRow midalign">
+            <div class="setupTitle smaller">Check-in</div>
+            <button type="button" class="helpIcon" data-tip="Changes the rule to start scoring.">?</button>
+          </div>
+          <div class="setupBtnRow" data-setup-group data-target="setupCheckIn">
+            <button type="button" class="setupBtn" data-value="straight">Straight</button>
+            <button type="button" class="setupBtn" data-value="double">Double</button>
+          </div>
+          <select id="setupCheckIn" class="setupHiddenControl" aria-hidden="true" tabindex="-1">
+            <option value="straight" selected>Straight In</option>
+            <option value="double">Double In</option>
+          </select>
+        </div>
+        </div>
+        <div class="setupblock">
+        <!-- Check-out -->
+        <div id="setupCheckOutField" class="setupField">
+          <div class="setupTitleRow midalign">
+            <div class="setupTitle smaller">Check-Out</div>
+            <button type="button" class="helpIcon" data-tip="Changes the rule to end scoring.">?</button>
+          </div>
+          <div class="setupBtnRow" data-setup-group data-target="setupCheckOut">
+            <button type="button" class="setupBtn" data-value="straight">Straight</button>
+            <button type="button" class="setupBtn" data-value="double">Double</button>
+          </div>
+          <select id="setupCheckOut" class="setupHiddenControl" aria-hidden="true" tabindex="-1">
+            <option value="double" selected>Double Out</option>
+            <option value="straight">Straight Out</option>
+          </select>
+        </div>
+        </div>
+        <div class="setupblock">
+        <!-- Doubles tracking -->
+        <div class="setupField">
+          <div class="setupTitleRow midalign gap2">
+            <div class="setupTitle smaller">Track Doubles</div>
+            <button type="button" class="helpIcon" data-tip="Enables / Disables the prompts for &quot;Darts used on double&quot;. Disabling will turn off tracking for certain statistics, such as Check-in and out %.">?</button>
+          </div>
+          <div class="setupBtnRow" data-setup-toggle data-target="setupTrackCheckoutStats">
+            <button type="button" class="setupBtn" data-value="on">On</button>
+            <button type="button" class="setupBtn" data-value="off">Off</button>
+          </div>
+          <label class="checkboxLabel neoCheck setupHiddenControl" for="setupTrackCheckoutStats" aria-hidden="true">
+            <input type="checkbox" id="setupTrackCheckoutStats" checked />
+            <span class="checkUI"></span>
+            <span class="checkText">Track checkout % / doubles success</span>
+          </label>
+        </div>
+        </div>
+      </div>
+      </div>
 
 
       <div id="setupOnlineOptions" class="setupBlock">
-        <div class="formRow">
-          <label for="setupCompetition">Mode</label>
-          <select id="setupCompetition">
-            <option value="casual" selected>Casual (no stats)</option>
-            <option value="competitive">Competitive (save stats)</option>
-          </select>
-        </div>
-
-        <div class="formRow">
-          <label for="setupMutualControl">Allow mutual control</label>
-          <select id="setupMutualControl">
-            <option value="no" selected>No (turn-based)</option>
-            <option value="yes">Yes (either device can score)</option>
-          </select>
-        </div>
-      </div>
-
-      <div id="setupLocalNameFields" class="setupBlock">
-        <div class="formRow">
-          <label>Player 1 Name</label>
-          <input id="setupP1" type="text" value="Player 1" />
-        </div>
-
-        <div class="formRow">
-          <label>Player 2 Name</label>
-          <input id="setupP2" type="text" value="Player 2" />
-        </div>
-      </div>
-  
-      <div class="formRow">
-        <label>Starting Score</label>
-        <select id="setupMode">
-          <option value="121">121</option>
-          <option value="301">301</option>
-          <option value="501" selected>501</option>
-          <option value="701">701</option>
-        </select>
-      </div>
-  
-      <div class="formRow">
-        <label>Best of Legs</label>
-        <select id="setupBestOf">
-          <option value="1">1</option>
-          <option value="3" selected>3</option>
-          <option value="5">5</option>
-          <option value="7">7</option>
-          <option value="9">9</option>
-        </select>
-      </div>
-
-      <div class="formRow">
-        <label for="setupStarter">Starting Player</label>
-        <select id="setupStarter">
-          <option value="bull" selected>Bull Throw</option>
-          <option value="random">Random</option>
-          <option value="p1">Player 1</option>
-          <option value="p2">Player 2</option>
-        </select>
-      </div>
-
-  
-            <div>
-              <label class="checkboxLabel neoCheck" for="setupTrackCheckoutStats">
-                <input type="checkbox" id="setupTrackCheckoutStats" checked />
-                <span class="checkUI"></span>
-                <span class="checkText">Track checkout % / doubles success</span>
-              </label>
+        <div class="setupblock twogrid" style="gap:50px;">
+          <div class="setupField">
+            <div class="setupTitleRow midalign">
+              <div class="setupTitle">Mode</div>
+              <button type="button" class="helpIcon" data-tip="Ranked matches are logged in profile statistics, while Casual games still display them, but do not count to your record.">?</button>
             </div>
+            <div class="setupBtnRow shrunk" data-setup-group data-target="setupCompetition">
+              <button type="button" class="setupBtn" data-value="competitive">Ranked</button>
+              <button type="button" class="setupBtn" data-value="casual">Casual</button>
+            </div>
+            <select id="setupCompetition" class="setupHiddenControl" aria-hidden="true" tabindex="-1">
+              <option value="casual">Casual</option>
+              <option value="competitive" selected>Ranked</option>
+            </select>
+          </div>
+
+          <div id="setupMutualControlField" class="setupField">
+            <div class="setupTitleRow midalign">
+              <div class="setupTitle">Mutual Control</div>
+              <button type="button" class="helpIcon" data-tip="When turned on, both players may log scores for each other. When off, you can only log scores for yourself.">?</button>
+            </div>
+            <div class="setupBtnRow shrunk" data-setup-group data-target="setupAllowMutualControl">
+              <button type="button" class="setupBtn" data-value="yes">On</button>
+              <button type="button" class="setupBtn" data-value="no">Off</button>
+            </div>
+            <!-- Hidden: canonical control used by startMatchFromSetup() -->
+            <select id="setupAllowMutualControl" class="setupHiddenControl" aria-hidden="true" tabindex="-1">
+              <option value="no" selected>No (turn-based)</option>
+              <option value="yes">Yes (either device can score)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div id="setupLocalNameFields" class="setupBlock twogrid" style="padding:16px 0px;">
+        <div class="setupTitle">
+          <label>Player 1 Name</label>
+          <input id="setupP1" type="text" placeholder="Player 1" />
+        </div>
+
+        <div class="setupTitle">
+          <label>Player 2 Name</label>
+          <input id="setupP2" type="text" placeholder="Player 2" />
+        </div>
+      </div>
+  
+      <div class="setupGrid setupGridTwo">
+        <div class="setupblock">
+                    <div class="setupTitleRow midalign">
+            <div class="setupTitle">Match Format</div>
+          </div>
+        <div class="setupField stepper">
+          <div class="setupTitleRow">
+            <div class="setupTitle">Score</div>
+          </div>
+          <div class="setupStepper" data-setup-stepper data-target="setupMode" data-values="121,301,501,701">
+            <button type="button" class="setupStepBtn" data-step="dec" aria-label="Decrease score">&lt;</button>
+            <div class="setupStepValue" data-stepper-value>—</div>
+            <button type="button" class="setupStepBtn" data-step="inc" aria-label="Increase score">&gt;</button>
+          </div>
+<select id="setupMode" class="setupHiddenControl" aria-hidden="true" tabindex="-1">
+            <option value="121">121</option>
+            <option value="301">301</option>
+            <option value="501" selected>501</option>
+            <option value="701">701</option>
+          </select>
+        </div>
+
+        <div class="setupField stepper">
+          <div class="setupTitleRow">
+            <div class="setupTitle">Legs</div>
+          </div>
+          <div class="setupStepper" data-setup-stepper data-target="setupBestOf" data-values="1,3,5,7">
+            <button type="button" class="setupStepBtn" data-step="dec" aria-label="Decrease legs">&lt;</button>
+            <div class="setupStepValue" data-stepper-value>—</div>
+            <button type="button" class="setupStepBtn" data-step="inc" aria-label="Increase legs">&gt;</button>
+          </div>
+<select id="setupBestOf" class="setupHiddenControl" aria-hidden="true" tabindex="-1">
+            <option value="1">1</option>
+            <option value="3" selected>3</option>
+            <option value="5">5</option>
+            <option value="7">7</option>
+            <option value="9">9</option>
+          </select>
+        </div>
+        </div>
+
+        <div class="setupblock">
+          <div class="setupTitleRow midalign">
+            <div class="setupTitle">Starting Player</div>
+          </div>
+          <div class="setupBtnRow twogrid" data-setup-group data-target="setupStarter">
+            <button type="button" class="setupBtn" data-value="bull">Bull Throw</button>
+            <button type="button" class="setupBtn" data-value="random">Random</button>
+            <button type="button" class="setupBtn" data-value="p1">Host</button>
+            <button type="button" class="setupBtn" data-value="p2">Guest</button>
+          </div>
+          <select id="setupStarter" class="setupHiddenControl" aria-hidden="true" tabindex="-1">
+            <option value="bull" selected>Bull Throw</option>
+            <option value="random">Random</option>
+            <option value="p1">Player 1</option>
+            <option value="p2">Player 2</option>
+          </select>
+        </div>
+      </div>
 
       <div class="row">
         <button id="setupCancelBtn">Cancel</button>
