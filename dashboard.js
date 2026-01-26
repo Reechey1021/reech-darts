@@ -1252,7 +1252,7 @@ function renderFriendsModal(data) {
               <div class="friendRowName">${name}</div>
             </div>
             <div class="friendRowActions">
-              <button class="bluebutton" data-action="invite" type="button">Invite to game</button>
+              <button class="bluebutton mobsmall" data-action="invite" type="button">Invite to game</button>
             </div>
           </div>
         `;

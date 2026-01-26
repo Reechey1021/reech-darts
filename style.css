@@ -3310,7 +3310,7 @@ body.dashboardPage {
     padding-bottom: 20px;
   }
 
-  .bluebutton {
+  .bluebutton.mobsmall {
     padding: 2px 8px;
   }
 
@@ -4007,6 +4007,7 @@ body.dashboardPage {
     height:90vh !important;
     max-height:50vh !important;
     z-index:12000;
+    justify-content:flex-end;
   }
 
   #auditChatPanel{
