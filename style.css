@@ -2826,7 +2826,7 @@ button.iconOnly {
 
 /* Mobile */
 @media (max-width: 700px) {
-  body { padding: 0px; overflow: hidden}
+  body { padding: 0px;}
 
   .card {
     min-height: 100vh;
