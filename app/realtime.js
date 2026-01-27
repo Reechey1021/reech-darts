@@ -6,6 +6,7 @@ import { updateAuditFromState, renderAuditChat } from "./ui/auditChat.js";
 // app/ui/auditChat is lightweight; audits are derived from state deltas.
 import { playClipsWebAudio, stopAllAudio } from "./audio/audio.js";
 import { applyFinishedMatchProfileUpdatesForMe } from "./userStats.js";
+import { nudgeVoiceAfterGameActivity } from "./input/voice.js";
 
 // Call this whenever we move to a different game document.
 // Prevents stale audio IDs + seat-claim state leaking across lobbies.
@@ -135,6 +136,9 @@ export function bindGameListener() {
       const prev = app.latestState;
       try { updateAuditFromState(state, prev); } catch (e) { console.log("[audit] update failed", e); }
       app.latestState = state;
+
+      // Keep Chrome/Edge Web Speech sessions alive in voice mode by nudging after score/turn changes.
+      try { nudgeVoiceAfterGameActivity(prev, state); } catch (_) {}
 
       // Detect seat2 being filled (online only) and show a lightweight toast.
       // No extra reads/writes: we already have the game snapshot.

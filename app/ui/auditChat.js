@@ -79,9 +79,11 @@ function renderFeed(state) {
     }
 
     const mySeat = mySeatIndex(state);
+    // Sender should appear on the RIGHT, the other player on the LEFT.
+    // (Previously this was reversed.)
     let align = "center";
-    if (it.seat === mySeat) align = "left";
-    else if (it.seat !== null && it.seat !== undefined) align = "right";
+    if (it.seat === mySeat) align = "right";
+    else if (it.seat !== null && it.seat !== undefined) align = "left";
     const cls = it.source === "chat" ? "msgChat" : "msgAudit";
     return `<div class="msgRow ${align}">
       <div class="msgPill ${cls}">${escapeHtml(it.text)}</div>

@@ -57,17 +57,24 @@ export function setInputMode(mode) {
 
   const keypad = document.getElementById("keypad");
   const table = document.getElementById("dartTableArea");
+  const voice = document.getElementById("voiceArea");
   const btn = document.getElementById("inputModeBtn");
   const scoreInput = document.getElementById("scoreInput");
 
   if (keypad) keypad.classList.toggle("hidden", mode !== "keypad");
   if (table) table.classList.toggle("hidden", mode !== "table");
+  if (voice) voice.classList.toggle("hidden", mode !== "voice");
 
-  // icon hint
-  if (btn) btn.textContent = mode === "keypad" ? "🎯" : "⌨️";
+  // icon hint (shows the NEXT mode)
+  // keypad -> table -> voice -> keypad
+  if (btn) {
+    if (mode === "keypad") btn.textContent = "🎯";
+    else if (mode === "table") btn.textContent = "🎙️";
+    else btn.textContent = "⌨️";
+  }
 
-  // in table mode, prevent typing into the input (table drives it)
-  if (scoreInput) scoreInput.readOnly = mode === "table";
+  // In non-keypad modes, prevent typing into the input (the mode drives it)
+  if (scoreInput) scoreInput.readOnly = mode !== "keypad";
 
   if (mode === "table") {
     // Entering table mode: clear any keypad numeric input and start fresh.

@@ -30,7 +30,7 @@ export const app = {
   userProfile: null, // populated for Google users (users/{uid})
 
   // input
-  inputMode: localStorage.getItem("inputMode") || "keypad", // "keypad" | "table"
+  inputMode: localStorage.getItem("inputMode") || "keypad", // "keypad" | "table" | "voice"
   dartMult: localStorage.getItem("dartMult") || "S", // "S" | "D" | "T"
   dartThrows: [], // per-dart scores (max 3)
 

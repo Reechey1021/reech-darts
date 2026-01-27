@@ -257,6 +257,17 @@
   </div>
 </div>
 
+      <!-- Voice input (best-effort; supported on some browsers) -->
+      <div id="voiceArea" class="voiceArea hidden">
+        <div id="voiceHeard" class="voiceHeard" aria-live="polite"></div>
+        <button id="voiceMicBtn" class="voiceMicBtn" type="button" aria-label="Voice input">
+          <span class="voiceMicIcon" aria-hidden="true">🎙️</span>
+          <span class="voiceMicLabel">Tap &amp; speak</span>
+        </button>
+        <div id="voiceStatus" class="voiceStatus" aria-live="polite">Tap to speak</div>
+        <div id="voiceEngine" class="voiceEngine" aria-live="polite"></div>
+      </div>
+
     
   </div>
 

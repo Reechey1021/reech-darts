@@ -167,7 +167,7 @@ button,
   -webkit-tap-highlight-color: transparent;
 }
 
-.keypad, .dartPad {
+.keypad, .dartPad, .voiceArea {
   height:400px;
 }
 
@@ -2253,6 +2253,91 @@ button:disabled,
   font-size: 18px;
 }
 
+/* ----------------------------
+   Voice input (third input mode)
+   ---------------------------- */
+.voiceArea {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 0px 10px;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.voiceMicBtn {
+  width: 180px;
+  height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid var(--key-border);
+  background: var(--key-bg);
+  color: var(--text);
+}
+
+.voiceMicBtn:disabled {
+  opacity: 0.55;
+}
+
+.voiceMicIcon {
+  font-size: 80px;
+  line-height: 1;
+}
+
+.voiceMicLabel {
+  display: none;
+}
+
+.voiceStatus {
+  width: 100%;
+  max-width: 420px;
+  text-align: center;
+  font-size: 22px;
+  opacity: 0.9;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 2px 6px;
+}
+
+.voiceHeard {
+  width: 100%;
+  max-width: 420px;
+  text-align: center;
+  font-size: 18px;
+  opacity: 0.75;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 6px;
+  min-height: 16px;
+  font-style: italic;
+}
+
+.voiceHeard::before, .voiceHeard::after {
+  content: "“";
+  opacity: 0.6;
+  margin: 0 2px;
+}
+
+.voiceMicBtn.isListening {
+  border-color: var(--active-border);
+  box-shadow: 0 0 0 4px var(--active-glow);
+  transform: translateY(-1px);
+  animation: voicePulse 1.6s ease-in-out infinite;
+}
+
+@keyframes voicePulse {
+  0% { transform: translateY(-1px) scale(1); }
+  50% { transform: translateY(-1px) scale(1.04); }
+  100% { transform: translateY(-1px) scale(1); }
+}
+
 
 .keypad {
   display: grid;
@@ -3237,7 +3322,7 @@ body.dashboardPage {
     font-size: 16px;
   }
 
-  .keypad, .dartPad {
+  .keypad, .dartPad, .voiceArea {
     height: 320px;
 }
 
@@ -3291,6 +3376,24 @@ body.dashboardPage {
     background-color: transparent;
     border-color: transparent;
   }
+
+  .voiceMicBtn {
+  width: 140px;
+  height: 140px;
+}
+
+  .voiceMicIcon {
+    font-size: 60px;
+  }
+
+  .voiceStatus {
+    font-size: 18px;
+  }
+
+  .voiceEngine {
+    font-size: 10px !important;
+  }
+
 
   #undoBtn { padding: 8px 8px; font-size:12px !important; border-radius: 16px;}
   #submitBtn { padding: 8px 10px;}
@@ -4122,3 +4225,13 @@ body.dashboardPage {
 .auditChatFeed::-webkit-scrollbar{ width:8px; }
 .auditChatFeed::-webkit-scrollbar-track{ background: transparent; }
 .auditChatFeed::-webkit-scrollbar-thumb{ background: var(--accent); border-radius: 999px; }
+
+
+/* Voice engine indicator (debug/testing) */
+.voiceEngine{
+  font-size:12px;
+  opacity:.75;
+  margin-top:26px;
+  max-width: 400px;
+  text-align:center;
+}

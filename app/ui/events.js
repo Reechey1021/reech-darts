@@ -1,6 +1,6 @@
 // app/ui/events.js
 import { app } from "../state.js";
-import { canScoreNow, canUndoNow, isHost } from "../permissions.js";
+import { canScoreNow, canUndoNow, isHost, mySeatIndex } from "../permissions.js";
 import {
   openNewGameFlow,
   submitScore,
@@ -31,6 +31,7 @@ import {
   clearDarts,
   updateDartUI,
 } from "../input/dartpad.js";
+import { initVoiceUI, stopVoice, startVoiceAuto } from "../input/voice.js";
 
 // ---------- Setup UI mode (local vs online) ----------
 function configureSetupModalForLobbyType(lobbyType) {
@@ -334,12 +335,37 @@ export function wireUI() {
   // ----------------------------
   // Input mode init + toggle
   // ----------------------------
-  setInputMode(app.inputMode); // restore last mode on load
+  // Always start in keypad mode on page load.
+  // (We still cycle keypad -> dartpad -> voice -> keypad via the mode button.)
+  try {
+    app.inputMode = "keypad";
+    localStorage.setItem("inputMode", "keypad");
+  } catch (_) {}
+  setInputMode("keypad");
+
+  // Voice UI init (safe no-op if unsupported)
+  initVoiceUI();
 
   if (inputModeBtn) {
     inputModeBtn.addEventListener("click", () => {
-      const next = app.inputMode === "keypad" ? "table" : "keypad";
+      // keypad -> table -> voice -> keypad
+      const next =
+        app.inputMode === "keypad"
+          ? "table"
+          : app.inputMode === "table"
+            ? "voice"
+            : "keypad";
+
+      // Leaving voice mode? Ensure we stop any active recognition.
+      if (app.inputMode === "voice" && next !== "voice") {
+        stopVoice();
+      }
+
       setInputMode(next);
+      if (next === "voice") {
+        // Auto-start listening when entering voice mode (runs inside the mode-switch click gesture).
+        startVoiceAuto();
+      }
     });
   }
 
@@ -567,6 +593,7 @@ export function wireUI() {
       // Ensure we can submit a normal score using existing logic.
       // If the user is currently in table mode, switch to keypad mode first.
       if (app.inputMode !== "keypad") {
+        if (app.inputMode === "voice") stopVoice();
         setInputMode("keypad");
         clearDarts();
         updateDartUI();
@@ -576,13 +603,25 @@ export function wireUI() {
       submitScore();
     });
   }
-  if (undoBtn) undoBtn.addEventListener("click", undoLast);
+  async function undoWithAudit() {
+    if (!canUndoNow(app.latestState)) return;
+    await undoLast();
+
+    // Write a local, centered system line into the combined Chat & Audits feed.
+    try {
+      const s = app.latestState;
+      const seat = mySeatIndex(s);
+      const name = s?.match?.players?.[seat]?.name || (seat === 0 ? "Player 1" : "Player 2");
+      addAuditSystem(`${name} performed action: Undo.`);
+    } catch (_) {}
+  }
+
+  if (undoBtn) undoBtn.addEventListener("click", undoWithAudit);
 
   // Overlay undo (allowed even when not your turn in online mode)
   if (overlayUndoBtn) {
     overlayUndoBtn.addEventListener("click", () => {
-      if (!canUndoNow(app.latestState)) return;
-      undoLast();
+      undoWithAudit();
     });
   }
 
