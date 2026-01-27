@@ -12,6 +12,100 @@ import { submitScore } from "../actions.js";
 import { canScoreNow } from "../permissions.js";
 import { showError } from "../ui/render.js";
 
+
+// -----------------------------
+// Turn gating (online, mutual control OFF)
+// -----------------------------
+let pausedForTurn = false;
+let turnOverlayObserver = null;
+
+function isTurnGatingActive() {
+  const st = app.latestState;
+  return st?.match?.gameType === "online" && !st?.match?.allowMutualControl;
+}
+
+// Future-proof primary signal: if #turnOverlay is visible (NOT .hidden), it is NOT your turn.
+function overlayBlocksTurn() {
+  const overlay = document.getElementById("turnOverlay");
+  if (!overlay) return null; // unknown
+  return !overlay.classList.contains("hidden");
+}
+
+function isVoiceAllowedNow() {
+  if (!isTurnGatingActive()) return true;
+
+  const overlayBlocked = overlayBlocksTurn();
+  if (overlayBlocked === true) return false;
+
+  // If overlay is missing or hidden, fall back to rules-based check.
+  return canScoreNow(app.latestState);
+}
+
+function stopWhisperCaptureOnly() {
+  // Stop capture graph without transcribing (used when pausing for turn).
+  clearWhisperTimers();
+  whisperIsRecording = false;
+
+  try { whisperProcessor?.disconnect?.(); } catch (_) {}
+  try { whisperSource?.disconnect?.(); } catch (_) {}
+  whisperProcessor = null;
+  whisperSource = null;
+
+  whisperPcmChunks = [];
+  try { whisperAudioCtx?.close?.(); } catch (_) {}
+  whisperAudioCtx = null;
+
+  setMicVisual(false);
+}
+
+function applyTurnGate() {
+  if (app.inputMode !== "voice") return;
+  if (!wantListening) return;
+
+  const allowed = isVoiceAllowedNow();
+
+  if (!allowed) {
+    pausedForTurn = true;
+    // Hard stop listening while not your turn.
+    if (activeEngine === "webspeech") {
+      stopWebSpeech(true); // soft stop (keep wantListening)
+    } else if (activeEngine === "whisper") {
+      if (whisperIsRecording) stopWhisperCaptureOnly();
+    }
+    setMicVisual(false);
+    setVoiceStatus("Waiting for your turn…");
+    return;
+  }
+
+  // allowed
+  if (pausedForTurn) {
+    pausedForTurn = false;
+    // Resume if still in voice mode + user wants listening.
+    if (activeEngine === "webspeech") {
+      // Web Speech can be touchy if restarted immediately after stop; give it a brief moment.
+      clearWebSpeechTimers();
+      restartTimer = setTimeout(() => {
+        if (!wantListening || app.inputMode !== "voice" || pausedForTurn || !isVoiceAllowedNow()) return;
+        startWebSpeech(true);
+      }, 300);
+      return;
+    }
+    startVoiceAuto();
+  }
+}
+
+function setupTurnOverlayObserver() {
+  if (turnOverlayObserver) return;
+
+  const overlay = document.getElementById("turnOverlay");
+  if (!overlay) return;
+
+  turnOverlayObserver = new MutationObserver(() => {
+    applyTurnGate();
+  });
+  turnOverlayObserver.observe(overlay, { attributes: true, attributeFilter: ["class"] });
+}
+
 // -----------------------------
 // Engine selection
 // -----------------------------
@@ -226,6 +320,7 @@ let startTimer = null;
 let restartTimer = null;
 let lastError = null;
 let isStopping = false;
+let webSpeechRunning = false;
 
 function clearWebSpeechTimers() {
   try { if (startTimer) clearTimeout(startTimer); } catch (_) {}
@@ -254,6 +349,7 @@ function buildWebSpeechRecognizer() {
   r.continuous = false;
 
   r.onstart = () => {
+    webSpeechRunning = true;
     clearWebSpeechTimers();
     isStarting = false;
     lastError = null;
@@ -265,6 +361,7 @@ function buildWebSpeechRecognizer() {
   r.onerror = (e) => {
     clearWebSpeechTimers();
     isStarting = false;
+    webSpeechRunning = false;
     lastError = e?.error || "unknown";
 
     // If we intentionally stopped/aborted, ignore spurious errors so we don't overwrite
@@ -292,13 +389,14 @@ function buildWebSpeechRecognizer() {
     // If we still want to listen (always-on), schedule a restart. Some browsers may not fire onend after onerror.
     if (wantListening && app.inputMode === "voice") {
       restartTimer = setTimeout(() => {
-        if (!wantListening || app.inputMode !== "voice") return;
+        if (!wantListening || app.inputMode !== "voice" || pausedForTurn || !isVoiceAllowedNow()) return;
         startWebSpeech(true);
       }, 400);
     }
   };
 
   r.onend = () => {
+    webSpeechRunning = false;
     clearWebSpeechTimers();
     isStarting = false;
     setMicVisual(false);
@@ -314,6 +412,8 @@ function buildWebSpeechRecognizer() {
   };
 
   r.onresult = (event) => {
+    // If we become disallowed mid-stream (online + mutual control OFF), ignore results.
+    if (pausedForTurn || !isVoiceAllowedNow()) return;
     let interim = "";
     let finalText = "";
 
@@ -348,6 +448,15 @@ function startWebSpeech(fromRestart = false) {
 
   if (!isSpeechRecognitionAllowedOrigin()) {
     setVoiceStatus("Starting… (tip: use https:// or localhost)");
+  }
+
+  // Turn gate (online + mutual control OFF): do not start while it's not your turn.
+  if (!isVoiceAllowedNow()) {
+    pausedForTurn = true;
+    setMicVisual(false);
+    setVoiceStatus("Waiting for your turn…");
+    isStarting = false;
+    return;
   }
 
   if (isStarting) return;
@@ -391,7 +500,7 @@ function startWebSpeech(fromRestart = false) {
     // In always-on mode we should retry rather than killing the loop.
     if (name === "InvalidStateError" || /already started/i.test(msg) || /invalid state/i.test(msg)) {
       restartTimer = setTimeout(() => {
-        if (!wantListening || app.inputMode !== "voice") return;
+        if (!wantListening || app.inputMode !== "voice" || pausedForTurn || !isVoiceAllowedNow()) return;
         startWebSpeech(true);
       }, 900);
       return;
@@ -408,7 +517,7 @@ function startWebSpeech(fromRestart = false) {
     // Otherwise: show a transient message and retry.
     setVoiceStatus("Restarting listening…");
     restartTimer = setTimeout(() => {
-      if (!wantListening || app.inputMode !== "voice") return;
+      if (!wantListening || app.inputMode !== "voice" || pausedForTurn || !isVoiceAllowedNow()) return;
       startWebSpeech(true);
     }, 1200);
   }
@@ -417,6 +526,7 @@ function startWebSpeech(fromRestart = false) {
 
 function stopWebSpeech(preserveWantListening = false) {
   isStopping = true;
+  webSpeechRunning = false;
   setTimeout(() => { isStopping = false; }, 750);
 
   if (!preserveWantListening) {
@@ -580,6 +690,7 @@ function scheduleWhisperRestart(delayMs = 250) {
   if (app.inputMode !== "voice") return;
   if (!whisperUserActivated) return;
   if (whisperIsRecording) return;
+  if (pausedForTurn || !isVoiceAllowedNow()) return;
 
   setTimeout(() => {
     if (!wantListening) return;
@@ -604,6 +715,14 @@ async function startWhisperRecording() {
   if (whisperIsRecording) return;
   if (!supportsWhisperFallback()) {
     setVoiceStatus("Voice not supported");
+    return;
+  }
+
+  // Turn gate: do not listen while it's not your turn (online + mutual control OFF).
+  if (!isVoiceAllowedNow()) {
+    pausedForTurn = true;
+    setMicVisual(false);
+    setVoiceStatus("Waiting for your turn…");
     return;
   }
 
@@ -774,6 +893,7 @@ function resampleTo16k(input, inputSampleRate) {
 }
 
 async function transcribeWithWhisperPcm(audioData16k) {
+  if (pausedForTurn || !isVoiceAllowedNow()) return "";
   const asr = await ensureWhisperReady();
   if (!asr) throw new Error("Whisper not available");
 
@@ -892,11 +1012,21 @@ export function startVoiceAuto() {
   if (app.inputMode !== "voice") return;
   if (activeEngine === "none") return;
 
+  // Hard gate: in online games with mutual control OFF, do not listen while it isn't your turn.
+  if (!isVoiceAllowedNow()) {
+    pausedForTurn = true;
+    setMicVisual(false);
+    setVoiceStatus("Waiting for your turn…");
+    return;
+  }
+
   // Default-on listening when entering voice mode.
   if (activeEngine === "webspeech") {
-    if (wantListening || isStarting) return;
+    // If we still "wantListening" but we were paused/stopped (e.g., turn gating),
+    // allow a restart without requiring a manual double-click.
+    if (isStarting) return;
     wantListening = true;
-    startWebSpeech(false);
+    if (!webSpeechRunning) startWebSpeech(false);
     return;
   }
 
@@ -985,7 +1115,26 @@ export function initVoiceUI() {
       return;
     }
   });
+
+  // Turn gating observer (online + mutual control OFF). This is intentionally best-effort:
+  // - It will stop voice capture while it isn't your turn.
+  // - It will resume automatically when you can act again.
+  setupTurnOverlayObserver();
+  applyTurnGate();
+
+  // #turnOverlay may be injected after init; retry attaching briefly.
+  let tries = 0;
+  const attach = setInterval(() => {
+    if (turnOverlayObserver) {
+      clearInterval(attach);
+      return;
+    }
+    setupTurnOverlayObserver();
+    tries++;
+    if (tries > 20) clearInterval(attach);
+  }, 250);
 }
+
 
 // When a score is logged (by you or the opponent), nudging Web Speech can help keep
 // the Chrome/Edge session alive.
@@ -994,6 +1143,11 @@ export function nudgeVoiceAfterGameActivity(prevState, nextState) {
   try {
     if (app.inputMode !== "voice") return;
     if (!wantListening) return;
+
+    // Re-evaluate turn gate on any game activity (turn/score changes).
+    applyTurnGate();
+    if (pausedForTurn || !isVoiceAllowedNow()) return;
+
     if (activeEngine !== "webspeech") return;
     if (!prevState || !nextState) return;
 
