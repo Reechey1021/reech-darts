@@ -417,7 +417,7 @@ export async function applyFinishedMatchProfileUpdatesForMe(db, uid, gameId, mat
       result: wonNow ? "W" : "L",
       scoreline,
       mode,
-      competition: isCompetitive ? "Competitive" : "Casual",
+      competition: isCompetitive ? "Ranked" : "Casual",
       opponentUid: oppPlayer.uid || null,
       opponentName: oppPlayer.name || "Opponent",
       // Avatars: follow the same fallback chain used in-game.

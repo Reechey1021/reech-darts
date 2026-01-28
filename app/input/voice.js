@@ -136,7 +136,7 @@ function supportsWhisperFallback() {
 }
 
 
-const WAKE_WORDS = ["score", "school", "sore", "scored", "scores"];
+const WAKE_WORDS = ["score", "school", "sore", "scored", "scores", "call"];
 // -----------------------------
 // Parsing
 // -----------------------------
@@ -200,11 +200,9 @@ function normalizeBritishDigitHomophones(text) {
     if (w === "too" && nearNumber) { out.push("two"); continue; }
     if (w === "free" && nearNumber) { out.push("three"); continue; }
     if (w === "ate" && nearNumber) { out.push("eight"); continue; }
-
-    // "a" is extremely ambiguous: only treat it as "eight" when it is clearly numeric.
-    if (w === "a" && (nearNumber || prev === "double" || prev === "treble" || prev === "triple")) {
-      out.push("eight"); continue;
-    }
+    if (w === "a" && nearNumber) { out.push("eight"); continue; }
+    if (w === "Xero" && nearNumber) { out.push("zero"); continue; }
+    if (w === "Siri" && nearNumber) { out.push("zero"); continue; }
 
     out.push(w);
   }
