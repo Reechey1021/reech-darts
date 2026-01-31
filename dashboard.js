@@ -1741,7 +1741,7 @@ if (oppDeclineFriendBtn) {
       e.preventDefault();
       setConfirmSignOutVisible(false);
       await signOutUser();
-      window.location.href = withBase("/index");
+      window.location.href = withBase("/index/");
     });
   }
 
@@ -1856,7 +1856,7 @@ setSettingsModalVisible(false);
     app.user = user;
 
     if (!user || user.isAnonymous) {
-      window.location.href = withBase("/index");
+      window.location.href = withBase("/index/");
       return;
     }
 

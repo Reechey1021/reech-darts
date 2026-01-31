@@ -1,8 +1,7 @@
 // app/actions.js
 import { app } from "./state.js";
 import { getActorId, getActorName } from "./auth.js";
-import { setGameIdInUrl, withBase } from "./routing.js";
-import { clearGameIdFromUrl } from "./routing.js";
+import { setGameIdInUrl, clearGameIdFromUrl, withBase } from "./routing.js";
 import { bindGameListener, resetRealtimeStateForGameSwitch } from "./realtime.js";
 import { makeNewMatch, makeFreshLeg, starterForLeg } from "./model/match.js";
 import {
@@ -26,21 +25,34 @@ import { makeRng } from "./nemesis/rng.js";
 import { showError, safeFocusScoreInput, setLobbyGateVisible, setInviteModalVisible, setSetupModalVisible, setNemesisMatchSetupModalVisible, setConfirmNewMatchModalVisible, setWinnerModalVisible } from "./ui/render.js";
 import { canScoreNow, mySeatIndex, isHost } from "./permissions.js";
 import { clearDarts } from "./input/dartpad.js";
-
 // ---------- Routing / switching ----------
 export function switchToGame(newGameId) {
-  app.gameId = newGameId;
-  app.gameRef = app.db.collection("games").doc(newGameId);
-  setGameIdInUrl(newGameId);
+  const id = String(newGameId || "").trim();
+  if (!id) return;
+
+  // If we are not already on the dedicated /game page, navigate there.
+  // This prevents /index?game=... (which breaks refresh and mixes page UI).
+  try {
+    const path = window.location.pathname || "";
+    const baseGame = withBase("/game/");
+    const isGamePage = path === baseGame || path === (baseGame + "/");
+    if (!isGamePage) {
+      window.location.href = withBase(`/game/?game=${encodeURIComponent(id)}`);
+      return;
+    }
+  } catch (_) {}
+
+  app.gameId = id;
+  app.gameRef = app.db.collection("games").doc(id);
+  setGameIdInUrl(id);
 
   // Reset per-game runtime flags
   app.lastAudioId = null;
   app.seatClaimed = false;
 
-  console.log("Switched to gameId:", newGameId);
-    resetRealtimeStateForGameSwitch();
-    bindGameListener();
-
+  console.log("Switched to gameId:", id);
+  resetRealtimeStateForGameSwitch();
+  bindGameListener();
 }
 
 // ---------- Lobby / invite ----------
@@ -92,44 +104,28 @@ export async function createNewGameAndShowInvite({ lobbyType = "online", openInv
     },
   });
 
-  // Switch routing + bind listener
-  switchToGame(newId);
+  // Navigate to the dedicated /game page for this game.
+  // (Prevents /index?game=... which breaks refresh and mixes page UI.)
+  const url = new URL(window.location.href);
+  url.pathname = withBase("/game/");
+  url.searchParams.set("game", newId);
+  if (openInvite) url.searchParams.set("openInvite", "1");
+  // For local/offline lobbies, auto-open setup on first load.
+  if (lobbyType === "local") url.searchParams.set("autoSetup", "1");
 
-  // Hide gate + show invite modal (existing UI)
+  // Hide gate before navigating.
   setLobbyGateVisible(false);
 
-  // Build invite link using pretty route (/game/<id>)
-  const url = new URL(window.location.href);
-  url.pathname = `/game/${encodeURIComponent(newId)}`;
-  url.searchParams.delete("game");
-
-  const txt = url.toString();
-  const linkEl = document.getElementById("inviteLinkText");
-  if (linkEl) linkEl.textContent = txt;
-
-  if (openInvite) setInviteModalVisible(true);
+  window.location.href = url.toString();
 
   return { ok: true, gameId: newId };
 }
 
 // Convenience: start a local (offline) game flow
 export async function createLocalGameAndOpenSetup() {
-  // Local games don’t need a name gate; setup modal collects names.
-  const res = await createNewGameAndShowInvite({ lobbyType: "local", openInvite: false });
-  if (!res?.ok) return res;
-
-  // QoL: prefill Player 1 name for local games with the current user's name (editable).
-  // This avoids showing "Player 1" for signed-in users.
-  try {
-    const p1 = document.getElementById("setupP1");
-    if (p1 && (!p1.value || p1.value.trim() === "Player 1")) {
-      p1.value = getActorName() || "Player 1";
-    }
-  } catch (_) {}
-
-  // Open setup immediately (no invite step)
-  setSetupModalVisible(true);
-  return res;
+  // Local games don't use invite links. We still create a normal game doc with
+  // lobbyType="local" and then navigate to /game with autoSetup=1 so refresh works.
+  return await createNewGameAndShowInvite({ lobbyType: "local", openInvite: false });
 }
 
 export function openInviteModalForCurrentGame({ autoSetup = false } = {}) {
@@ -221,7 +217,7 @@ export async function leaveMatch() {
     return;
   }
   clearGameIdFromUrl();
-  window.location.href = withBase("/index");
+  window.location.href = withBase("/index/");
 }
 
 export async function restartMatch() {

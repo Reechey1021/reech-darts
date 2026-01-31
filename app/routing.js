@@ -60,7 +60,7 @@ export function setGameIdInUrl(gameId) {
   // history rewrites for /game/<id>.
   const parts = url.pathname.split("/").filter(Boolean);
   if ((parts.length >= 1 && parts[0] === "game") || (parts.length >= 2 && parts[1] === "game")) {
-    url.pathname = withBase("/game");
+    url.pathname = withBase("/game/");
   }
   url.searchParams.set("game", cleaned);
 
@@ -72,7 +72,7 @@ export function clearGameIdFromUrl() {
   const parts = url.pathname.split("/").filter(Boolean);
 
   if ((parts.length >= 1 && parts[0] === "game") || (parts.length >= 2 && parts[1] === "game")) {
-    url.pathname = withBase("/game");
+    url.pathname = withBase("/game/");
     url.searchParams.delete("game");
     window.history.replaceState({}, "", url.toString());
     return;

@@ -40,10 +40,10 @@ if (!app.gameId) {
 // The lobby/login UI lives on /index.
 try {
   const path = window.location.pathname || "";
-  const baseGame = withBase("/game");
+  const baseGame = withBase("/game/");
   const isGameRoot = path === baseGame || path === (baseGame + "/");
   if (isGameRoot && !app.gameId) {
-    window.location.replace(withBase("/index"));
+    window.location.replace(withBase("/index/"));
   }
 } catch (_) {}
 app.gameRef = app.gameId ? app.db.collection("games").doc(app.gameId) : null;
@@ -63,10 +63,10 @@ initAuth({ autoAnonymous: Boolean(app.gameId) }).then(() => {
   // - Guests should stay on /index and use the lobby gate there.
   try {
     const path = window.location.pathname || "";
-    const baseIndex = withBase("/index");
+    const baseIndex = withBase("/index/");
     const isIndex = path === baseIndex || path === (baseIndex + "/");
     if (isIndex && app.user && !app.user.isAnonymous) {
-      window.location.replace(withBase("/dashboard"));
+      window.location.replace(withBase("/dashboard/"));
       return;
     }
   } catch (_) {}

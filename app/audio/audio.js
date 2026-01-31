@@ -1,5 +1,6 @@
 // app/audio/audio.js
 import { CHECKOUTS } from "../../checkouts.js";
+import { withBase } from "../routing.js";
 import { BOGEY_NUMBERS } from "../model/constants.js";
 
 // ---------- Audio (Firestore-synced, WebAudio-only, iOS-safe) ----------
@@ -128,13 +129,14 @@ async function loadAudioBuffer(src) {
   // files) without maintaining legacy/renamed phrase fallbacks.
   const candidates = [];
   const s = String(src);
-  candidates.push(s);
 
-  // Also try the same path with/without a leading slash.
-  // Depending on hosting base paths, some environments resolve one but not the other.
-  if (s.startsWith("/")) candidates.push(s.slice(1));
-  else candidates.push("/" + s);
+  // Always resolve audio assets from the site root (plus GitHub Pages base prefix),
+  // never relative to the current page path (e.g. /index/audio/...).
+  const abs = s.startsWith("/") ? s : ("/" + s);
+  candidates.push(withBase(abs));
 
+  // As a fallback, also try the raw absolute path (works on localhost and custom domains).
+  if (withBase(abs) !== abs) candidates.push(abs);
 
   // Case-insensitive names: try common casing variants.
   // (Static hosts can be case-sensitive, so we probe a few likely filenames.)
@@ -357,6 +359,14 @@ export async function playSfxWebAudio(src) {
   }
 }
 
+
+// Only these name audio files exist in /audio/names.
+const AVAILABLE_NAME_CLIPS = new Set([
+  "kameron",
+  "marie",
+  "richard",
+  "rookie",
+]);
 export function pad3(n) {
   return String(n).padStart(3, "0");
 }
@@ -366,8 +376,13 @@ export function pad3(n) {
 export function nameClipForDisplayName(name) {
   const cleaned = String(name || "").trim();
   if (!cleaned) return null;
-  // We encode the name so spaces/special chars don't break URLs.
-  return `/audio/names/${encodeURIComponent(cleaned)}.mp3`;
+
+  // Only request clips that actually exist in the repo.
+  // (Prevents noisy 404s for Guest/Nemesis/etc.)
+  const key = cleaned.toLowerCase();
+  if (!AVAILABLE_NAME_CLIPS.has(key)) return null;
+
+  return withBase(`/audio/names/${encodeURIComponent(cleaned)}.mp3`);
 }
 
 // Whether someone is "on a possible checkout" (your current rules)

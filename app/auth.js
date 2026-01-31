@@ -28,15 +28,6 @@ export async function initAuth({ autoAnonymous = false } = {}) {
   } catch (e) {
     console.warn("Auth persistence failed:", e);
   }
-
-  // Complete any pending redirect sign-in (important for GitHub Pages / Safari).
-  try {
-    await app.auth.getRedirectResult();
-  } catch (e) {
-    // Usually harmless (e.g., no pending redirect)
-    console.debug("No redirect result:", e?.message || e);
-  }
-
   // Track user in app state
   app.authReady = new Promise((resolve) => {
     app.auth.onAuthStateChanged(async (user) => {
@@ -119,25 +110,37 @@ export function getActorName() {
 export async function signInWithGoogle() {
   const provider = new firebase.auth.GoogleAuthProvider();
 
-  const host = window.location.hostname || "";
-  const isGitHubPages = host.endsWith("github.io");
+  // IMPORTANT:
+  // We intentionally use POPUP auth for static hosting (e.g., GitHub Pages).
+  // Redirect auth relies on the Firebase Hosting helper endpoint:
+  //   https://<authDomain>/__/firebase/init.json
+  // which is not available unless you are actually serving the app from Firebase Hosting.
+  //
+  // Popup auth avoids the /__/auth/handler flow entirely and works on GitHub Pages
+  // as long as the domain is added in Firebase Auth → Authorized domains.
 
-  // GitHub Pages + modern COOP/COEP policies can make popup flows noisy/flaky.
-  // Redirect is the most reliable option there.
-  if (isGitHubPages) {
-    await app.auth.signInWithRedirect(provider);
-    return;
-  }
-
-  // Popup works well on localhost/normal hosts; fallback to redirect if popup fails.
   try {
     await app.auth.signInWithPopup(provider);
   } catch (e) {
-    console.warn("Popup sign-in failed, trying redirect:", e?.message || e);
-    await app.auth.signInWithRedirect(provider);
+    console.error("Google sign-in failed:", e);
+    // Common causes:
+    // - Popup blocked by browser
+    // - Third-party cookies / tracking protection blocking the auth session
+    // - Domain not authorized in Firebase console
+    const msg = e?.message || String(e);
+    alert(
+      [
+        "Google sign-in failed.",
+        "",
+        "If you blocked popups, allow popups for this site and try again.",
+        "Also verify your domain is in Firebase Auth → Settings → Authorized domains.",
+        "",
+        msg,
+      ].join("\n")
+    );
+    throw e;
   }
 }
-
 
 export async function signOutUser() {
   if (!app.auth) return;

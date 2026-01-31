@@ -32,16 +32,16 @@ async function main() {
 
   // If already signed-in (Google), go straight to dashboard.
   if (app.user && !app.user.isAnonymous) {
-    window.location.replace(withBase("/dashboard"));
+    window.location.replace(withBase("/dashboard/"));
     return;
   }
 
   // Otherwise, go to the game lobby (it will show the correct LobbyGate UI).
-  window.location.replace(withBase("/game"));
+  window.location.replace(withBase("/game/"));
 }
 
 main().catch((e) => {
   console.error(e);
   // Worst-case fallback: don't strand the user.
-  try { window.location.replace(withBase("/game")); } catch (_) {}
+  try { window.location.replace(withBase("/game/")); } catch (_) {}
 });

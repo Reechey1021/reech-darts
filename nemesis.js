@@ -656,7 +656,7 @@ function syncPresetFromUI() {
 
 
 function goBackToDashboard() {
-  softNavigate(withBase("/dashboard"));
+  softNavigate(withBase("/dashboard/"));
 }
 
 function initHelpIconTooltips(root = document) {
@@ -911,7 +911,7 @@ async function boot() {
 
     // Nemesis is for signed-in (non-anonymous) users only.
     if (!u || u.isAnonymous) {
-      window.location.href = withBase("/index");
+      window.location.href = withBase("/index/");
       return;
     }
 

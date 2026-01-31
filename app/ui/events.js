@@ -246,7 +246,7 @@ export function wireUI() {
     }
 
     // Navigate to the match
-    window.location.href = `/index?game=${encodeURIComponent(gameId)}`;
+    window.location.href = withBase(`/game/?game=${encodeURIComponent(gameId)}`);
   }
 
   if (joinGameConfirmBtn) {
@@ -1168,6 +1168,22 @@ for (const stepper of setupSteppers) {
       if (app.latestState) render(app.latestState);
     });
   }
+
+  // One-shot: if the URL asks us to auto-open setup (used for local/offline games),
+  // do it once and then clean the URL so refresh doesn't re-trigger.
+  try {
+    const qs = new URLSearchParams(window.location.search);
+    if (qs.get("autoSetup") === "1") {
+      qs.delete("autoSetup");
+      const url = new URL(window.location.href);
+      url.search = qs.toString();
+      window.history.replaceState({}, "", url.toString());
+
+      configureSetupModalForLobbyType("local");
+      setSetupModalVisible(true);
+    }
+  } catch (_) {}
+
 }
 
 export function wireGlobalKeyboard() {
