@@ -98,10 +98,12 @@ export async function createNewGameAndShowInvite({ lobbyType = "online", openInv
   // Hide gate + show invite modal (existing UI)
   setLobbyGateVisible(false);
 
-  // Build invite link using pretty route (/game/<id>)
+  // Build invite link using query routing so it works on GitHub Pages (no rewrites).
   const url = new URL(window.location.href);
-  url.pathname = `/game/${encodeURIComponent(newId)}`;
-  url.searchParams.delete("game");
+  url.pathname = withBase("/game/");
+  url.searchParams.set("game", newId);
+  url.searchParams.delete("openInvite");
+  url.searchParams.delete("autoSetup");
 
   const txt = url.toString();
   const linkEl = document.getElementById("inviteLinkText");

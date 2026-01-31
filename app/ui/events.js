@@ -245,7 +245,7 @@ export function wireUI() {
     }
 
     // Navigate to the match
-    window.location.href = `/index?game=${encodeURIComponent(gameId)}`;
+    window.location.href = withBase(`/index/?game=${encodeURIComponent(gameId)}`);
   }
 
   if (joinGameConfirmBtn) {

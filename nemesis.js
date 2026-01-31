@@ -888,7 +888,7 @@ function wireUI() {
         // query/path during redirects.
         try { localStorage.setItem("nemesisPendingGameId", String(gameId)); } catch (_) {}
         // Use query-param form to work even on basic static servers (no rewrites).
-        window.location.href = `/game?game=${encodeURIComponent(gameId)}`;
+        window.location.href = withBase(`/game/?game=${encodeURIComponent(gameId)}`);
       } catch (err) {
         console.error(err);
         setSetupMsg(err?.message || "Couldn’t start Nemesis match.", true);
