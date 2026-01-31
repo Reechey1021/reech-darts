@@ -1,7 +1,7 @@
 // app/actions.js
 import { app } from "./state.js";
 import { getActorId, getActorName } from "./auth.js";
-import { setGameIdInUrl } from "./routing.js";
+import { setGameIdInUrl, withBase } from "./routing.js";
 import { clearGameIdFromUrl } from "./routing.js";
 import { bindGameListener, resetRealtimeStateForGameSwitch } from "./realtime.js";
 import { makeNewMatch, makeFreshLeg, starterForLeg } from "./model/match.js";
@@ -217,11 +217,11 @@ export async function leaveMatch() {
 
   // Signed-in users go back to dashboard; guests go back to gate/index.
   if (app.user && !app.user.isAnonymous) {
-    window.location.href = "/dashboard";
+    window.location.href = withBase("/dashboard");
     return;
   }
   clearGameIdFromUrl();
-  window.location.href = "/index";
+  window.location.href = withBase("/index");
 }
 
 export async function restartMatch() {

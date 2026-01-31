@@ -7,6 +7,7 @@ import { initFirebase } from "./app/firebase.js";
 import { initAuth, onUserChanged, getActorId, getActorName } from "./app/auth.js";
 import { NEMESIS_PRESETS, getPresetById, findMatchingPresetId } from "./app/nemesis/presets.js";
 import { initPageTransitions, softNavigate } from "./app/ui/pageTransitions.js";
+import { withBase } from "./app/routing.js";
 import { makeNewMatch } from "./app/model/match.js";
 import { initBullState } from "./app/bull/core.js";
 
@@ -655,7 +656,7 @@ function syncPresetFromUI() {
 
 
 function goBackToDashboard() {
-  softNavigate("/dashboard");
+  softNavigate(withBase("/dashboard"));
 }
 
 function initHelpIconTooltips(root = document) {
@@ -910,7 +911,7 @@ async function boot() {
 
     // Nemesis is for signed-in (non-anonymous) users only.
     if (!u || u.isAnonymous) {
-      window.location.href = "/index";
+      window.location.href = withBase("/index");
       return;
     }
 

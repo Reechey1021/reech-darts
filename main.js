@@ -2,7 +2,7 @@
 import { app } from "./app/state.js";
 import { applyBuildTag, logBuildInfo } from "./app/ui/buildInfo.js";
 import { initFirebase } from "./app/firebase.js";
-import { getGameIdFromUrl, setGameIdInUrl } from "./app/routing.js";
+import { getGameIdFromUrl, setGameIdInUrl, withBase } from "./app/routing.js";
 import { bindGameListener } from "./app/realtime.js";
 import { wireUI, wireGlobalKeyboard } from "./app/ui/events.js";
 import { initAuth } from "./app/auth.js";
@@ -54,7 +54,8 @@ initAuth({ autoAnonymous: Boolean(app.gameId) }).then(() => {
     // Only do this on the /game root.
     try {
       const path = window.location.pathname || "";
-      const isGameRoot = path === "/game" || path === "/game/";
+      const baseGame = withBase("/game");
+      const isGameRoot = path === baseGame || path === (baseGame + "/");
       if (isGameRoot) {
         const lastNemesis = (localStorage.getItem("lastNemesisGameId") || "").trim();
         if (lastNemesis) {

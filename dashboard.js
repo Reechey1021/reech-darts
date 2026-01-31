@@ -9,6 +9,7 @@ import { ensureUserProfile, updateMyProfile } from "./app/userProfile.js";
 import { acceptFriendRequest, cancelFriendRequest, declineFriendRequest, getFriendStateDb, removeFriend, sendFriendRequest, sendGameInvite, respondToGameInvite, listenForGameInvites } from "./app/friends.js";
 import { playSfxWebAudio } from "./app/audio/audio.js";
 import { initPageTransitions, softNavigate } from "./app/ui/pageTransitions.js";
+import { withBase } from "./app/routing.js";
 
 logBuildInfo();
 applyBuildTag();
@@ -1499,11 +1500,11 @@ function renderMatchHistory(stats) {
   wireCard(playOnlineCard, async () => createLobbyAndGo({ lobbyType: "online" }));
   wireCard(nemesisCard, () => {
     // Slice 1: Nemesis configuration screen (logged-in users only)
-    softNavigate("/nemesis");
+    softNavigate(withBase("/nemesis"));
   });
   wireCard(nemesisCard, () => {
     // Nemesis is for signed-in users only; dashboard is already gated.
-    softNavigate("/nemesis");
+    softNavigate(withBase("/nemesis"));
   });
 
   // Match history open/close
@@ -1740,7 +1741,7 @@ if (oppDeclineFriendBtn) {
       e.preventDefault();
       setConfirmSignOutVisible(false);
       await signOutUser();
-      window.location.href = "/index";
+      window.location.href = withBase("/index");
     });
   }
 
@@ -1855,7 +1856,7 @@ setSettingsModalVisible(false);
     app.user = user;
 
     if (!user || user.isAnonymous) {
-      window.location.href = "/index";
+      window.location.href = withBase("/index");
       return;
     }
 

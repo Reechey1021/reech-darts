@@ -305,7 +305,7 @@ export function wireUI() {
       try {
         await signInWithGoogle();
         // Go to dashboard for logged-in users.
-        window.location.href = "/dashboard";
+        window.location.href = withBase("/dashboard");
       } catch (e) {
         console.error(e);
         showError("Google login failed.");

@@ -14,6 +14,7 @@ import { app } from "./app/state.js";
 import { initFirebase } from "./app/firebase.js";
 import { initAuth } from "./app/auth.js";
 import { initPageTransitions, softNavigate } from "./app/ui/pageTransitions.js";
+import { withBase } from "./app/routing.js";
 
 function applyGateTheme() {
   // Match dashboard behavior: use saved theme, otherwise default.
@@ -31,16 +32,16 @@ async function main() {
 
   // If already signed-in (Google), go straight to dashboard.
   if (app.user && !app.user.isAnonymous) {
-    window.location.replace("/dashboard");
+    window.location.replace(withBase("/dashboard"));
     return;
   }
 
   // Otherwise, go to the game lobby (it will show the correct LobbyGate UI).
-  window.location.replace("/game");
+  window.location.replace(withBase("/game"));
 }
 
 main().catch((e) => {
   console.error(e);
   // Worst-case fallback: don't strand the user.
-  try { window.location.replace("/game"); } catch (_) {}
+  try { window.location.replace(withBase("/game")); } catch (_) {}
 });

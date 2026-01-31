@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css" />
+  <link rel="stylesheet" href="../style.css" />
 </head>
 
 <body class="dashboardPage">
@@ -21,7 +21,7 @@
           <div id="dashName" class="dashName">Player</div>
           <div id="dashEquipmentDiv" class="dashEquipmentDiv">
             <div class="dashStatTileIcon small">
-          <img class="dashEquipmentIcon" src="/icons/EquipmentIcon.png"></img>
+          <img class="dashEquipmentIcon" src="../icons/EquipmentIcon.png"></img>
           </div>
           <div id="dashEquipment" class="dashEquipment"></div>
           </div>
@@ -41,17 +41,17 @@
         <!-- Top metric tiles -->
         <div class="dashStatTiles" aria-label="Key statistics">
           <div class="dashStatTile dashStatTile--glow">
-            <div class="dashStatTileIcon"><img src="/icons/3DAIcon.png" alt="3 dart average" /></div>
+            <div class="dashStatTileIcon"><img src="../icons/3DAIcon.png" alt="3 dart average" /></div>
             <div class="dashStatTileLabel">AVERAGE</div>
             <div id="dashTdaVal" class="dashStatTileValue">0.0</div>
           </div>
           <div class="dashStatTile dashStatTile--glow">
-            <div class="dashStatTileIcon"><img src="/icons/F9DIcon.png" alt="First nine" /></div>
+            <div class="dashStatTileIcon"><img src="../icons/F9DIcon.png" alt="First nine" /></div>
             <div class="dashStatTileLabel">FIRST NINE</div>
             <div id="dashF9dVal" class="dashStatTileValue">0.0</div>
           </div>
           <div class="dashStatTile dashStatTile--glow">
-            <div class="dashStatTileIcon"><img src="/icons/CheckoutIcon.png" alt="Checkout percentage" /></div>
+            <div class="dashStatTileIcon"><img src="../icons/CheckoutIcon.png" alt="Checkout percentage" /></div>
             <div class="dashStatTileLabel">CHECKOUT %</div>
             <div id="dashCheckoutPctVal" class="dashStatTileValue">0%</div>
           </div>
@@ -116,7 +116,7 @@
         </div>
 
         <div id="dashNemesisCard" class="dashPlayCard dashPlayNemesis dashPlayCard--glow" role="button" tabindex="0" aria-label="Play vs Nemesis">
-          <img src="/img/Nemesis_menu.png" class="dashboardGameIcon" alt="Nemesis" />
+          <img src="../img/Nemesis_menu.png" class="dashboardGameIcon" alt="Nemesis" />
           <div class="dashPlayText">
             <div class="big">Nemesis</div>
             <div class="small">AI Opponent</div>
@@ -126,11 +126,11 @@
 
         <div id="dashMiscCard" class="dashMiscCardDiv">
           <div id="dashFriendsBtn" class="dashMiscCard dashFriends dashPlayCard--glow">
-            <img src="/img/Friends.png" class="dashboardGameIcon">
+            <img src="../img/Friends.png" class="dashboardGameIcon">
             <div class="dashPlayText medium">Friends</div>
           </div>
           <div id="dashJoinGameBtn" class="dashMiscCard dashJoinGame dashPlayCard--glow">
-            <img src="/img/Join.png" class="dashboardGameIcon">
+            <img src="../img/Join.png" class="dashboardGameIcon">
             <div class="dashPlayText medium">Join Game</div>
           </div>
         </div>
@@ -248,7 +248,7 @@
           <div id="oppProfileName" class="dashName">—</div>
             <div class="dashEquipmentDiv">
               <div class="dashStatTileIcon small">
-              <img class="dashEquipmentIcon" src="/icons/EquipmentIcon.png" alt="Darts" /></div>
+              <img class="dashEquipmentIcon" src="../icons/EquipmentIcon.png" alt="Darts" /></div>
               <div id="oppProfileEquipment" class="dashEquipment"></div>
             </div>
           </div>
@@ -270,17 +270,17 @@
 
         <div class="dashStatTiles" aria-label="Key statistics">
           <div class="dashStatTile dashStatTile--glow">
-            <div class="dashStatTileIcon"><img src="/icons/3DAIcon.png" alt="3 dart average" /></div>
+            <div class="dashStatTileIcon"><img src="../icons/3DAIcon.png" alt="3 dart average" /></div>
             <div class="dashStatTileLabel">AVERAGE</div>
             <div id="oppProfileTdaVal" class="dashStatTileValue">0.0</div>
           </div>
           <div class="dashStatTile dashStatTile--glow">
-            <div class="dashStatTileIcon"><img src="/icons/F9DIcon.png" alt="First nine" /></div>
+            <div class="dashStatTileIcon"><img src="../icons/F9DIcon.png" alt="First nine" /></div>
             <div class="dashStatTileLabel">FIRST NINE</div>
             <div id="oppProfileF9dVal" class="dashStatTileValue">0.0</div>
           </div>
           <div class="dashStatTile dashStatTile--glow">
-            <div class="dashStatTileIcon"><img src="/icons/CheckoutIcon.png" alt="Checkout percentage" /></div>
+            <div class="dashStatTileIcon"><img src="../icons/CheckoutIcon.png" alt="Checkout percentage" /></div>
             <div class="dashStatTileLabel">CHECKOUT %</div>
             <div id="oppProfileCheckoutPctVal" class="dashStatTileValue">0%</div>
           </div>
@@ -448,7 +448,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 
-  <script type="module" src="/dashboard.js"></script>
+  <script type="module" src="../dashboard.js"></script>
   <div id="buildTag" class="build-tag"></div>
 </body>
 </html>
