@@ -29,6 +29,14 @@ export async function initAuth({ autoAnonymous = false } = {}) {
     console.warn("Auth persistence failed:", e);
   }
 
+
+  // Complete any pending Google redirect sign-in (helps on GitHub Pages / Safari)
+  try {
+    await app.auth.getRedirectResult();
+  } catch (e) {
+    console.warn("Auth redirect result error:", e);
+  }
+
   // Track user in app state
   app.authReady = new Promise((resolve) => {
     app.auth.onAuthStateChanged(async (user) => {
@@ -111,7 +119,15 @@ export function getActorName() {
 export async function signInWithGoogle() {
   const provider = new firebase.auth.GoogleAuthProvider();
 
-  // Popup works on desktop; on iOS/Safari it can be flaky — fallback to redirect if popup fails.
+  // GitHub Pages often triggers COOP/COEP warnings with popup close behavior.
+  // Redirect is the most reliable flow there.
+  const isGitHubPages = window.location.hostname.endsWith("github.io");
+  if (isGitHubPages) {
+    await app.auth.signInWithRedirect(provider);
+    return;
+  }
+
+  // Popup works on most desktop browsers; fallback to redirect if popup fails.
   try {
     await app.auth.signInWithPopup(provider);
   } catch (e) {

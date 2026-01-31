@@ -17,6 +17,7 @@ import {
 } from "../actions.js";
 import { applyTheme, initThemeToggle, showError, hideError, setInviteModalVisible, setSetupModalVisible, setLobbyGateVisible, openModal, closeModal, render } from "./render.js";
 import { unlockAudioOnce } from "../audio/audio.js";
+import { withBase } from "../routing.js";
 import { initBullUI } from "../bull/ui.js";
 import { initAuditChatUI, isAuditChatInputFocused, addAuditSystem } from "./auditChat.js";
 import { signInWithGoogle, ensureAnonymousSignIn } from "../auth.js";
