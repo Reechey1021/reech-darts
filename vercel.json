@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    { "source": "/index/:path*", "destination": "/index/index.html" },
+    { "source": "/dashboard/:path*", "destination": "/dashboard/index.html" },
+    { "source": "/nemesis/:path*", "destination": "/nemesis/index.html" },
+    { "source": "/game/:path*", "destination": "/game/index.html" }
+  ]
+}

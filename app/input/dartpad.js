@@ -65,13 +65,8 @@ export function setInputMode(mode) {
   if (table) table.classList.toggle("hidden", mode !== "table");
   if (voice) voice.classList.toggle("hidden", mode !== "voice");
 
-  // icon hint (shows the NEXT mode)
-  // keypad -> table -> voice -> keypad
-  if (btn) {
-    if (mode === "keypad") btn.textContent = "🎯";
-    else if (mode === "table") btn.textContent = "🎙️";
-    else btn.textContent = "⌨️";
-  }
+  // NOTE: Input mode button is now a static icon that opens a picker (V6).
+  // We no longer mutate its inner content here.
 
   // In non-keypad modes, prevent typing into the input (the mode drives it)
   if (scoreInput) scoreInput.readOnly = mode !== "keypad";

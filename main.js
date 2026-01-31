@@ -2,23 +2,39 @@
 import { app } from "./app/state.js";
 import { applyBuildTag, logBuildInfo } from "./app/ui/buildInfo.js";
 import { initFirebase } from "./app/firebase.js";
-import { getGameIdFromUrl } from "./app/routing.js";
+import { getGameIdFromUrl, setGameIdInUrl } from "./app/routing.js";
 import { bindGameListener } from "./app/realtime.js";
 import { wireUI, wireGlobalKeyboard } from "./app/ui/events.js";
 import { initAuth } from "./app/auth.js";
 import { setLobbyGateVisible } from "./app/ui/render.js";
 import { openInviteModalForCurrentGame } from "./app/actions.js";
+import { initPageTransitions } from "./app/ui/pageTransitions.js";
 import { getGuestDisplayName, setGuestDisplayName } from "./app/profile.js";
 
 logBuildInfo();
 console.log("Reech Darts loaded");
 applyBuildTag();
+initPageTransitions();
 window.onerror = (m, s, l, c, e) => console.log("JS ERROR:", m, l, c, e);
 
 app.db = initFirebase();
 
 // Routing params first
 app.gameId = getGameIdFromUrl();
+// Nemesis flow fallback: if we were just redirected into /game but the URL lost
+// its game id (some static servers / redirects can drop query/path), recover
+// from a one-shot localStorage handoff.
+if (!app.gameId) {
+  try {
+    const pending = (localStorage.getItem("nemesisPendingGameId") || "").trim();
+    if (pending) {
+      localStorage.removeItem("nemesisPendingGameId");
+      app.gameId = pending;
+    }
+  } catch (_) {
+    // ignore
+  }
+}
 app.gameRef = app.gameId ? app.db.collection("games").doc(app.gameId) : null;
 const qs = new URLSearchParams(window.location.search);
 const shouldOpenInvite = qs.get("openInvite") === "1";
@@ -32,14 +48,45 @@ initAuth({ autoAnonymous: Boolean(app.gameId) }).then(() => {
   wireGlobalKeyboard();
 
   if (!app.gameId) {
-    // If you're already signed in with Google, you should never see the lobby-gate.
-    if (app.user && !app.user.isAnonymous) {
-      window.location.href = "./dashboard.html";
+    // Nemesis-only recovery: if the host drops the game id on reload, try to resume the last
+    // active Nemesis game WITHOUT a full page reload (prevents the "double refresh").
+    //
+    // Only do this on the /game root.
+    try {
+      const path = window.location.pathname || "";
+      const isGameRoot = path === "/game" || path === "/game/";
+      if (isGameRoot) {
+        const lastNemesis = (localStorage.getItem("lastNemesisGameId") || "").trim();
+        if (lastNemesis) {
+          // Hand off the id in case the host drops the query on navigation.
+          try { localStorage.setItem("nemesisPendingGameId", String(lastNemesis)); } catch (_) {}
+
+          // Set app state + URL in-place (no reload).
+          app.gameId = lastNemesis;
+          app.gameRef = app.db.collection("games").doc(lastNemesis);
+          setGameIdInUrl(lastNemesis);
+        }
+      }
+    } catch (_) {}
+
+    if (!app.gameId) {
+      // On /game with no active lobby id, show the lobby gate (host/join/offline).
+      setLobbyGateVisible(true);
+
+      // If the dedicated /index gate asked us to start offline immediately, do it once.
+      try {
+        const flag = localStorage.getItem("startOfflineOnLoad");
+        if (flag === "1") {
+          localStorage.removeItem("startOfflineOnLoad");
+          const playOfflineBtn = document.getElementById("playOfflineBtn");
+          if (playOfflineBtn) setTimeout(() => playOfflineBtn.click(), 0);
+        }
+      } catch (_) {
+        // ignore
+      }
+
       return;
     }
-
-    setLobbyGateVisible(true);
-    return;
   }
 
   // Direct invite links: guests must pick a display name before entering the lobby.
@@ -96,4 +143,3 @@ initAuth({ autoAnonymous: Boolean(app.gameId) }).then(() => {
   }
 
 });
-

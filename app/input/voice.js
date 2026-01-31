@@ -14,6 +14,33 @@ import { showError } from "../ui/render.js";
 
 
 // -----------------------------
+// Voice mic mode
+// -----------------------------
+// "always" = keep the existing always-on auto-restart logic
+// "push"   = listen only while the user taps the mic (no auto-restart)
+const VOICE_AUTO_MODE_KEY = "voiceAutoMode";
+const DEFAULT_VOICE_AUTO_MODE = "always";
+
+function getVoiceAutoMode() {
+  try {
+    return localStorage.getItem(VOICE_AUTO_MODE_KEY) || DEFAULT_VOICE_AUTO_MODE;
+  } catch (_) {
+    return DEFAULT_VOICE_AUTO_MODE;
+  }
+}
+
+function isAutoMicEnabled() {
+  return getVoiceAutoMode() !== "push";
+}
+
+function setVoiceAutoMode(mode) {
+  const v = (mode === "push") ? "push" : "always";
+  try { localStorage.setItem(VOICE_AUTO_MODE_KEY, v); } catch (_) {}
+  return v;
+}
+
+
+// -----------------------------
 // Turn gating (online, mutual control OFF)
 // -----------------------------
 let pausedForTurn = false;
@@ -245,9 +272,9 @@ function parseNumberWords(words) {
 
 export function parseSpokenScore(rawTranscript) {
   let t = normalizeTranscript(rawTranscript);
-  if (activeEngine === "whisper") {
-    t = normalizeBritishDigitHomophones(t);
-  }
+  // Apply numeric homophone normalization for *both* engines.
+  // This is intentionally context-gated inside normalizeBritishDigitHomophones().
+  t = normalizeBritishDigitHomophones(t);
   if (!t) return null;
 
   // Whisper (and some other engines) may return digit-by-digit transcripts like:
@@ -305,7 +332,10 @@ function setMicVisual(active, labelOverride = null) {
   btn.setAttribute("aria-pressed", active ? "true" : "false");
 
   const label = btn.querySelector(".voiceMicLabel");
-  if (label) label.textContent = labelOverride || (active ? "Say 'Score' followed by a number." : "Tap & Speak");
+  if (label) {
+    const push = getVoiceAutoMode() === "push";
+    label.textContent = labelOverride || (active ? (push ? "Listening..." : "Say 'Score' followed by a number.") : "Tap & Speak");
+  }
 }
 
 // -----------------------------
@@ -351,8 +381,10 @@ function buildWebSpeechRecognizer() {
     clearWebSpeechTimers();
     isStarting = false;
     lastError = null;
-    setMicVisual(true, "Say 'Score' followed by a number.");
-    setVoiceStatus("Say 'Score' followed by a number.");
+    const pushToTalk = (getVoiceAutoMode() === "push");
+    const msg = pushToTalk ? "Listening…" : "Say 'Score' followed by a number.";
+    setMicVisual(true, msg);
+    setVoiceStatus(msg);
     setHeard("");
   };
 
@@ -365,6 +397,9 @@ function buildWebSpeechRecognizer() {
     // If we intentionally stopped/aborted, ignore spurious errors so we don't overwrite
     // useful UI like "Logged 60".
     if (isStopping || lastError === "aborted") return;
+
+    // Push-to-talk: do not keep the session alive after an error.
+    if (!isAutoMicEnabled()) wantListening = false;
 
     setMicVisual(false);
     // Keep always-on listening for transient errors (e.g., no-speech/network).
@@ -385,7 +420,7 @@ function buildWebSpeechRecognizer() {
     }
 
     // If we still want to listen (always-on), schedule a restart. Some browsers may not fire onend after onerror.
-    if (wantListening && app.inputMode === "voice") {
+    if (wantListening && app.inputMode === "voice" && isAutoMicEnabled()) {
       restartTimer = setTimeout(() => {
         if (!wantListening || app.inputMode !== "voice" || pausedForTurn || !isVoiceAllowedNow()) return;
         startWebSpeech(true);
@@ -399,7 +434,7 @@ function buildWebSpeechRecognizer() {
     isStarting = false;
     setMicVisual(false);
 
-    if (wantListening) {
+    if (wantListening && isAutoMicEnabled()) {
       restartTimer = setTimeout(() => {
         if (!wantListening) return;
         startWebSpeech(true);
@@ -683,6 +718,7 @@ function clearWhisperTimers() {
 
 
 function scheduleWhisperRestart(delayMs = 250) {
+  if (!isAutoMicEnabled()) return;
   if (!wantListening) return;
   if (activeEngine !== "whisper") return;
   if (app.inputMode !== "voice") return;
@@ -725,8 +761,12 @@ async function startWhisperRecording() {
   }
 
   whisperIsRecording = true;
-  setMicVisual(true, "Say 'Score' followed by a number.");
-  setVoiceStatus("Say 'Score' followed by a number.");
+  {
+    const pushToTalk = (getVoiceAutoMode() === "push");
+    const msg = pushToTalk ? "Listening…" : "Say 'Score' followed by a number.";
+    setMicVisual(true, msg);
+    setVoiceStatus(msg);
+  }
   setHeard("");
 
   try {
@@ -835,7 +875,7 @@ function stopWhisperRecording(fromInternal = false) {
       setVoiceStatus("Couldn't transcribe speech");
     } finally {
       // Always-on loop: keep listening in voice mode unless user toggled off.
-      if (wantListening && app.inputMode === "voice" && activeEngine === "whisper") {
+      if (isAutoMicEnabled() && wantListening && app.inputMode === "voice" && activeEngine === "whisper") {
         setTimeout(() => {
           // Guard against mode changes between scheduling and execution
           if (wantListening && app.inputMode === "voice" && !whisperIsRecording) {
@@ -909,23 +949,33 @@ async function transcribeWithWhisperPcm(audioData16k) {
 // Shared transcript handling
 // -----------------------------
 function handleTranscript(text) {
+  const pushToTalk = (getVoiceAutoMode() === "push");
   const finalText = (text || "").trim();
   if (!finalText) {
     setVoiceStatus("Didn't catch a score");
+    if (pushToTalk) stopVoice();
     return;
   }
 
-  // Wake word gate: only accept commands that include the wake word.
-  // Example: "score one hundred and twenty five"
+  // Always-listen: require wake word (existing behavior).
+  // Push-to-talk: do NOT require wake word — treat the whole transcript as the command.
+  // Example (always): "score one hundred and twenty five"
+  // Example (push):   "one hundred and twenty five"
   const norm = normalizeTranscript(finalText);
   const parts = norm.split(" ").filter(Boolean);
-  const wakeSet = new Set(WAKE_WORDS);
-  const wi = parts.findIndex((w) => wakeSet.has(w));
-  if (wi === -1) {
-    setVoiceStatus('Say "score …"');
-    return;
+  let cmdRaw = "";
+
+  if (!pushToTalk) {
+    const wakeSet = new Set(WAKE_WORDS);
+    const wi = parts.findIndex((w) => wakeSet.has(w));
+    if (wi === -1) {
+      setVoiceStatus('Say "score …"');
+      return;
+    }
+    cmdRaw = parts.slice(wi + 1).join(" ").trim();
+  } else {
+    cmdRaw = parts.join(" ").trim();
   }
-  const cmdRaw = parts.slice(wi + 1).join(" ").trim();
   // Wake-word command normalization: in many accents, "four" is transcribed as "for",
   // and "eight" as "a"/"ate". Because this is *after* the wake word, it's safe to be
   // more aggressive than in general transcript normalization.
@@ -942,17 +992,20 @@ function handleTranscript(text) {
     }
   }
   if (!cmd) {
-    setVoiceStatus('Say "score" then the number');
+    setVoiceStatus(pushToTalk ? "Didn't catch a score" : 'Say "score" then the number');
+    if (pushToTalk) stopVoice();
     return;
   }
 
   const score = parseSpokenScore(cmd);
   if (!Number.isFinite(score)) {
     setVoiceStatus("Didn't catch a score");
+    if (pushToTalk) stopVoice();
     return;
   }
   if (score < 0 || score > 180) {
     setVoiceStatus("Score must be 0–180");
+    if (pushToTalk) stopVoice();
     return;
   }
 
@@ -970,6 +1023,12 @@ function handleTranscript(text) {
   }
 
   // Keep listening if voice mode is toggled on.
+  // Push-to-talk: stop listening once we've heard something (no auto-restart).
+  if (!isAutoMicEnabled()) {
+    stopVoice();
+    return;
+  }
+
   if (wantListening && app.inputMode === "voice") {
     if (activeEngine === "webspeech") {
       // Restart to keep the session alive.
@@ -1009,6 +1068,7 @@ export function stopVoice() {
 export function startVoiceAuto() {
   if (app.inputMode !== "voice") return;
   if (activeEngine === "none") return;
+  if (!isAutoMicEnabled()) return;
 
   // Hard gate: in online games with mutual control OFF, do not listen while it isn't your turn.
   if (!isVoiceAllowedNow()) {
@@ -1055,6 +1115,24 @@ export function startVoiceAuto() {
 
 export function initVoiceUI() {
   const btn = document.getElementById("voiceMicBtn");
+  const modeSel = document.getElementById("voiceAutoMode");
+
+  // Restore mic mode (always listen vs push-to-talk).
+  if (modeSel) {
+    modeSel.value = getVoiceAutoMode();
+    modeSel.addEventListener("change", () => {
+      const v = setVoiceAutoMode(modeSel.value);
+
+      // Switching away from always-on should immediately stop any active loop.
+      if (v === "push") {
+        stopVoice();
+        setVoiceStatus("Tap & Speak");
+      } else {
+        // Switching to always-on: auto-start if we are currently in voice mode (user gesture).
+        if (app.inputMode === "voice") startVoiceAuto();
+      }
+    });
+  }
   const webSpeechCtor = getSpeechRecognitionCtor();
   const whisperOk = supportsWhisperFallback();
 
@@ -1084,21 +1162,31 @@ export function initVoiceUI() {
     if (app.inputMode !== "voice") return;
 
     if (activeEngine === "webspeech") {
-      // Toggle behaviour
+      // Always listen = toggle loop on/off.
+      // Push-to-talk = listen only while the user taps the mic (no auto-restart).
+      const autoMic = isAutoMicEnabled();
+
       if (wantListening || isStarting) {
+        wantListening = false;
         stopWebSpeech();
         return;
       }
+
       wantListening = true;
       startWebSpeech(false);
+
+      // Push-to-talk: we will stop after a transcript is handled (see handleTranscript).
+      if (!autoMic) setVoiceStatus("Listening…");
       return;
     }
 
     if (activeEngine === "whisper") {
-      // Toggle: ON = always-on loop (segments); OFF = stop and release mic.
+      // Always listen = toggle loop on/off.
+      // Push-to-talk = listen only while the user taps the mic (no auto-restart).
       whisperUserActivated = true;
+
       if (wantListening) {
-        // Turning off
+        // Turning off (or cancelling a one-shot session)
         wantListening = false;
         if (whisperIsRecording) stopWhisperRecording(true);
         stopWhisperStream();
@@ -1106,6 +1194,7 @@ export function initVoiceUI() {
         setMicVisual(false);
         return;
       }
+
       // Turning on
       wantListening = true;
       if (whisperIsRecording) return;
@@ -1141,6 +1230,7 @@ export function nudgeVoiceAfterGameActivity(prevState, nextState) {
   try {
     if (app.inputMode !== "voice") return;
     if (!wantListening) return;
+    if (!isAutoMicEnabled()) return;
 
     // Re-evaluate turn gate on any game activity (turn/score changes).
     applyTurnGate();

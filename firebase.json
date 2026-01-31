@@ -1,0 +1,67 @@
+{
+  "hosting": {
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "redirects": [
+      {
+        "source": "/",
+        "destination": "/index/",
+        "type": 302
+      }
+    ],
+    "rewrites": [
+      {
+        "source": "/index",
+        "destination": "/index/index.html"
+      },
+      {
+        "source": "/dashboard",
+        "destination": "/dashboard/index.html"
+      },
+      {
+        "source": "/nemesis",
+        "destination": "/nemesis/index.html"
+      },
+      {
+        "source": "/game",
+        "destination": "/game/index.html"
+      },
+      {
+        "source": "/game/",
+        "destination": "/game/index.html"
+      },
+      {
+        "source": "/game/**",
+        "destination": "/game/index.html"
+      },
+      {
+        "source": "/index/**",
+        "destination": "/index/index.html"
+      },
+      {
+        "source": "/index/",
+        "destination": "/index/index.html"
+      },
+      {
+        "source": "/dashboard/**",
+        "destination": "/dashboard/index.html"
+      },
+      {
+        "source": "/dashboard/",
+        "destination": "/dashboard/index.html"
+      },
+      {
+        "source": "/nemesis/**",
+        "destination": "/nemesis/index.html"
+      },
+      {
+        "source": "/nemesis/",
+        "destination": "/nemesis/index.html"
+      }
+    ]
+  }
+}

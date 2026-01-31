@@ -1,6 +1,10 @@
 // app/ui/auditChat.js
 import { app } from "../state.js";
 import { mySeatIndex } from "../permissions.js";
+import { openModal, closeModal } from "./render.js";
+import { getNemesisLegPlan } from "../nemesis/planner.js";
+import { makeRng } from "../nemesis/rng.js";
+import { decideNemesisThought } from "../nemesis/mood.js";
 
 const MAX_AUDIT = 600; // in-memory only
 const MAX_CHAT = 100;  // persisted in match doc (kept small)
@@ -32,6 +36,16 @@ function distUnits(d2) {
   return Math.max(0, Math.round(d * 1000));
 }
 
+function bullPickDist2(pick) {
+  if (!pick) return null;
+  const x = Number(pick.x);
+  const y = Number(pick.y);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+  const dx = x - 0.5;
+  const dy = y - 0.5;
+  return dx * dx + dy * dy;
+}
+
 function pushAudit(entry) {
   if (!app.auditFeed) app.auditFeed = [];
   app.auditFeed.push(entry);
@@ -40,6 +54,150 @@ function pushAudit(entry) {
 
 function makeEntry({ kind, seat = null, text, t = nowTs() }) {
   return { kind, seat, text: String(text || ""), t };
+}
+
+function formatNemesisSeedDebug(state) {
+  try {
+    if (!(state?.nemesis?.enabled === true)) return "";
+    const plan = getNemesisLegPlan(state);
+    if (!plan) return "";
+
+    const target3DA = Number(state?.nemesis?.target3DA ?? plan.target3DA ?? 0);
+    const legTarget3DA = Number(plan.legTarget3DA ?? 0);
+    const implied = Number(plan.impliedAvg ?? 0);
+
+    const range = Number(plan.range ?? state?.nemesis?.rangeBand ?? 0);
+    const cons = Number(plan.consistency ?? plan.sliders?.consistency ?? state?.nemesis?.sliders?.consistency ?? 5);
+    const check = Number(plan.checkoutSkill ?? plan.sliders?.checkout ?? state?.nemesis?.sliders?.checkout ?? 5);
+
+    const lowVar = plan.scoringVarLow ?? "?";
+    const highVar = plan.scoringVarHigh ?? "?";
+
+    const pct = (Number(plan.checkoutPct || 0) * 100).toFixed(1);
+    const baseMin = (Number(plan.checkoutPctMin || 0) * 100).toFixed(1);
+    const baseMax = (Number(plan.checkoutPctMax || 0) * 100).toFixed(1);
+    const effMin = (Number(plan.checkoutPctEffMin ?? plan.checkoutPctMin ?? 0) * 100).toFixed(1);
+    const effMax = (Number(plan.checkoutPctEffMax ?? plan.checkoutPctMax ?? 0) * 100).toFixed(1);
+
+    const plannedAttempts = Math.max(1, Number(plan.plannedDoubleAttempts || 1));
+    const ratioRaw = 100 / plannedAttempts;
+    const ratio = Number.isFinite(ratioRaw) ? (Math.abs(ratioRaw - Math.round(ratioRaw)) < 0.05 ? String(Math.round(ratioRaw)) : ratioRaw.toFixed(1)) : "?";
+
+    const plannedVisits = Number(plan.plannedVisits || 0);
+
+    const lines = [];
+    lines.push(`Target 3DA: ${target3DA} | Leg target 3DA: ${legTarget3DA} | Implied 3DA: ${implied.toFixed(1)}`);
+    lines.push(`Range +-${range} | Consistency ${cons} | Checkout ${check}.`);
+    lines.push(`Variance: Low ${lowVar} - High ${highVar}`);
+    lines.push(`Checkout rate: ${pct} | Base ${baseMin}-${baseMax}% | Effective ${effMin}-${effMax}%`);
+    lines.push(`Checkout this leg: Dart #${plannedAttempts} (Leg ratio ${ratio}%)`);
+    lines.push(`Planned Visits: ${plannedVisits}`);
+
+    // Optional: precompute which visits would have produced a dialog, for debugging only.
+    const simRt = { thoughtVisits: 0, thoughtsShown: 0, lastPopupAtMs: 0, lastPopupKey: "", recentVisitTags: [] };
+    let remaining = 501;
+    let dartsSoFar = 0;
+    let pointsSoFar = 0;
+
+    for (let i = 0; i < plannedVisits; i++) {
+      const remainingBefore = remaining;
+      const score = Number(plan.visitScores?.[i] ?? 0);
+      const darts = Array.isArray(plan.visitDarts?.[i]) ? plan.visitDarts[i] : [];
+      // Update remaining/points (bust should not happen in plan; clamp anyway)
+      remaining = Math.max(0, remaining - score);
+      pointsSoFar += score;
+
+      // Infer darts used for scoring visits (always 3), checkout visits stop at hit dart but we don't have that here,
+      // so keep at 3 for sim—this only affects actual3DA for dialog logic, which is approximate and debug-only.
+      dartsSoFar += 3;
+      const actual3DA = dartsSoFar > 0 ? (pointsSoFar / dartsSoFar) * 3 : 0;
+
+      // Classify visit tag (same spirit as runtime)
+      const v = score;
+      let visitTag = "normal";
+      const attemptedCheckout = remainingBefore > 0 && remainingBefore <= 170 && darts.some(d => d && d.onDouble === true);
+      const checkoutHit = (remaining === 0);
+      if (checkoutHit) visitTag = "clutch";
+      else if (v === 0 && cons <= 2 && legTarget3DA > 0 && legTarget3DA < 80) visitTag = "catastrophic";
+      else if (legTarget3DA > 0 && v >= Math.max(100, legTarget3DA * 1.25)) visitTag = "great";
+      else if (legTarget3DA > 0 && v <= Math.min(40, legTarget3DA * 0.70)) visitTag = "bad";
+
+      // Streaks
+      const prev = Array.isArray(simRt.recentVisitTags) ? simRt.recentVisitTags.slice(0) : [];
+      const nextTags = prev.concat([visitTag]).slice(-4);
+      simRt.recentVisitTags = nextTags;
+      const last2 = nextTags.slice(-2);
+      let streakTag = "none";
+      const goodSet = new Set(["great", "clutch"]);
+      const badSet = new Set(["bad", "catastrophic"]);
+      if (last2.length === 2 && badSet.has(last2[0]) && badSet.has(last2[1])) streakTag = "bad2";
+      if (last2.length === 2 && goodSet.has(last2[0]) && goodSet.has(last2[1])) streakTag = "good2";
+
+      simRt.thoughtVisits = Number(simRt.thoughtVisits || 0) + 1;
+
+      const legNo = (Array.isArray(state?.match?.legs) ? state.match.legs.length : 0) + 1;
+      const visitKey = `L${legNo}V${i+1}`;
+      const seedBase = `${state?.nemesis?.seed || ""}::${state?.gameId || ""}::${visitKey}`;
+      const rng = makeRng(seedBase, "popupThought");
+
+      const nowMs = 2000 * (i + 1);
+      const text = decideNemesisThought({
+        nowMs,
+        visitKey,
+        runtime: simRt,
+        target3DA,
+        legTarget3DA,
+        actual3DA,
+        legPos: "even",
+        visitTag,
+        streakTag,
+        consistency: cons,
+      }, rng);
+
+      if (typeof text === "string" && text.trim().length) {
+        simRt.thoughtsShown = Number(simRt.thoughtsShown || 0) + 1;
+        simRt.lastPopupAtMs = nowMs;
+        simRt.lastPopupKey = visitKey;
+      }
+
+      const dialog = (typeof text === "string" && text.trim().length) ? (streakTag !== "none" ? streakTag : visitTag) : "none";
+
+      // Visit formatting
+      const dartParts = [];
+      for (let k = 0; k < 3; k++) {
+        const d = darts[k] || { aim: "MISS", scored: 0, onDouble: false };
+        const aim = String(d.aim || "MISS");
+        const scored = Number(d.scored || 0);
+        dartParts.push(`${aim} / ${scored}`);
+      }
+
+      const dartsOnDouble = attemptedCheckout ? darts.filter(d => d && d.onDouble === true).length : 0;
+
+      lines.push(
+        `Visit ${i+1}/${plannedVisits} - ${dartParts.join(", ")} | Checkout attempt: ${attemptedCheckout ? "yes" : "no"} | Darts on double: ${dartsOnDouble} | Dialog: ${dialog}`
+      );
+    }
+
+    return lines.join("\n");
+} catch (_) {
+    return "";
+  }
+}
+
+function openNemesisDebug(state) {
+  try {
+    const modal = qs("nemesisDebugModal");
+    const body = qs("nemesisDebugBody");
+    if (!modal || !body) return;
+
+    const seed = String(state?.nemesis?.seed ?? "").trim();
+    const header = seed ? `Nemesis Seed ${seed}` : "Nemesis Seed —";
+    const debug = String(formatNemesisSeedDebug(state) || "").trim();
+    body.textContent = debug.length ? `${debug}` : `${header}
+
+—`;
+    openModal(modal);
+  } catch (_) {}
 }
 
 
@@ -74,23 +232,48 @@ function renderFeed(state) {
   const items = getMergedFeed(state);
 
   const html = items.map((it) => {
+    if (it.kind === "system_link") {
+      return `<button type="button" class="auditLine auditSystem auditSystemLink" data-action="nemesisDebug">${escapeHtml(it.text)}</button>`;
+    }
     if (it.kind === "system") {
       return `<div class="auditLine auditSystem">${escapeHtml(it.text)}</div>`;
     }
 
+    const isOnline = state?.match?.gameType === "online";
     const mySeat = mySeatIndex(state);
-    // Sender should appear on the RIGHT, the other player on the LEFT.
-    // (Previously this was reversed.)
+    // Alignment rules:
+    // - Online: show "me" on the right, opponent on the left (chat-style).
+    // - Local/Nemesis: Player 1 (seat 0) left, Player 2 (seat 1) right.
     let align = "center";
-    if (it.seat === mySeat) align = "right";
-    else if (it.seat !== null && it.seat !== undefined) align = "left";
+    if (it.seat !== null && it.seat !== undefined) {
+      if (!isOnline) {
+        align = (it.seat === 1) ? "right" : "left";
+      } else {
+        align = (it.seat === mySeat) ? "right" : "left";
+      }
+    }
     const cls = it.source === "chat" ? "msgChat" : "msgAudit";
-    return `<div class="msgRow ${align}">
-      <div class="msgPill ${cls}">${escapeHtml(it.text)}</div>
-    </div>`;
+    return `<div class="msgRow ${align}">`
+      + `<div class="msgPill ${cls}">${escapeHtml(it.text)}</div>`
+      + `</div>`;
   }).join("");
 
   feed.innerHTML = html;
+
+  // Wire system link actions (feed is re-rendered often, so do this here).
+  try {
+    const links = feed.querySelectorAll(".auditSystemLink[data-action='nemesisDebug']");
+    links.forEach((btn) => {
+      btn.onclick = () => openNemesisDebug(state);
+    });
+  } catch (_) {}
+
+  // Wire system link actions (feed re-renders frequently, so bind after render).
+  try {
+    Array.from(feed.querySelectorAll(".auditSystemLink[data-action='nemesisDebug']")).forEach((el) => {
+      el.addEventListener("click", () => openNemesisDebug(state));
+    });
+  } catch (_) {}
 
   // auto-scroll to bottom
   feed.scrollTop = feed.scrollHeight;
@@ -292,6 +475,15 @@ export function initAuditChatUI() {
   };
 
   if (sendBtn) sendBtn.addEventListener("click", send);
+
+  // Nemesis debug modal close.
+  try {
+    const dbgClose = qs("nemesisDebugCloseBtn");
+    const dbgModal = qs("nemesisDebugModal");
+    if (dbgClose && dbgModal) {
+      dbgClose.addEventListener("click", () => closeModal(dbgModal));
+    }
+  } catch (_) {}
 }
 
 export function updateAuditFromState(state, prev) {
@@ -300,6 +492,12 @@ export function updateAuditFromState(state, prev) {
   // Initialize on first seen match
   if (!prev?.match && state.match) {
     pushAudit(makeEntry({ kind: "system", text: `Game started with: ${formatPreset(state)}` }));
+    // Nemesis debug link (seed + leg plan) lives in the Audits feed.
+    if (state?.nemesis?.enabled === true) {
+      const seed = String(state?.nemesis?.seed ?? "").trim();
+      const text = seed ? `Nemesis Seed ${seed}` : "Nemesis Seed —";
+      pushAudit(makeEntry({ kind: "system_link", text }));
+    }
     return;
   }
 
@@ -308,10 +506,10 @@ export function updateAuditFromState(state, prev) {
   const b1 = state?.match?.bull;
 
   if (b1 && (!b0 || !b0.p1) && b1.p1) {
-    pushAudit(makeEntry({ kind: "audit", seat: 0, text: `${safeName(state,0)} threw for bull. Distance: ${distUnits(b1.d1 ?? 0)}.` }));
+    pushAudit(makeEntry({ kind: "audit", seat: 0, text: `${safeName(state,0)} threw for bull. Distance: ${distUnits((b1.d1 ?? bullPickDist2(b1.p1)) ?? 0)}.` }));
   }
   if (b1 && (!b0 || !b0.p2) && b1.p2) {
-    pushAudit(makeEntry({ kind: "audit", seat: 1, text: `${safeName(state,1)} threw for bull. Distance: ${distUnits(b1.d2 ?? 0)}.` }));
+    pushAudit(makeEntry({ kind: "audit", seat: 1, text: `${safeName(state,1)} threw for bull. Distance: ${distUnits((b1.d2 ?? bullPickDist2(b1.p2)) ?? 0)}.` }));
   }
   if (b1 && !b0?.resolved && b1.resolved) {
     const w = b1.winner ?? 0;

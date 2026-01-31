@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Reech Darts • Nemesis</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css" />
+</head>
+
+<body class="nemesisPage">
+  <div class="nemesisShell">
+
+    <main class="nemesisMain">
+      <section class="nemesisCard" aria-label="Nemesis configuration">
+        <div class="nemesisTitleWrap">
+          <img src="/img/Nemesis_menu.png" class="nemesisIcon" alt="Nemesis" />
+          <div class="dashPlayText">
+            <div class="big">Nemesis</div>
+          </div>
+      </div>
+        <div class="nemesisTwoGrid">
+          <div class="nemesisSlider mobor">
+              <div class="nemesisSliderLabel">
+              <div class="nemesisSliderName">Preset</div>
+              <button type="button" class="helpIcon" data-tip="Choose from pre-configured Nemesis personalities, or build your own.">?</button>
+              <div id="nemesisTarget3daVal" class="nemesisSliderValue">40</div>
+            </div>
+            <div id="nemesisPresetRow" class="nemesisPresetRow" aria-label="Nemesis presets">
+              <!-- Filled by nemesis.js -->
+            </div>
+        </div>
+
+          <div class="nemesisSlider">
+            <div class="nemesisSliderLabel">
+              <div class="nemesisSliderName">Target 3DA</div>
+              <button type="button" class="helpIcon" data-tip="Sets the overall difficulty, based on three-dart average.">?</button>
+              <div id="nemesisTarget3daVal" class="nemesisSliderValue">40</div>
+            </div>
+            <input id="nemesisTarget3da" type="range" min="1" max="10" step="1" value="4" />
+          </div>
+
+        </div>
+
+        <div class="nemesisSlider master">
+        <h2 style="text-align: center; margin: 6px !important;">Traits</h2>
+
+        <div class="nemesisDifficultyGrid">
+
+
+          <div class="nemesisSlider nobg">
+            <div class="nemesisSliderLabel">
+              <div class="nemesisSliderName">Range</div>
+              <button type="button" class="helpIcon" data-tip="Defines how far performance can deviate from the target average.">?</button>
+              <div id="nemesisRangeVal" class="nemesisSliderValue">±0</div>
+            </div>
+            <input id="nemesisRange" type="range" min="0" max="5" step="1" value="0" />
+          </div>
+
+          <div class="nemesisSlider nobg">
+            <div class="nemesisSliderLabel">
+              <div class="nemesisSliderName">Consistency</div>
+              <button type="button" class="helpIcon" data-tip="Determines the stability of scoring between visits.">?</button>
+              <div id="nemesisConsistencyVal" class="nemesisSliderValue">5</div>
+            </div>
+            <input id="nemesisConsistency" type="range" min="1" max="10" step="1" value="5" />
+          </div>
+
+          <div class="nemesisSlider nobg">
+            <div class="nemesisSliderLabel">
+              <div class="nemesisSliderName">Checkout strength</div>
+              <button type="button" class="helpIcon" data-tip="Controls finishing accuracy and performance under pressure.">?</button>
+              <div id="nemesisCheckoutVal" class="nemesisSliderValue">5</div>
+            </div>
+            <input id="nemesisCheckout" type="range" min="1" max="10" step="1" value="5" />
+          </div>
+            </div>
+        </div>
+
+<div class="nemesisActions">
+          <button id="nemesisCancelBtn" class="actionBtn autowidth" type="button">Back to menu</button>
+          <button id="nemesisContinueBtn" class="actionBtn autowidth bluebutton" type="button">Continue</button>
+        </div>
+
+        <div id="nemesisMsg" class="nemesisMsg" aria-live="polite"></div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Slice 2: Nemesis match setup modal (uses the standard setup modal layout + styling) -->
+  <div id="nemesisMatchSetupModal" class="modal hidden" aria-hidden="true">
+    <div class="modal-card mobilepad" role="dialog" aria-modal="true" aria-labelledby="nemesisSetupTitle">
+      <h2 id="nemesisSetupTitle">Nemesis Match</h2>
+
+      <div class="setupGrid">
+        <!-- Preset (Nemesis V1 is X01 only) -->
+        <div class="setupField">
+          <div class="setupTitleRow midalign hidden">
+            <div class="setupTitle">Preset</div>
+          </div>
+
+          <div class="setupBtnRow hidden" data-setup-group data-target="nemesisSetupPreset">
+            <button type="button" class="setupBtn" data-value="x01">X01</button>
+          </div>
+
+          <select id="nemesisSetupPreset" class="setupHiddenControl" aria-hidden="true" tabindex="-1">
+            <option value="x01" selected>X01 (Straight In / Double Out)</option>
+          </select>
+        </div>
+
+        <div class="setupthreegrid nemesis">
+          <div class="setupblock hidden">
+            <!-- Check-in -->
+            <div id="nemesisSetupCheckInField" class="setupField">
+              <div class="setupTitleRow midalign">
+                <div class="setupTitle smaller">Check-in</div>
+              </div>
+              <div class="setupBtnRow" data-setup-group data-target="nemesisSetupCheckIn">
+                <button type="button" class="setupBtn" data-value="straight">Straight</button>
+                <button type="button" class="setupBtn" data-value="double">Double</button>
+              </div>
+              <select id="nemesisSetupCheckIn" class="setupHiddenControl" aria-hidden="true" tabindex="-1">
+                <option value="straight" selected>Straight In</option>
+                <option value="double">Double In</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="setupblock hidden">
+            <!-- Check-out -->
+            <div id="nemesisSetupCheckOutField" class="setupField">
+              <div class="setupTitleRow midalign">
+                <div class="setupTitle smaller">Check-Out</div>
+              </div>
+              <div class="setupBtnRow" data-setup-group data-target="nemesisSetupCheckOut">
+                <button type="button" class="setupBtn" data-value="straight">Straight</button>
+                <button type="button" class="setupBtn" data-value="double">Double</button>
+              </div>
+              <select id="nemesisSetupCheckOut" class="setupHiddenControl" aria-hidden="true" tabindex="-1">
+                <option value="double" selected>Double Out</option>
+                <option value="straight">Straight Out</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="setupblock">
+            <!-- Doubles tracking -->
+            <div class="setupField">
+              <div class="setupTitleRow midalign gap2">
+                <div class="setupTitle smaller">Track Doubles</div>
+              </div>
+              <div class="setupBtnRow" data-setup-toggle data-target="nemesisSetupTrackCheckoutStats">
+                <button type="button" class="setupBtn" data-value="on">On</button>
+                <button type="button" class="setupBtn" data-value="off">Off</button>
+              </div>
+              <label class="checkboxLabel neoCheck setupHiddenControl" for="nemesisSetupTrackCheckoutStats" aria-hidden="true">
+                <input type="checkbox" id="nemesisSetupTrackCheckoutStats" checked />
+                <span class="checkUI"></span>
+                <span class="checkText">Track checkout % / doubles success</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="setupblock">
+            <!-- Nemesis dialog toggle -->
+            <div class="setupField">
+              <div class="setupTitleRow midalign gap2">
+                <div class="setupTitle smaller">Show Nemesis dialog</div>
+              </div>
+              <div class="setupBtnRow" data-setup-toggle data-target="nemesisSetupShowDialog">
+                <button type="button" class="setupBtn" data-value="on">On</button>
+                <button type="button" class="setupBtn" data-value="off">Off</button>
+              </div>
+              <label class="checkboxLabel neoCheck setupHiddenControl" for="nemesisSetupShowDialog" aria-hidden="true">
+                <input type="checkbox" id="nemesisSetupShowDialog" checked />
+                <span class="checkUI"></span>
+                <span class="checkText">Enable Nemesis thought popups</span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Locked seats (display only) -->
+      <div class="setupBlock twogrid hidden" style="padding:16px 0px;">
+        <div class="setupTitle">
+          <label>Player 1 Name</label>
+          <input id="nemesisSetupP1" type="text" placeholder="Player 1" disabled />
+        </div>
+
+        <div class="setupTitle">
+          <label>Player 2 Name</label>
+          <input id="nemesisSetupP2" type="text" placeholder="Nemesis" disabled />
+        </div>
+      </div>
+
+      <div class="setupGrid setupGridTwo">
+        <div class="setupblock">
+          <div class="setupTitleRow midalign">
+            <div class="setupTitle">Match Format</div>
+          </div>
+
+          <div class="setupField stepper">
+            <div class="setupTitleRow">
+              <div class="setupTitle">Score</div>
+            </div>
+            <div class="setupStepper" data-setup-stepper data-target="nemesisSetupMode" data-values="301,501,701">
+              <button type="button" class="setupStepBtn" data-step="dec" aria-label="Decrease score">&lt;</button>
+              <div class="setupStepValue" data-stepper-value>—</div>
+              <button type="button" class="setupStepBtn" data-step="inc" aria-label="Increase score">&gt;</button>
+            </div>
+            <select id="nemesisSetupMode" class="setupHiddenControl" aria-hidden="true" tabindex="-1">
+              <option value="301">301</option>
+              <option value="501" selected>501</option>
+              <option value="701">701</option>
+            </select>
+          </div>
+
+          <div class="setupField stepper">
+            <div class="setupTitleRow">
+              <div class="setupTitle">Legs</div>
+            </div>
+            <div class="setupStepper" data-setup-stepper data-target="nemesisSetupBestOf" data-values="1,3,5,7,9">
+              <button type="button" class="setupStepBtn" data-step="dec" aria-label="Decrease legs">&lt;</button>
+              <div class="setupStepValue" data-stepper-value>—</div>
+              <button type="button" class="setupStepBtn" data-step="inc" aria-label="Increase legs">&gt;</button>
+            </div>
+            <select id="nemesisSetupBestOf" class="setupHiddenControl" aria-hidden="true" tabindex="-1">
+              <option value="1">1</option>
+              <option value="3" selected>3</option>
+              <option value="5">5</option>
+              <option value="7">7</option>
+              <option value="9">9</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="setupblock">
+          <div class="setupTitleRow midalign">
+            <div class="setupTitle">Starting Player</div>
+          </div>
+          <div class="setupBtnRow twogrid" data-setup-group data-target="nemesisSetupStarter">
+            <button type="button" class="setupBtn" data-value="bull">Bull Throw</button>
+            <button type="button" class="setupBtn" data-value="random">Random</button>
+            <button type="button" class="setupBtn" data-value="p1">You</button>
+            <button type="button" class="setupBtn" data-value="p2">Nemesis</button>
+          </div>
+          <select id="nemesisSetupStarter" class="setupHiddenControl" aria-hidden="true" tabindex="-1">
+            <option value="bull">Bull Throw</option>
+            <option value="random" selected>Random</option>
+            <option value="p1">Player 1</option>
+            <option value="p2">Player 2</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row" style="justify-content:center;">
+        <button id="nemesisSetupBackBtn">Back</button>
+        <button id="nemesisSetupStartBtn">Start Match</button>
+      </div>
+
+      <div id="nemesisSetupMsg" class="nemesisMsg" aria-live="polite" style="margin-top:10px;"></div>
+    </div>
+  </div>
+
+  <!-- Firebase SDKs (compat) -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+
+  <script type="module" src="/nemesis.js"></script>
+  <div id="buildTag" class="build-tag"></div>
+</body>
+</html>

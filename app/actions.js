@@ -20,8 +20,10 @@ import { calcLegStats } from "./model/stats.js";
 import { initBullState, tryResolveBull } from "./bull/core.js";
 import { promptDidHitDouble, promptCheckInDartsUsed } from "./ui/checkinPrompt.js";
 import { promptAttemptedCheckout } from "./ui/checkoutAttemptPrompt.js";
-import { setAudioEvent, buildVisitClips } from "./audio/audio.js";
-import { showError, safeFocusScoreInput, setLobbyGateVisible, setInviteModalVisible, setSetupModalVisible, setConfirmNewMatchModalVisible, setWinnerModalVisible } from "./ui/render.js";
+import { setAudioEvent, buildVisitClips, nameClipForDisplayName } from "./audio/audio.js";
+import { decideNemesisThought } from "./nemesis/mood.js";
+import { makeRng } from "./nemesis/rng.js";
+import { showError, safeFocusScoreInput, setLobbyGateVisible, setInviteModalVisible, setSetupModalVisible, setNemesisMatchSetupModalVisible, setConfirmNewMatchModalVisible, setWinnerModalVisible } from "./ui/render.js";
 import { canScoreNow, mySeatIndex, isHost } from "./permissions.js";
 import { clearDarts } from "./input/dartpad.js";
 
@@ -96,8 +98,10 @@ export async function createNewGameAndShowInvite({ lobbyType = "online", openInv
   // Hide gate + show invite modal (existing UI)
   setLobbyGateVisible(false);
 
+  // Build invite link using pretty route (/game/<id>)
   const url = new URL(window.location.href);
-  url.searchParams.set("game", newId);
+  url.pathname = `/game/${encodeURIComponent(newId)}`;
+  url.searchParams.delete("game");
 
   const txt = url.toString();
   const linkEl = document.getElementById("inviteLinkText");
@@ -213,11 +217,11 @@ export async function leaveMatch() {
 
   // Signed-in users go back to dashboard; guests go back to gate/index.
   if (app.user && !app.user.isAnonymous) {
-    window.location.href = "./dashboard.html";
+    window.location.href = "/dashboard";
     return;
   }
   clearGameIdFromUrl();
-  window.location.href = "./index.html";
+  window.location.href = "/index";
 }
 
 export async function restartMatch() {
@@ -315,12 +319,14 @@ export async function openNewGameFlow() {
   const state = snap.data();
 
   if (!state || !state.match) {
-    setSetupModalVisible(true);
+    if (state?.nemesis?.enabled === true) setNemesisMatchSetupModalVisible(true);
+    else setSetupModalVisible(true);
     return;
   }
 
   if (state.leg?.status === "finished") {
-    setSetupModalVisible(true);
+    if (state?.nemesis?.enabled === true) setNemesisMatchSetupModalVisible(true);
+    else setSetupModalVisible(true);
     return;
   }
 
@@ -358,7 +364,13 @@ export async function startMatchFromSetup() {
       const snap = await tx.get(app.gameRef);
       const lobby = snap.data() || {};
 
-      const lobbyType = lobby.lobbyType || app.pendingLobbyType || "online"; // "online" | "local"
+      let lobbyType = lobby.lobbyType || app.pendingLobbyType || "online";
+
+      const isNemesis = lobby?.nemesis?.enabled === true;
+      if (isNemesis) {
+        // Nemesis games are always local. Keep the existing Nemesis config when restarting.
+        lobbyType = "local";
+      } // "online" | "local"
 
       const actorId = getActorId();
     const actorName = getActorName();
@@ -369,11 +381,13 @@ export async function startMatchFromSetup() {
       // Names:
       // - local: user-entered in setup modal
       // - online: auto from host/joiner profile (not editable)
-      const p1Name = lobbyType === "local" ? p1Input : (lobby.seat1Name || hostName).trim() || "Player 1";
-      const p2Name =
-        lobbyType === "local"
-          ? p2Input
-          : (String(joinerName).trim() || "Player 2");
+      const p1Name = isNemesis
+        ? (String(lobby.seat1Name || p1Input || hostName).trim() || "Player 1")
+        : (lobbyType === "local" ? p1Input : (lobby.seat1Name || hostName).trim() || "Player 1");
+
+      const p2Name = isNemesis
+        ? (String(lobby.seat2Name || "Nemesis").trim() || "Nemesis")
+        : (lobbyType === "local" ? p2Input : (String(joinerName).trim() || "Player 2"));
 
       const seat2 = lobby.seat2Id || lobby?.match?.seat2Id || lobby?.lobby?.joiner?.actorId;
       if (lobbyType === "online" && !seat2) {
@@ -399,6 +413,21 @@ export async function startMatchFromSetup() {
 
       // Persist mode
       state.match.gameType = lobbyType; // "online" | "local"
+
+      // Preserve Nemesis configuration when restarting a Nemesis lobby.
+      // IMPORTANT: do not alter scoring/checkout methodology here — this is config only.
+      if (isNemesis && lobby?.nemesis && typeof lobby.nemesis === "object") {
+        const prev = lobby.nemesis;
+        state.nemesis = {
+          ...prev,
+          enabled: true,
+          name: prev.name || "Nemesis",
+          // Fresh seed per new match so legs re-randomise within the same config.
+          seed: Math.floor(Math.random() * 1_000_000_000),
+          runtime: {},
+          createdAt: Date.now(),
+        };
+      }
 
       // Online-only options
       state.match.competition = lobbyType === "online" ? competition : "casual";
@@ -445,7 +474,23 @@ export async function startMatchFromSetup() {
       state.match.seat2Id = lobbyType === "online" ? (lobby.seat2Id || null) : null;
 
       if (starterChoice !== "bull") {
-        setAudioEvent(state, ["./audio/phrases/match_start.mp3"]);
+        const isNemesisGame = !!(state?.nemesis?.enabled);
+        const starterName = (state.match?.players?.[state.leg.currentPlayer]?.name) || "";
+        const clips = [];
+        if (isNemesisGame) {
+          clips.push("/audio/phrases/nemesis_gameon.mp3");
+        } else {
+        const nameClip = nameClipForDisplayName(starterName);
+        if (nameClip) {
+          clips.push(nameClip);
+          clips.push("/audio/phrases/ThrowFirst.mp3");
+        } else {
+          // If we do not have an eligible name clip, fall back to a generic line.
+          // (File will be supplied by the repo: /audio/phrases/match_start.mp3)
+          clips.push("/audio/phrases/match_start.mp3");
+        }
+        }
+        setAudioEvent(state, clips);
       }
 
       // Preserve lobby identity fields on the doc so future "New Game" works
@@ -454,7 +499,9 @@ export async function startMatchFromSetup() {
       state.seat2Id = lobby.seat2Id || lobby?.match?.seat2Id || null;
       state.seat1Name = lobby.seat1Name || p1Name;
       state.seat2Name = lobby.seat2Name || p2Name;
-      state.lobby = lobby.lobby || state.lobby;  // keep host/joiner object if present
+      // Firestore does not allow `undefined` values. Ensure lobby is always an object when writing.
+      // For local/Nemesis games there may not be a lobby host/joiner object present.
+      state.lobby = (lobby.lobby ?? state.lobby ?? {});
       state.createdBy = lobby.createdBy || state.seat1Id;
 
       tx.set(app.gameRef, state);
@@ -468,6 +515,124 @@ export async function startMatchFromSetup() {
     showError(e?.message || "Could not start match.");
   }
 }
+
+export async function startMatchFromNemesisSetup() {
+  if (!app.gameRef) {
+    showError("Create a lobby first.");
+    return;
+  }
+
+  const mode = Number(document.getElementById("nemesisSetupMode")?.value || 501);
+  const bestOf = Number(document.getElementById("nemesisSetupBestOf")?.value || 3);
+  const starterChoice = (document.getElementById("nemesisSetupStarter")?.value || "random");
+
+  const preset = (document.getElementById("nemesisSetupPreset")?.value || "x01");
+  const checkIn = (document.getElementById("nemesisSetupCheckIn")?.value || "straight");
+  const checkOut = (document.getElementById("nemesisSetupCheckOut")?.value || "double");
+  const trackCheckoutStats = !!document.getElementById("nemesisSetupTrackCheckoutStats")?.checked;
+
+  try {
+    await app.db.runTransaction(async (tx) => {
+      const snap = await tx.get(app.gameRef);
+      const lobby = snap.data() || {};
+
+      // Nemesis games are always local. Keep the existing Nemesis config when restarting.
+      let lobbyType = "local";
+
+      const actorName = getActorName();
+      const hostName = lobby?.lobby?.host?.name || actorName || "Player 1";
+
+      const p1Name = String(lobby.seat1Name || hostName || "Player 1").trim() || "Player 1";
+      const p2Name = String(lobby.seat2Name || "Nemesis").trim() || "Nemesis";
+
+      const state = makeNewMatch({ mode, bestOf, p1Name, p2Name });
+      state.match.rules = { preset, checkIn, checkOut, trackCheckoutStats };
+
+      // Initialize per-player check-in state for the leg
+      const _checkedInInit = checkIn !== "double";
+      if (state.leg && Array.isArray(state.leg.players)) {
+        state.leg.players = state.leg.players.map(p => ({ ...p, checkedIn: _checkedInInit }));
+      }
+
+      state.match.gameType = lobbyType;
+
+      // Match owner/host identity (needed for Game Settings host-only actions in local/Nemesis mode)
+      {
+        const actorId = getActorId();
+        state.match.hostId = actorId;
+        state.match.seat1Id = actorId;
+      }
+
+      // Preserve Nemesis configuration when restarting a Nemesis lobby.
+      if (lobby?.nemesis && typeof lobby.nemesis === "object") {
+        const prev = lobby.nemesis;
+        state.nemesis = {
+          ...prev,
+          enabled: true,
+          name: prev.name || "Nemesis",
+          seed: Math.floor(Math.random() * 1_000_000_000),
+          runtime: {},
+          createdAt: Date.now(),
+        };
+      }
+
+      // Starter selection (match-start behavior)
+      state.match.starting = starterChoice; // "bull" | "random" | "p1" | "p2"
+
+      if (starterChoice === "p1") {
+        state.match.starterLeg1 = 0;
+        state.leg.currentPlayer = 0;
+      } else if (starterChoice === "p2") {
+        state.match.starterLeg1 = 1;
+        state.leg.currentPlayer = 1;
+      } else if (starterChoice === "bull") {
+        state.match.bull = initBullState();
+        state.match.starterLeg1 = 0;
+        state.leg.currentPlayer = 0;
+      }
+
+      // Carry seat ids through (local/nemesis doesn't need online ids)
+      state.match.players[0].uid = lobby?.lobby?.host?.uid || (app.user && !app.user.isAnonymous ? app.user.uid : null);
+      state.match.players[1].uid = null;
+
+      // Photos: keep P1 photo if present; Nemesis uses fixed icon client-side
+      const hostPhotoURL = lobby?.lobby?.host?.photoURL || lobby.seat1PhotoURL || (app.user && !app.user.isAnonymous ? (app.user.photoURL || null) : null);
+      state.match.players[0].photoURL = hostPhotoURL;
+      state.match.players[1].photoURL = null;
+      state.match.seat1PhotoURL = hostPhotoURL;
+      state.match.seat2PhotoURL = null;
+
+      // Match lifecycle
+      state.expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      state.status = "active";
+
+      // Reset lobby wrapper fields while preserving lobby metadata
+      const next = {
+        ...lobby,
+        lobbyType,
+        match: state.match,
+        leg: state.leg,
+        legs: state.match.legs,
+        status: state.status,
+        expiresAt: state.expiresAt,
+        createdAt: lobby.createdAt || Date.now(),
+        updatedAt: Date.now(),
+        // Nemesis config lives at top-level for listeners
+        nemesis: state.nemesis,
+      };
+
+      tx.set(app.gameRef, next, { merge: true });
+    });
+
+    // Close modal and focus score
+    setNemesisMatchSetupModalVisible(false);
+    safeFocusScoreInput();
+  } catch (e) {
+    console.error("startMatchFromNemesisSetup failed", e);
+    showError(e?.message || "Could not start match");
+  }
+}
+
 
 
 export async function submitScore() {
@@ -770,7 +935,10 @@ checkoutAttemptDartsOnDouble: (() => {
     const scoreCallType = bust || entered === 0 ? "no_score" : "number";
 
     const nextP = state.leg.currentPlayer;
-    const nextName = state.match.players[nextP].name;
+    // Prefer seat names (most consistently updated), fall back to players[].name.
+    const nextName = (nextP === 0 ? (state.match.seat1Name || null) : (state.match.seat2Name || null))
+      || state.match.players?.[nextP]?.name
+      || (nextP === 0 ? "Player 1" : "Player 2");
     const nextRemaining = state.leg.players[nextP].score;
 
     const clips = buildVisitClips({
@@ -778,6 +946,7 @@ checkoutAttemptDartsOnDouble: (() => {
       entered,
       nextPlayerName: nextName,
       nextRemaining,
+      nextIsNemesis: !!(state?.nemesis?.enabled) && (nextP === 1),
       checkOutRule: state.match?.rules?.checkOut ?? "double",
     });
 
@@ -800,6 +969,370 @@ app.__checkoutAttemptDecision = null;
   if (inputEl) inputEl.value = "";
   safeFocusScoreInput();
 }
+
+
+// Nemesis (offline bot) scoring: programmatic score submission with no UI prompts.
+// This uses the same leg/match bookkeeping as submitScore(), but:
+// - does not read from DOM
+// - writes pendingCheckout.actorId = null so the local player can auto-confirm for Nemesis
+export async function submitNemesisScore(entered, dartsUsed = 3, meta = null) {
+  if (!app.gameRef) return;
+
+  const v = Number(entered);
+  if (!Number.isFinite(v) || v < 0 || v > 180) return;
+  if (IMPOSSIBLE_TURN_SCORES.has(v)) return;
+
+  await app.db.runTransaction(async (tx) => {
+    const snap = await tx.get(app.gameRef);
+    const state = snap.data();
+    if (!state || !state.match || !state.leg) return;
+
+    const match = state.match;
+    const leg = state.leg;
+
+    if (match.status !== "in_progress") return;
+    if (leg.status !== "in_progress") return;
+    if (state.pendingCheckout) return;
+
+    // Nemesis is always seat 2 (index 1) in this mode.
+    const p = 1;
+
+    const rule0 = match.rules || {};
+    const checkInRule = rule0.checkIn || "straight";
+    const checkOutRule = rule0.checkOut || "double";
+    const trackCheckoutStats = rule0.trackCheckoutStats === true;
+
+    const oldScore = leg.players?.[p]?.score;
+    if (!Number.isFinite(oldScore)) return;
+
+    // Double-In bookkeeping (minimal simulation for slice 3)
+    const checkedInBefore = !!leg.players[p].checkedIn;
+    let checkedInAfter = checkedInBefore;
+    let checkInHit = false;
+    let checkInDartsUsed = null;
+
+    let effectiveEntered = v;
+
+    if (!checkedInBefore && checkInRule === "double") {
+      // Simple probability: higher target3DA => more likely to find a double-in quickly.
+      const t3 = Number(state?.nemesis?.target3DA) || 50;
+      const pHit = Math.max(0.10, Math.min(0.85, 0.08 + (t3 / 140)));
+      checkInHit = Math.random() < pHit;
+      if (!checkInHit) {
+        effectiveEntered = 0;
+        checkedInAfter = false;
+      } else {
+        checkedInAfter = true;
+        checkInDartsUsed = Math.max(1, Math.min(3, Math.floor(1 + Math.random() * 3)));
+      }
+      leg.players[p].checkedIn = checkedInAfter;
+    }
+
+    const newScore = oldScore - effectiveEntered;
+
+    // Persist Nemesis debug thought text each visit (temporary always-on).
+    try {
+      const m0 = (meta && typeof meta === "object") ? meta : null;
+      if (m0 && typeof m0.thought === "string") {
+        state.nemesis = state.nemesis || {};
+        state.nemesis.runtime = state.nemesis.runtime || {};
+        state.nemesis.runtime.lastDebugThought = m0.thought;
+      }
+    } catch (_) {}
+
+
+    // Validate impossible checkout patterns (keeps rules consistent)
+    try {
+        if (isImpossibleCheckout(oldScore, effectiveEntered, checkOutRule)) {
+          effectiveEntered = 0;
+        }
+    } catch (_) {}
+
+    
+    
+    // --- Nemesis flavor thought popup (rare, meaningful) ---
+    function maybeAttachNemesisPopup({ visitScore, dartsUsed, checkoutHit, attemptedCheckout }) {
+      try {
+        if (!(state?.nemesis?.enabled === true)) return;
+        if (state?.nemesis?.showDialog === false) return;
+        state.nemesis.runtime = state.nemesis.runtime || {};
+        const rt = state.nemesis.runtime;
+
+        // Count bot visits in this leg.
+        const botVisits = Array.isArray(leg.history) ? leg.history.filter(h => h && h.player === p).length : 0;
+        const legNo = (Array.isArray(match.legs) ? match.legs.length : 0) + 1;
+        const visitKey = `L${legNo}V${botVisits}`;
+
+        // Update visit counters (used for global throttling).
+        rt.thoughtVisits = Number(rt.thoughtVisits || 0) + 1;
+
+        // Determine actual 3DA so far in the leg (based on recorded history, so it works even before we mutate leg.players[p].score).
+        let myRemaining = Number(leg.players?.[p]?.score ?? 501);
+        let oppRemaining = Number(leg.players?.[1 - p]?.score ?? 501);
+
+        let darts = 0;
+        let points = 0;
+        if (Array.isArray(leg.history)) {
+          for (const h of leg.history) {
+            if (!h || h.player !== p) continue;
+            darts += Number(h.dartsUsed || 3);
+            // Points actually scored in that visit (busts score 0).
+            const before = Number(h.before ?? 0);
+            const after = Number(h.after ?? before);
+            if (h.bust === true) continue;
+            if (Number.isFinite(before) && Number.isFinite(after) && before >= after) {
+              points += (before - after);
+            }
+          }
+          // Use the latest "after" as our current remaining (more accurate than leg.players while mid-transaction).
+          for (let i = leg.history.length - 1; i >= 0; i--) {
+            const h = leg.history[i];
+            if (h && h.player === p && Number.isFinite(h.after)) { myRemaining = Number(h.after); break; }
+          }
+        }
+        const actual3DA = darts > 0 ? (points / darts) * 3 : 0;
+
+        const legPos = (myRemaining < oppRemaining) ? "ahead" : (myRemaining > oppRemaining) ? "behind" : "even";
+
+        // Visit tagging (simple and realistic).
+        const legTarget = Number(state?.nemesis?.runtime?.activeLegTarget3DA ?? state?.nemesis?.target3DA ?? 0);
+        const cons = Number(state?.nemesis?.sliders?.consistency ?? state?.nemesis?.consistency ?? 5);
+
+        let visitTag = "normal";
+        if (checkoutHit) {
+          const oppOnFinish = Number.isFinite(oppRemaining) && oppRemaining > 0 && oppRemaining <= 170;
+          const clutch = oppOnFinish || Number(dartsUsed || 3) === 1;
+          visitTag = clutch ? "clutch" : "normal";
+        } else {
+          const v = Number(visitScore || 0);
+          if (v === 0 && cons <= 2 && legTarget > 0 && legTarget < 80) visitTag = "catastrophic";
+          else if (legTarget > 0 && v >= Math.max(100, legTarget * 1.25)) visitTag = "great";
+          else if (legTarget > 0 && v <= Math.min(40, legTarget * 0.70)) visitTag = "bad";
+        }
+
+        // Streaks: track last few tags.
+        const prev = Array.isArray(rt.recentVisitTags) ? rt.recentVisitTags.slice(0) : [];
+        const nextTags = prev.concat([visitTag]).slice(-4);
+        rt.recentVisitTags = nextTags;
+
+        const last2 = nextTags.slice(-2);
+        let streakTag = "none";
+        const goodSet = new Set(["great", "clutch"]);
+        const badSet = new Set(["bad", "catastrophic"]);
+        if (last2.length === 2 && badSet.has(last2[0]) && badSet.has(last2[1])) streakTag = "bad2";
+        if (last2.length === 2 && goodSet.has(last2[0]) && goodSet.has(last2[1])) streakTag = "good2";
+
+        const nowMs = Date.now();
+        const seedBase = `${state?.nemesis?.seed || ""}::${state?.gameId || ""}::${visitKey}`;
+        const rng = makeRng(seedBase, "popupThought");
+
+        const text = decideNemesisThought({
+          nowMs,
+          visitKey,
+          runtime: rt,
+          target3DA: Number(state?.nemesis?.target3DA || 0),
+          legTarget3DA: legTarget,
+          actual3DA,
+          legPos,
+          visitTag,
+          streakTag,
+          consistency: cons,
+        }, rng);
+
+        if (typeof text === "string" && text.trim().length) {
+          rt.thoughtsShown = Number(rt.thoughtsShown || 0) + 1;
+          rt.lastPopupAtMs = nowMs;
+          rt.lastPopupKey = visitKey;
+          rt.lastFlavorThought = text;
+          rt.popup = {
+            text,
+            ts: nowMs,
+            expiresAt: nowMs + 5200,
+          };
+        }
+      } catch (_) {}
+    }
+
+// Nemesis checkout: resolve immediately (no UI prompt).
+    if (newScore === 0) {
+      const m0 = (meta && typeof meta === "object") ? meta : {};
+      const dartsOnDouble = (match.rules && match.rules.checkOut === "double") ? (Number(m0.checkoutDartsOnDouble) || 1) : null;
+
+      leg.history.push({
+        player: p,
+        entered: effectiveEntered,
+        bust: false,
+        before: oldScore,
+        after: 0,
+        dartsUsed: Math.max(1, Math.min(3, Number(dartsUsed) || 3)),
+        at: new Date(),
+        checkout: true,
+        checkoutOpportunity: (match.rules?.trackCheckoutStats === true && (match.rules?.checkOut || "double") === "double" && isPossibleCheckout(oldScore, "double")) === true,
+        attemptedCheckout: (match.rules?.trackCheckoutStats === true && (match.rules?.checkOut || "double") === "double") ? true : null,
+        checkoutAttemptDartsOnDouble: (match.rules && match.rules.checkOut === "double" && match.rules.trackCheckoutStats === true)
+          ? Number(m0.checkoutAttemptDartsOnDouble ?? m0.checkoutDartsOnDouble ?? dartsOnDouble ?? 0)
+          : null,
+        checkoutDartsOnDouble: (match.rules && match.rules.checkOut === "double" && match.rules.trackCheckoutStats === true) ? dartsOnDouble : null,
+      });
+
+      // Decide whether Nemesis should speak (rare + meaningful)
+      maybeAttachNemesisPopup({ visitScore: effectiveEntered, dartsUsed, checkoutHit: true, attemptedCheckout: true });
+
+leg.players[p].score = 0;
+      leg.status = "finished";
+      leg.winner = p;
+
+      // Advance legs/match using existing helper logic by reusing calcLegStats summary path in confirmCheckout.
+      // We call the same aggregation by invoking confirmCheckout-style summary inline.
+      const s0 = calcLegStats(leg, 0);
+      const s1 = calcLegStats(leg, 1);
+
+      // Step E plumbing: summarize check-in/checkout tracking for this finished leg (keeps end-game stats correct)
+      const rules = match.rules || {};
+      const trackingOn2 = rules.trackCheckoutStats === true;
+      const checkInRule2 = rules.checkIn || "straight";
+      const checkOutRule2 = rules.checkOut || "double";
+
+      const checkInDoublesThrown2 = [0, 0];
+      const checkInDoublesHit2 = [0, 0];
+      const checkoutOpp2 = [0, 0];
+      const checkoutDoublesThrown2 = [0, 0];
+      const checkoutDoublesHit2 = [0, 0];
+
+      if (Array.isArray(leg.history)) {
+        for (const h of leg.history) {
+          const pIdx = h.player;
+          if (pIdx !== 0 && pIdx !== 1) continue;
+          if (trackingOn2 && checkInRule2 === "double" && h.checkedInBefore === false) {
+            if (h.checkInHit === true) {
+              checkInDoublesHit2[pIdx] += 1;
+              checkInDoublesThrown2[pIdx] += Number(h.checkInDartsUsed || 1);
+            } else if (h.checkInHit === false) {
+              checkInDoublesThrown2[pIdx] += Number(h.checkInDartsUsed || 3);
+            }
+          }
+          if (trackingOn2 && checkOutRule2 === "double") {
+            const isOpp = h.checkoutOpportunity === true || (h.checkout === true);
+            if (isOpp) checkoutOpp2[pIdx] += 1;
+            if (h.attemptedCheckout === true) {
+              checkoutDoublesThrown2[pIdx] += Number(h.checkoutAttemptDartsOnDouble || 0);
+            }
+            if (h.checkout === true) {
+              checkoutDoublesHit2[pIdx] += 1;
+              checkoutDoublesThrown2[pIdx] += Number(h.checkoutDartsOnDouble || 0);
+            }
+          }
+        }
+      }
+
+      s0.checkInDoublesThrown = checkInDoublesThrown2[0];
+      s1.checkInDoublesThrown = checkInDoublesThrown2[1];
+      s0.checkInDoublesHit = checkInDoublesHit2[0];
+      s1.checkInDoublesHit = checkInDoublesHit2[1];
+      s0.checkoutOpp = checkoutOpp2[0];
+      s1.checkoutOpp = checkoutOpp2[1];
+      s0.checkoutDoublesThrown = checkoutDoublesThrown2[0];
+      s1.checkoutDoublesThrown = checkoutDoublesThrown2[1];
+      s0.checkoutDoublesHit = checkoutDoublesHit2[0];
+      s1.checkoutDoublesHit = checkoutDoublesHit2[1];
+
+
+      // Record finished leg stats on match
+      match.legs = match.legs || [];
+      match.legs.push({
+        winner: p,
+        checkoutScore: oldScore,
+        players: [s0, s1],
+        finishedAt: new Date(),
+      });
+
+      // Increment legsWon
+      match.legsWon = match.legsWon || [0, 0];
+      match.legsWon[p] += 1;
+
+      // Determine match winner
+      const targetWins = Math.ceil((match.bestOf || 1) / 2);
+      if (match.legsWon[p] >= targetWins) {
+        match.status = "finished";
+        match.winner = p;
+      }
+      // Next leg is started from the winner modal (keeps 'Game shot' visible).
+      state.pendingCheckout = null;
+      // Audio: leg/match finish announcement for Nemesis.
+      try {
+        const clips = [match.status === "finished"
+          ? "/audio/phrases/nemesis_matchend.mp3"
+          : "/audio/phrases/nemesis_gameend.mp3"];
+        setAudioEvent(state, clips);
+      } catch (_) {}
+
+      state.updatedAt = new Date();
+      tx.set(app.gameRef, state);
+      return;
+    }
+
+    const bust = isBustScore(newScore, checkOutRule);
+
+    leg.history.push({
+      player: p,
+      entered: effectiveEntered,
+      bust,
+      before: oldScore,
+      after: bust ? oldScore : newScore,
+      dartsUsed: Math.max(1, Math.min(3, Number(dartsUsed) || 3)),
+      at: new Date(),
+
+      // Double-In bookkeeping (minimal)
+      checkedInBefore,
+      checkedInAfter,
+      checkInHit,
+      checkInDartsUsed,
+
+      // Checkout attempt bookkeeping (slice 3: conservative)
+      checkoutOpportunity: (trackCheckoutStats && checkOutRule === "double" && isPossibleCheckout(oldScore, "double")) === true,
+      attemptedCheckout: (meta && typeof meta === "object" && meta.attemptedCheckout === true) ? true : null,
+      checkoutAttemptDartsOnDouble: (meta && typeof meta === "object")
+        ? Number(meta.checkoutAttemptDartsOnDouble ?? meta.checkoutDartsOnDouble ?? 0)
+        : 0,
+      checkoutDartsOnDouble: null,
+    });
+
+    // Decide whether Nemesis should speak (rare + meaningful)
+    maybeAttachNemesisPopup({ visitScore: effectiveEntered, dartsUsed, checkoutHit: false, attemptedCheckout: false });
+
+if (!bust) {
+      leg.players[p].score = newScore;
+      if (!checkedInBefore && checkInRule === "double") {
+        leg.players[p].checkedIn = checkedInAfter;
+      }
+    }
+
+    // Advance turn
+    leg.currentPlayer = (leg.currentPlayer + 1) % 2;
+
+    
+    try {
+      const scoreCallType = bust || effectiveEntered === 0 ? "no_score" : "number";
+      const nextP = leg.currentPlayer;
+      const nextName = (nextP === 0 ? (state.match.seat1Name || null) : (state.match.seat2Name || null))
+        || state.match.players?.[nextP]?.name
+        || (nextP === 0 ? "Player 1" : "Player 2");
+      const nextRemaining = leg.players[nextP].score;
+      const clips = buildVisitClips({
+        scoreCallType,
+        entered: effectiveEntered,
+        nextPlayerName: nextName,
+        nextRemaining,
+        nextIsNemesis: !!(state?.nemesis?.enabled) && (nextP === 1),
+      checkOutRule: state.match?.rules?.checkOut ?? "double",
+      });
+      setAudioEvent(state, clips);
+    } catch (_) {}
+state.updatedAt = new Date();
+    tx.set(app.gameRef, state);
+  });
+}
+
 
 export async function confirmCheckout(dartsUsed, dartsOnDouble = null) {
   if (!app.gameRef) return;
@@ -929,10 +1462,30 @@ export async function confirmCheckout(dartsUsed, dartsOnDouble = null) {
     // Instead, each signed-in client applies their own stats client-side when
     // they observe match.status === "finished" via the realtime listener.
 
+    const winnerName = (match.players?.[p]?.name) || "";
+    const winnerNameClip = nameClipForDisplayName(winnerName);
+
     if (match.status === "finished") {
-      setAudioEvent(state, ["./audio/phrases/match_end.mp3"]);
+      // Match finish announcement.
+      // The shipped audio pack has the spoken content for GameShot/GameShotMatch
+      // swapped, so reference GameShot.mp3 here.
+      const isNemesisWinner = !!(state?.nemesis?.enabled) && p === 1;
+      const clips = [isNemesisWinner ? "/audio/phrases/nemesis_matchend.mp3" : "/audio/phrases/GameShot.mp3"];
+      if (!isNemesisWinner) {
+        if (winnerNameClip) clips.push(winnerNameClip);
+        clips.push("/audio/phrases/Congratulations.mp3");
+      }
+      setAudioEvent(state, clips);
     } else {
-      setAudioEvent(state, ["./audio/phrases/game_end.mp3"]);
+      // Leg finish announcement.
+      // The shipped audio pack has the spoken content for GameShot/GameShotMatch
+      // swapped, so reference GameShotMatch.mp3 here.
+      const isNemesisWinner = !!(state?.nemesis?.enabled) && p === 1;
+      const clips = [isNemesisWinner ? "/audio/phrases/nemesis_gameend.mp3" : "/audio/phrases/GameShotMatch.mp3"];
+      if (!isNemesisWinner) {
+        if (winnerNameClip) clips.push(winnerNameClip);
+      }
+      setAudioEvent(state, clips);
     }
 
     state.pendingCheckout = null;
@@ -1003,6 +1556,14 @@ export async function continueOrNewMatch() {
     const starter = starterForLeg(match);
     state.leg = makeFreshLeg(match.mode, starter, match.rules);
     state.pendingCheckout = null;
+
+    // Nemesis: play "game on" when Nemesis starts the leg.
+    try {
+      if (state?.nemesis?.enabled === true && state.leg?.currentPlayer === 1) {
+        setAudioEvent(state, ["/audio/phrases/nemesis_gameon.mp3"]);
+      }
+    } catch (_) {}
+
     state.updatedAt = new Date();
 
     tx.set(app.gameRef, state);

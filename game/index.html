@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Reech Darts</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/style.css" />
+</head>
+
+<body data-theme="dark">
+
+  <!-- Slide-down toast (online join notifications) -->
+  <div id="seatJoinToast" class="topToast hidden" aria-live="polite">
+    <span id="seatJoinToastText">Player 2 has joined the game</span>
+  </div>
+
+
+<div id="lobbyGateModal" class="modal hidden">
+  <div class="modal-card welcome">
+    <h2>Welcome</h2>
+    <p style="opacity:.85; margin-top:0;">Play online (login or guest), or play offline on this device.</p>
+    <div class="welcomewrapper">
+
+    <div class="welcome-left" style="justify-content:center; gap:10px; margin-top:12px;">
+      <button id="googleLoginBtn" type="button">Log in with Google</button>
+    </div>
+    <hr class="mobile-divider">
+    <div class="welcome-right">
+    <div class="formRow column" style="margin-top:0;">
+      <label for="guestNameInput">Continue as Guest</label>
+      <input id="guestNameInput" type="text" placeholder="Display Name" autocomplete="nickname" maxlength="12" />
+      </div>
+
+    <div class="welcomebuttons">
+    <button id="createLobbyBtn" class="actionBtn" style="margin-top:12px;" disabled>
+      Create Lobby
+    </button>
+    <button id="joinGameGateBtn" class="actionBtn" style="margin-top:12px;">
+      Join a Game
+    </button>
+        </div>
+    </div>
+    </div>
+
+    <button id="playOfflineBtn" class="actionBtn" style="margin-top:10px;">
+      Play Offline
+    </button>
+    </div>
+
+    <p id="gateError" class="error hidden"></p>
+    
+  </div>
+</div>
+
+
+<!-- Direct invite (guest) name prompt -->
+<div id="directGuestNameModal" class="modal hidden">
+  <div class="modal-card" style="max-width:520px; text-align:center;">
+    <h2>Enter Display Name</h2>
+    <p style="opacity:.85; margin-top:0;">Choose a name to join this lobby.</p>
+    <input id="directGuestNameInput" type="text" placeholder="Display Name" autocomplete="nickname" maxlength="12" style="width:100%;" />
+    <div class="row" style="justify-content:center; margin-top:14px; gap:10px;">
+      <button id="directGuestJoinBtn" class="actionBtn autowidth" disabled>Join Game</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- Join Game modal -->
+<div id="joinGameModal" class="modal hidden">
+  <div class="modal-card" style="max-width:520px;">
+    <h2>Join a Game</h2>
+    <p style="opacity:.85; margin-top:0;">Paste the invite link below.</p>
+    <input id="joinGameLink" type="text" placeholder="https://.../?game=XXXX" style="width:100%;" />
+
+    <div class="row" style="justify-content:center; margin-top:14px; gap:10px;">
+        <button id="joinGameCancelBtn" class="actionBtn autowidth">Cancel</button>
+      <button id="joinGameConfirmBtn" class="actionBtn autowidth">Join</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- Seat 2 waiting modal (online lobby) -->
+<div id="seat2WaitingModal" class="modal hidden">
+  <div class="modal-card" style="max-width:520px; text-align:center;">
+    <h2>Waiting for host…</h2>
+    <p style="opacity:.85; margin-top:0;">Waiting for host to start match…</p>
+    <div class="row" style="justify-content:center; margin-top:14px; gap:10px;">
+      <button id="seat2WaitingLeaveBtn" class="actionBtn">Leave Match</button>
+    </div>
+  </div>
+</div>
+
+
+
+  <!-- Game + Audit/Chat wrapper (desktop: side-by-side via CSS; mobile: chat overlays) -->
+  <div id="gameChatWrap" class="gameChatWrap">
+	  <div class="card" id="gameCard">
+    <div class="toprow">
+        <div id="gameMeta" class="gameMeta"></div>
+        <p id="status">Connecting…</p>
+        <div id="masterbuttons" class="masterbuttons">
+          <button id="gameSettingsBtn">Game Settings</button>
+          <button id="leaveMatchBtn" class="btn hidden">Leave</button>
+        </div>
+
+
+<div id="inviteModal" class="modal hidden">
+  <div class="modal-card">
+    <h2>Invite link</h2>
+    <p id="inviteLinkText" style="word-break: break-all;"></p>
+    <p id="inviteCopyMsg" class="hidden" style="margin:6px 0 0; opacity:.85;">Link copied ✅</p>
+    <div class="row">
+      <button id="copyInviteBtn">Copy</button>
+      <button id="closeInviteBtn">Close</button>
+    </div>
+  </div>
+</div>
+
+        <!-- Theme is controlled from the dashboard for signed-in users.
+             Guests are always dark mode. Button kept for compatibility but hidden. -->
+        <button id="themeToggleBtn" type="button" class="hidden">🌙</button>
+      </div>      
+
+
+    <div class="scores">
+      <div class="player" id="p1Box">
+        <div class="legsBadge" id="p1Legs">0</div>
+        <div class="nameRow">
+          <img id="p1Photo" class="avatar hidden" alt="Player 1 photo" />
+          <span id="p1Name" class="name">Player 1</span>
+        </div>
+        <div class="score" id="p1Score">—</div>
+        <div class="checkout" id="p1Checkout"></div>
+        <div class="stats" id="p1Stats"></div>
+      </div>
+
+      <div class="player" id="p2Box">
+        <div class="legsBadge" id="p2Legs">0</div>
+        <div class="nameRow">
+          <img id="p2Photo" class="avatar hidden" alt="Player 2 photo">
+          <span id="p2Name" class="name">Player 2</span>
+        </div>
+        <div class="score" id="p2Score">—</div>
+        <div class="checkout" id="p2Checkout"></div>
+        <div class="stats" id="p2Stats"></div>
+      </div>
+    </div>
+
+    
+      <!-- Nemesis thought popup -->
+    <div id="nemesisThoughtPopup" class="nemesisThoughtPopup hidden" aria-live="polite">
+      <div class="bubble"><span id="nemesisThoughtPopupText"></span></div>
+    </div>
+
+    <!-- Nemesis debug (seed + plan) is available via Audits -> "Nemesis Seed ..." link -->
+
+<div id="inputArea" class="inputArea">
+  <div id="turnOverlay" class="turnOverlay hidden">
+    <div id="turnOverlayText"></div>
+    <button id="overlayUndoBtn" class="overlayUndoBtn danger">Undo last score</button>
+    <button id="overlayStartBtn" class="overlayUndoBtn hidden">New Game</button>
+  </div>
+    
+    <div class="actionGrid">
+  <div class="actionCell1">
+    <button id="inputModeBtn" class="iconBtn" title="Switch input mode" aria-label="Switch input mode">
+      <img class="inputModeBtnIcon" src="/icons/input_white_icon.png" alt="Input mode" />
+    </button>
+
+    <!-- Input mode picker (opens from the input mode button) -->
+    <div id="inputModePicker" class="inputModePicker hidden" role="dialog" aria-label="Choose input mode">
+      <button id="pickKeypadModeBtn" class="inputModePickBtn" type="button" title="Keypad">⌨️</button>
+      <button id="pickTableModeBtn" class="inputModePickBtn" type="button" title="Table">🎯</button>
+      <button id="pickVoiceModeBtn" class="inputModePickBtn" type="button" title="Voice">🎙️</button>
+    </div>
+    <button id="undoBtn" class="actionBtn">Undo</button>
+  </div>
+
+  <div class="actionCell2">
+    <input
+      id="scoreInput"
+      type="text"
+      inputmode="none"
+      placeholder=""
+      autocomplete="off"
+    />
+  </div>
+
+  <div class="actionCell3">
+    <button id="submitBtn" class="submitBtn">Submit</button>
+    <button id="quickCheckoutBtn"
+        class="checkoutBtn hidden"
+        aria-label="Checkout">
+  <svg
+    width="24"
+    height="24"
+    viewBox="0 0 24 16"
+    fill="none"
+    stroke="black"
+    stroke-width="4.5"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    aria-hidden="true">
+    <path d="M20 6L9 17l-5-5" />
+  </svg>
+</button>
+
+  </div>
+</div>
+
+      <!-- Legacy inline error (no longer used; kept for CSS/layout safety) -->
+      <p id="error" class="error hidden"></p>
+      
+      <div class="keypad" id="keypad">
+        <button class="key" data-digit="1">1</button>
+        <button class="key" data-digit="2">2</button>
+        <button class="key" data-digit="3">3</button>
+      
+        <button class="key" data-digit="4">4</button>
+        <button class="key" data-digit="5">5</button>
+        <button class="key" data-digit="6">6</button>
+      
+        <button class="key" data-digit="7">7</button>
+        <button class="key" data-digit="8">8</button>
+        <button class="key" data-digit="9">9</button>
+      
+        <button class="key key-wide" id="keyClear">Clear</button>
+        <button class="key" data-digit="0">0</button>
+        <button class="key key-wide" id="keyBack">⌫</button>
+      </div>
+
+<div id="dartTableArea" class="hidden"><div id="dartPad" class="dartPad">
+    <!-- Top row -->
+    <button class="dartMultBtn selected" data-mult="S">Single</button>
+    <button class="dartMultBtn" data-mult="D">Double</button>
+    <button class="dartMultBtn" data-mult="T">Treble</button>
+    <button class="dartInstantBtn" data-instant="50">Bull</button>
+    <button class="dartInstantBtn" data-instant="25">Outer</button>
+
+    <!-- Numbers 1–20 (5 columns x 4 rows) -->
+    <button class="dartNumBtn" data-num="1">1</button>
+    <button class="dartNumBtn" data-num="2">2</button>
+    <button class="dartNumBtn" data-num="3">3</button>
+    <button class="dartNumBtn" data-num="4">4</button>
+    <button class="dartNumBtn" data-num="5">5</button>
+
+    <button class="dartNumBtn" data-num="6">6</button>
+    <button class="dartNumBtn" data-num="7">7</button>
+    <button class="dartNumBtn" data-num="8">8</button>
+    <button class="dartNumBtn" data-num="9">9</button>
+    <button class="dartNumBtn" data-num="10">10</button>
+
+    <button class="dartNumBtn" data-num="11">11</button>
+    <button class="dartNumBtn" data-num="12">12</button>
+    <button class="dartNumBtn" data-num="13">13</button>
+    <button class="dartNumBtn" data-num="14">14</button>
+    <button class="dartNumBtn" data-num="15">15</button>
+
+    <button class="dartNumBtn" data-num="16">16</button>
+    <button class="dartNumBtn" data-num="17">17</button>
+    <button class="dartNumBtn" data-num="18">18</button>
+    <button class="dartNumBtn" data-num="19">19</button>
+    <button class="dartNumBtn" data-num="20">20</button>
+
+    <!-- Final row -->
+    <button class="dartSpecialBtn" data-action="back">⌫ Back</button>
+    <button class="dartSpecialBtn" data-action="miss">MISS</button>
+  </div>
+</div>
+
+      <!-- Voice input (best-effort; supported on some browsers) -->
+      <div id="voiceArea" class="voiceArea hidden">
+        <div id="voiceHeard" class="voiceHeard" aria-live="polite"></div>
+        <button id="voiceMicBtn" class="voiceMicBtn" type="button" aria-label="Voice input">
+          <span class="voiceMicIcon" aria-hidden="true">🎙️</span>
+          <span class="voiceMicLabel">Tap &amp; speak</span>
+        </button>
+        <div id="voiceStatus" class="voiceStatus" aria-live="polite">Tap to speak</div>
+        <div id="voiceEngine" class="voiceEngine" aria-live="polite"></div>
+
+        <div class="voiceModeRow">
+          <label class="voiceModeLabel" for="voiceAutoMode">Mic mode</label>
+          <select id="voiceAutoMode" class="voiceModeSelect" aria-label="Microphone mode">
+            <option value="always">Always listen</option>
+            <option value="push">Push to talk</option>
+          </select>
+        </div>
+      </div>
+
+    
+  </div>
+
+  <div id="winnerModal" class="modal hidden">
+    <div class="modal-card">
+      <h2 id="winnerText">Winner</h2>
+      <div id="matchStatsTabs" class="msTabs hidden"></div>
+      <!-- Match-end summary (rendered client-side) -->
+      <div id="matchStatsGrid" class="matchEndStats"></div>
+      <div class="row" style="justify-content:center; gap:10px;">
+        <button id="winnerLeaveBtn" class="secondary hidden" type="button">Leave</button>
+        <button id="winnerNewGameBtn">New Game</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Player profile modal (opens only on the device that clicked) -->
+  <div id="profileModal" class="modal hidden">
+    <div class="modal-card mobilepad">
+
+      <!-- Dashboard-style profile (identity + stats card) -->
+      
+      <div id="profileDash" class="profileDash" style="text-align:left;">
+        <div class="dashIdentity" style="margin-bottom:14px; justify-content:space-evenly">
+          <img id="profileUserPhoto" class="dashAvatar hidden" alt="Profile photo" />
+          <div class="dashHello row" style="display:flex; align-items:flex-start;">
+            <div>
+            <div class="dashWelcome">Player</div>
+            <div id="profileName" class="dashName">—</div>
+            <div class="dashEquipmentDiv">
+              <div class="dashStatTileIcon small">
+              <img class="dashEquipmentIcon" src="/icons/EquipmentIcon.png" alt="Darts" /></div>
+              <div id="profileEquipment" class="dashEquipment"></div>
+            </div>
+            </div>
+            <!-- Friends actions (hidden for self / guests) -->
+            <div id="profileFriendActions" class="friendActions hidden">
+              <button id="profileAddFriendBtn" class="greenbutton" type="button">Add Friend</button>
+              <button id="profileRemoveFriendBtn" class="redbutton hidden danger" type="button">Remove Friend</button>
+              <div id="profileFriendPendingRow" class="friendPendingRow hidden">
+                <button id="profileAcceptFriendBtn" class="greenbutton" type="button">Accept</button>
+                <button id="profileDeclineFriendBtn" class="redbutton danger" type="button">Decline</button>
+              </div>
+              <button id="profileCancelFriendBtn" class="redbutton hidden danger" type="button">Cancel Friend Request</button>
+            </div>
+          </div>
+        </div>
+
+        <section class="dashStatsCard profile" id="profileStatsCard">
+          <div class="dashStatsTitle" style="font-size:22px;">STATISTICS</div>
+
+          <div class="dashStatTiles" aria-label="Key statistics">
+            <div class="dashStatTile dashStatTile--glow">
+              <div class="dashStatTileIcon"><img src="/icons/3DAIcon.png" alt="3 dart average" /></div>
+              <div class="dashStatTileLabel">AVERAGE</div>
+              <div id="profileTdaVal" class="dashStatTileValue">0.0</div>
+            </div>
+            <div class="dashStatTile dashStatTile--glow">
+              <div class="dashStatTileIcon"><img src="/icons/F9DIcon.png" alt="First nine" /></div>
+              <div class="dashStatTileLabel">FIRST NINE</div>
+              <div id="profileF9dVal" class="dashStatTileValue">0.0</div>
+            </div>
+            <div class="dashStatTile dashStatTile--glow">
+              <div class="dashStatTileIcon"><img src="/icons/CheckoutIcon.png" alt="Checkout percentage" /></div>
+              <div class="dashStatTileLabel">CHECKOUT %</div>
+              <div id="profileCheckoutPctVal" class="dashStatTileValue">0%</div>
+            </div>
+          </div>
+
+          <div class="dashStatMid">
+            <div class="dashStatList" aria-label="Lifetime statistics">
+              <div class="dashStatRow"><div class="k">MATCHES PLAYED</div><div id="profileMatchesVal" class="v">0</div></div>
+              <div class="dashStatRow"><div class="k">DARTS THROWN</div><div id="profileDartsVal" class="v">0</div></div>
+              <div class="dashStatRow"><div class="k">TOTAL WINS</div><div id="profileWinsVal" class="v">0</div></div>
+              <div class="dashStatRow"><div class="k">TOTAL LOSSES</div><div id="profileLossesVal" class="v">0</div></div>
+            </div>
+
+            <div class="dashWinRate" aria-label="Win rate">
+              <div id="profileWinRateDonut" class="dashDonut" style="--p:0.0;">
+                <div class="dashDonutInner">
+                  <div class="dashDonutLabel">WIN RATE</div>
+                  <div id="profileWinRateVal" class="dashDonutValue">0%</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="dashStatsBottom">
+            <div class="dashLastRow dashLastRowTight">
+              <div class="dashLastLabel">Last 5 Match Results</div>
+              <div id="profileLast5" class="dashLast5"></div>
+            </div>
+
+            <div class="dashMilestones" aria-label="Milestones">
+              <div class="dashMilestone"><span class="k">100+</span><span id="profile100Val" class="v">0</span></div>
+              <div class="dashMilestone"><span class="k">140+</span><span id="profile140Val" class="v">0</span></div>
+              <div class="dashMilestone"><span class="k">180</span><span id="profile180Val" class="v">0</span></div>
+            </div>
+          </div>
+        </section>
+      </div>
+<!-- Legacy body kept for backwards compat (unused) -->
+      <div id="profileBody" class="hidden"></div>
+      <div class="row" style="justify-content:center;">
+        <button id="profileCloseBtn" type="button">Close</button>
+      </div>
+    </div>
+  </div>
+  
+  <div id="setupModal" class="modal hidden">
+    <div class="modal-card mobilepad">
+      <h2>New Match</h2>
+
+      <!-- Game type is decided by where you started the match (Local vs Online) -->
+
+      <!-- Setup: Button-driven UI (keeps the original form controls in DOM to preserve parameters) -->
+      <div class="setupGrid">
+        <!-- Preset -->
+        <div class="setupField">
+          <div class="setupTitleRow midalign">
+            <div class="setupTitle">Preset</div>
+            <button type="button" class="helpIcon" data-tip="Choose a default preset from an official Darts ruleset">?</button>
+          </div>
+
+          <div class="setupBtnRow" data-setup-group data-target="setupPreset">
+            <button type="button" class="setupBtn" data-value="x01">X01</button>
+            <button type="button" class="setupBtn" data-value="grand_prix">Grand Prix</button>
+            <button type="button" class="setupBtn" data-value="straight_in_out">SISO</button>
+            <button type="button" class="setupBtn" data-value="custom">Custom</button>
+          </div>
+
+          <!-- Hidden: canonical control used by startMatchFromSetup() -->
+          <select id="setupPreset" class="setupHiddenControl" aria-hidden="true" tabindex="-1">
+            <option value="x01" selected>X01 (Straight In / Double Out)</option>
+            <option value="grand_prix">Grand Prix (Double In / Double Out)</option>
+            <option value="straight_in_out">Straight In / Straight Out</option>
+            <option value="custom">Custom</option>
+          </select>
+        </div>
+        <div class="setupthreegrid">
+        <div class="setupblock">
+        <!-- Check-in -->
+        <div id="setupCheckInField" class="setupField">
+          <div class="setupTitleRow midalign">
+            <div class="setupTitle smaller">Check-in</div>
+            <button type="button" class="helpIcon" data-tip="Changes the rule to start scoring.">?</button>
+          </div>
+          <div class="setupBtnRow" data-setup-group data-target="setupCheckIn">
+            <button type="button" class="setupBtn" data-value="straight">Straight</button>
+            <button type="button" class="setupBtn" data-value="double">Double</button>
+          </div>
+          <select id="setupCheckIn" class="setupHiddenControl" aria-hidden="true" tabindex="-1">
+            <option value="straight" selected>Straight In</option>
+            <option value="double">Double In</option>
+          </select>
+        </div>
+        </div>
+        <div class="setupblock">
+        <!-- Check-out -->
+        <div id="setupCheckOutField" class="setupField">
+          <div class="setupTitleRow midalign">
+            <div class="setupTitle smaller">Check-Out</div>
+            <button type="button" class="helpIcon" data-tip="Changes the rule to end scoring.">?</button>
+          </div>
+          <div class="setupBtnRow" data-setup-group data-target="setupCheckOut">
+            <button type="button" class="setupBtn" data-value="straight">Straight</button>
+            <button type="button" class="setupBtn" data-value="double">Double</button>
+          </div>
+          <select id="setupCheckOut" class="setupHiddenControl" aria-hidden="true" tabindex="-1">
+            <option value="double" selected>Double Out</option>
+            <option value="straight">Straight Out</option>
+          </select>
+        </div>
+        </div>
+        <div class="setupblock">
+        <!-- Doubles tracking -->
+        <div class="setupField">
+          <div class="setupTitleRow midalign gap2">
+            <div class="setupTitle smaller">Track Doubles</div>
+            <button type="button" class="helpIcon" data-tip="Enables / Disables the prompts for &quot;Darts used on double&quot;. Disabling will turn off tracking for certain statistics, such as Check-in and out %.">?</button>
+          </div>
+          <div class="setupBtnRow" data-setup-toggle data-target="setupTrackCheckoutStats">
+            <button type="button" class="setupBtn" data-value="on">On</button>
+            <button type="button" class="setupBtn" data-value="off">Off</button>
+          </div>
+          <label class="checkboxLabel neoCheck setupHiddenControl" for="setupTrackCheckoutStats" aria-hidden="true">
+            <input type="checkbox" id="setupTrackCheckoutStats" checked />
+            <span class="checkUI"></span>
+            <span class="checkText">Track checkout % / doubles success</span>
+          </label>
+        </div>
+        </div>
+      </div>
+      </div>
+
+
+      <div id="setupOnlineOptions" class="setupBlock">
+        <div class="setupblock twogrid" style="gap:50px;">
+          <div class="setupField">
+            <div class="setupTitleRow midalign">
+              <div class="setupTitle">Mode</div>
+              <button type="button" class="helpIcon" data-tip="Ranked matches are logged in profile statistics, while Casual games still display them, but do not count to your record.">?</button>
+            </div>
+            <div class="setupBtnRow shrunk" data-setup-group data-target="setupCompetition">
+              <button type="button" class="setupBtn" data-value="competitive">Ranked</button>
+              <button type="button" class="setupBtn" data-value="casual">Casual</button>
+            </div>
+            <select id="setupCompetition" class="setupHiddenControl" aria-hidden="true" tabindex="-1">
+              <option value="casual">Casual</option>
+              <option value="competitive" selected>Ranked</option>
+            </select>
+          </div>
+
+          <div id="setupMutualControlField" class="setupField">
+            <div class="setupTitleRow midalign">
+              <div class="setupTitle">Mutual Control</div>
+              <button type="button" class="helpIcon" data-tip="When turned on, both players may log scores for each other. When off, you can only log scores for yourself.">?</button>
+            </div>
+            <div class="setupBtnRow shrunk" data-setup-group data-target="setupAllowMutualControl">
+              <button type="button" class="setupBtn" data-value="yes">On</button>
+              <button type="button" class="setupBtn" data-value="no">Off</button>
+            </div>
+            <!-- Hidden: canonical control used by startMatchFromSetup() -->
+            <select id="setupAllowMutualControl" class="setupHiddenControl" aria-hidden="true" tabindex="-1">
+              <option value="no" selected>No (turn-based)</option>
+              <option value="yes">Yes (either device can score)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div id="setupLocalNameFields" class="setupBlock twogrid" style="padding:16px 0px;">
+        <div class="setupTitle">
+          <label>Player 1 Name</label>
+          <input id="setupP1" type="text" placeholder="Player 1" />
+        </div>
+
+        <div class="setupTitle">
+          <label>Player 2 Name</label>
+          <input id="setupP2" type="text" placeholder="Player 2" />
+        </div>
+      </div>
+  
+      <div class="setupGrid setupGridTwo">
+        <div class="setupblock">
+                    <div class="setupTitleRow midalign">
+            <div class="setupTitle">Match Format</div>
+          </div>
+        <div class="setupField stepper">
+          <div class="setupTitleRow">
+            <div class="setupTitle">Score</div>
+          </div>
+          <div class="setupStepper" data-setup-stepper data-target="setupMode" data-values="121,301,501,701">
+            <button type="button" class="setupStepBtn" data-step="dec" aria-label="Decrease score">&lt;</button>
+            <div class="setupStepValue" data-stepper-value>—</div>
+            <button type="button" class="setupStepBtn" data-step="inc" aria-label="Increase score">&gt;</button>
+          </div>
+<select id="setupMode" class="setupHiddenControl" aria-hidden="true" tabindex="-1">
+            <option value="121">121</option>
+            <option value="301">301</option>
+            <option value="501" selected>501</option>
+            <option value="701">701</option>
+          </select>
+        </div>
+
+        <div class="setupField stepper">
+          <div class="setupTitleRow">
+            <div class="setupTitle">Legs</div>
+          </div>
+          <div class="setupStepper" data-setup-stepper data-target="setupBestOf" data-values="1,3,5,7">
+            <button type="button" class="setupStepBtn" data-step="dec" aria-label="Decrease legs">&lt;</button>
+            <div class="setupStepValue" data-stepper-value>—</div>
+            <button type="button" class="setupStepBtn" data-step="inc" aria-label="Increase legs">&gt;</button>
+          </div>
+<select id="setupBestOf" class="setupHiddenControl" aria-hidden="true" tabindex="-1">
+            <option value="1">1</option>
+            <option value="3" selected>3</option>
+            <option value="5">5</option>
+            <option value="7">7</option>
+            <option value="9">9</option>
+          </select>
+        </div>
+        </div>
+
+        <div class="setupblock">
+          <div class="setupTitleRow midalign">
+            <div class="setupTitle">Starting Player</div>
+          </div>
+          <div class="setupBtnRow twogrid" data-setup-group data-target="setupStarter">
+            <button type="button" class="setupBtn" data-value="bull">Bull Throw</button>
+            <button type="button" class="setupBtn" data-value="random">Random</button>
+            <button type="button" class="setupBtn" data-value="p1">Host</button>
+            <button type="button" class="setupBtn" data-value="p2">Guest</button>
+          </div>
+          <select id="setupStarter" class="setupHiddenControl" aria-hidden="true" tabindex="-1">
+            <option value="bull" selected>Bull Throw</option>
+            <option value="random">Random</option>
+            <option value="p1">Player 1</option>
+            <option value="p2">Player 2</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row">
+        <button id="setupCancelBtn">Cancel</button>
+        <button id="setupStartBtn">Start Match</button>
+      </div>
+    </div>
+
+      
+
+  </div>
+  
+  
+  <div id="checkInModal" class="modal hidden">
+    <div class="modal-card">
+      <h2 id="checkInTitle">Check-in</h2>
+      <p id="checkInBody">Did you hit the double?</p>
+
+      <div id="checkInYesNoRow" class="row" style="justify-content:center;">
+        <button id="checkInNoBtn">No</button>
+        <button id="checkInYesBtn">Yes</button>
+      </div>
+
+      <div id="checkInDartsRow" class="row hidden" style="justify-content:center;">
+        <button class="checkInDartsBtn" data-darts="1">1</button>
+        <button class="checkInDartsBtn" data-darts="2">2</button>
+        <button class="checkInDartsBtn" data-darts="3">3</button>
+      </div>
+
+      <div class="row" style="justify-content:center;">
+        <button id="checkInCancelBtn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+
+
+<div id="checkoutAttemptModal" class="modal hidden">
+  <div class="modal-card">
+    <h2 id="checkoutAttemptTitle">Checkout</h2>
+    <p id="checkoutAttemptBody">Attempted checkout?</p>
+
+    <div id="checkoutAttemptYesNoRow" class="row" style="justify-content:center;">
+      <button id="checkoutAttemptNoBtn">No</button>
+      <button id="checkoutAttemptYesBtn">Yes</button>
+    </div>
+
+    <div id="checkoutAttemptDartsRow" class="row hidden" style="justify-content:center;">
+      <button class="checkoutAttemptDartsBtn" data-darts="1">1</button>
+      <button class="checkoutAttemptDartsBtn" data-darts="2">2</button>
+      <button class="checkoutAttemptDartsBtn" data-darts="3">3</button>
+    </div>
+
+    <div class="row" style="justify-content:center;">
+      <button id="checkoutAttemptCancelBtn">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div id="checkoutModal" class="modal hidden">
+    <div class="modal-card">
+      <h2 id="checkoutTitle">Confirm Checkout</h2>
+      <p id="checkoutBody">How many darts did you use?</p>
+  
+      <div class="row">
+        <button class="dartsBtn" data-darts="1">1</button>
+        <button class="dartsBtn" data-darts="2">2</button>
+        <button class="dartsBtn" data-darts="3">3</button>
+      </div>
+
+      <p id="checkoutDoubleBody" class="muted" style="margin-top:12px; display:none;">How many of those darts were used on a double?</p>
+
+      <div id="checkoutDoubleRow" class="row" style="display:none;">
+        <button class="doubleDartsBtn" data-darts="1">1</button>
+        <button class="doubleDartsBtn" data-darts="2">2</button>
+        <button class="doubleDartsBtn" data-darts="3">3</button>
+      </div>
+
+  
+      <div class="row">
+        <button id="checkoutCancelBtn">Cancel</button>
+        <button id="checkoutConfirmBtn" disabled>Confirm</button>
+      </div>
+    </div>
+  </div>
+  
+  <div id="confirmNewMatchModal" class="modal hidden">
+    <div class="modal-card">
+      <h2>Start a new match?</h2>
+      <p>This will end the current match.</p>
+  
+      <div class="row" style="justify-content:center;">
+        <button id="confirmNewMatchCancelBtn">Cancel</button>
+        <button id="confirmNewMatchOkBtn">Start New Match</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Game Settings -->
+  <div id="gameSettingsModal" class="modal hidden">
+    <div class="modal-card">
+      <h2>Game Settings</h2>
+      <div class="row padding" style="justify-content:center; flex-direction:column; gap:10px;">
+        <button id="gsNewGameBtn" class="actionBtn">New Game</button>
+        <button id="gsRestartGameBtn" class="actionBtn">Restart Game</button>
+        <button id="gsOpenAuditChatBtn" class="actionBtn">Open Chat and Audits</button>
+        <button id="gsLeaveMatchBtn" class="actionBtn danger">Leave Match</button>
+        <button id="gsCloseBtn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="confirmRestartMatchModal" class="modal hidden">
+    <div class="modal-card">
+      <h2>Restart this game?</h2>
+      <p>This will reset the current match back to the start.</p>
+      <div class="row" style="justify-content:center;">
+        <button id="confirmRestartCancelBtn">Cancel</button>
+        <button id="confirmRestartOkBtn">Restart</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="confirmLeaveMatchModal" class="modal hidden">
+    <div class="modal-card">
+      <h2>Leave match?</h2>
+      <p>You will exit this lobby/match.</p>
+      <div class="row" style="justify-content:center;">
+        <button id="confirmLeaveCancelBtn">Cancel</button>
+        <button id="confirmLeaveOkBtn" class="actionBtn danger autowidth">Leave</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Generic error popup (used instead of inline error text) -->
+  <div id="errorModal" class="modal hidden">
+    <div class="modal-card error">
+      <h2>Error</h2>
+      <p id="errorModalText" style="opacity:.9;"></p>
+      <div class="row" style="justify-content:center;">
+        <button id="errorOkBtn">Okay</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="bullModal" class="modal hidden">
+  <div class="modal-card">
+    <h2>Throw for Bull</h2>
+    <p id="bullPrompt" style="margin-top:0; opacity:.85;"></p>
+    <p id="bullWaiting" class="hidden" style="margin:6px 0 0; opacity:.85;"></p>
+
+    <div id="bullBoard" class="bullBoard" aria-label="Dartboard"></div>
+
+    <div class="row" style="margin-top:14px;">
+      <button id="bullResetBtn" class="actionBtn">Reset</button>
+      <button id="bullConfirmBtn" class="actionBtn" disabled>Confirm</button>
+    </div>
+
+    <div id="bullResultPanel" class="hidden" style="margin-top:12px;">
+      <p id="bullResultText" style="margin:0 0 10px; opacity:.9;"></p>
+      <div class="row" style="justify-content:center; gap:10px;">
+        <button id="bullRethrowBtn" class="actionBtn" style="width:auto;" type="button">Rethrow</button>
+        <button id="bullStartBtn" class="greenbutton" type="button">Start Game</button>
+      </div>
+    </div>
+
+    <button id="abortBullBtn" class="actionBtn danger" style="margin-top:20px;">Abort Game</button>
+  </div>
+</div>
+
+  <!-- Friend action feedback modal (re-used) -->
+  <div id="friendFeedbackModal" class="modal hidden">
+    <div class="modal-card" style="max-width:420px;">
+      <h3 style="margin-top:0;">Friends</h3>
+      <div id="friendFeedbackMsg" style="opacity:.95; margin:10px 0 14px 0;">—</div>
+      <div class="row" style="gap:10px; justify-content:center;">
+        <button id="friendFeedbackOkBtn" type="button">OK</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Host left modal -->
+  <div id="hostLeftModal" class="modal hidden" style="z-index:99999;">
+    <div class="modal-card" style="max-width:460px;">
+      <h3 style="margin-top:0;">Lobby ended</h3>
+      <div id="hostLeftText" style="opacity:.95; margin:10px 0 14px 0;">—</div>
+      <div class="row" style="gap:10px; justify-content:center;">
+        <button id="hostLeftLeaveBtn" type="button" class="danger redbutton">Leave Lobby</button>
+      </div>
+    </div>
+  </div>
+
+  
+
+  <!-- Firebase SDKs (compat) -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
+  <!-- New modular entrypoint (script.legacy.js kept for reference) -->
+    <!-- Nemesis debug popup (opened via the "Nemesis Seed" link in Audits) -->
+  <div id="nemesisDebugModal" class="modal hidden" aria-hidden="true">
+    <div class="modal-card mobilepad" role="dialog" aria-modal="true" aria-labelledby="nemesisDebugTitle">
+      <h2 id="nemesisDebugTitle">Nemesis Debug</h2>
+      <div class="modalSubhead">Seed + leg plan / visit breakdown</div>
+      <pre id="nemesisDebugBody" class="nemesisDebugBody"></pre>
+      <div class="modalActions">
+        <button id="nemesisDebugCloseBtn" class="bluebutton" type="button">Close</button>
+      </div>
+    </div>
+  </div> 
+
+<!-- Nemesis match setup modal (used for in-game New Game on Nemesis matches) -->
+  <div id="nemesisMatchSetupModal" class="modal hidden" aria-hidden="true">
+    <div class="modal-card mobilepad" role="dialog" aria-modal="true" aria-labelledby="nemesisSetupTitle">
+      <h2 id="nemesisSetupTitle">Nemesis Match</h2>
+
+      <div class="setupGrid">
+        <!-- Preset (Nemesis V1 is X01 only) -->
+        <div class="setupField">
+          <div class="setupTitleRow midalign hidden">
+            <div class="setupTitle">Preset</div>
+          </div>
+
+          <div class="setupBtnRow hidden" data-setup-group data-target="nemesisSetupPreset">
+            <button type="button" class="setupBtn" data-value="x01">X01</button>
+          </div>
+
+          <select id="nemesisSetupPreset" class="setupHiddenControl" aria-hidden="true" tabindex="-1">
+            <option value="x01" selected>X01 (Straight In / Double Out)</option>
+          </select>
+        </div>
+
+        <div class="setupthreegrid nemesis">
+          <div class="setupblock hidden">
+            <!-- Check-in -->
+            <div id="nemesisSetupCheckInField" class="setupField">
+              <div class="setupTitleRow midalign">
+                <div class="setupTitle smaller">Check-in</div>
+              </div>
+              <div class="setupBtnRow" data-setup-group data-target="nemesisSetupCheckIn">
+                <button type="button" class="setupBtn" data-value="straight">Straight</button>
+                <button type="button" class="setupBtn" data-value="double">Double</button>
+              </div>
+              <select id="nemesisSetupCheckIn" class="setupHiddenControl" aria-hidden="true" tabindex="-1">
+                <option value="straight" selected>Straight In</option>
+                <option value="double">Double In</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="setupblock hidden">
+            <!-- Check-out -->
+            <div id="nemesisSetupCheckOutField" class="setupField">
+              <div class="setupTitleRow midalign">
+                <div class="setupTitle smaller">Check-Out</div>
+              </div>
+              <div class="setupBtnRow" data-setup-group data-target="nemesisSetupCheckOut">
+                <button type="button" class="setupBtn" data-value="straight">Straight</button>
+                <button type="button" class="setupBtn" data-value="double">Double</button>
+              </div>
+              <select id="nemesisSetupCheckOut" class="setupHiddenControl" aria-hidden="true" tabindex="-1">
+                <option value="double" selected>Double Out</option>
+                <option value="straight">Straight Out</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="setupblock">
+            <!-- Doubles tracking -->
+            <div class="setupField">
+              <div class="setupTitleRow midalign gap2">
+                <div class="setupTitle smaller">Track Doubles</div>
+              </div>
+              <div class="setupBtnRow" data-setup-toggle data-target="nemesisSetupTrackCheckoutStats">
+                <button type="button" class="setupBtn" data-value="on">On</button>
+                <button type="button" class="setupBtn" data-value="off">Off</button>
+              </div>
+              <label class="checkboxLabel neoCheck setupHiddenControl" for="nemesisSetupTrackCheckoutStats" aria-hidden="true">
+                <input type="checkbox" id="nemesisSetupTrackCheckoutStats" checked />
+                <span class="checkUI"></span>
+                <span class="checkText">Track checkout % / doubles success</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="setupblock">
+            <!-- Nemesis dialog toggle -->
+            <div class="setupField">
+              <div class="setupTitleRow midalign gap2">
+                <div class="setupTitle smaller">Show Nemesis dialog</div>
+              </div>
+              <div class="setupBtnRow" data-setup-toggle data-target="nemesisSetupShowDialog">
+                <button type="button" class="setupBtn" data-value="on">On</button>
+                <button type="button" class="setupBtn" data-value="off">Off</button>
+              </div>
+              <label class="checkboxLabel neoCheck setupHiddenControl" for="nemesisSetupShowDialog" aria-hidden="true">
+                <input type="checkbox" id="nemesisSetupShowDialog" checked />
+                <span class="checkUI"></span>
+                <span class="checkText">Enable Nemesis thought popups</span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Locked seats (display only) -->
+      <div class="setupBlock twogrid hidden" style="padding:16px 0px;">
+        <div class="setupTitle">
+          <label>Player 1 Name</label>
+          <input id="nemesisSetupP1" type="text" placeholder="Player 1" disabled />
+        </div>
+
+        <div class="setupTitle">
+          <label>Player 2 Name</label>
+          <input id="nemesisSetupP2" type="text" placeholder="Nemesis" disabled />
+        </div>
+      </div>
+
+      <div class="setupGrid setupGridTwo">
+        <div class="setupblock">
+          <div class="setupTitleRow midalign">
+            <div class="setupTitle">Match Format</div>
+          </div>
+
+          <div class="setupField stepper">
+            <div class="setupTitleRow">
+              <div class="setupTitle">Score</div>
+            </div>
+            <div class="setupStepper" data-setup-stepper data-target="nemesisSetupMode" data-values="301,501,701">
+              <button type="button" class="setupStepBtn" data-step="dec" aria-label="Decrease score">&lt;</button>
+              <div class="setupStepValue" data-stepper-value>—</div>
+              <button type="button" class="setupStepBtn" data-step="inc" aria-label="Increase score">&gt;</button>
+            </div>
+            <select id="nemesisSetupMode" class="setupHiddenControl" aria-hidden="true" tabindex="-1">
+              <option value="301">301</option>
+              <option value="501" selected>501</option>
+              <option value="701">701</option>
+            </select>
+          </div>
+
+          <div class="setupField stepper">
+            <div class="setupTitleRow">
+              <div class="setupTitle">Legs</div>
+            </div>
+            <div class="setupStepper" data-setup-stepper data-target="nemesisSetupBestOf" data-values="1,3,5,7,9">
+              <button type="button" class="setupStepBtn" data-step="dec" aria-label="Decrease legs">&lt;</button>
+              <div class="setupStepValue" data-stepper-value>—</div>
+              <button type="button" class="setupStepBtn" data-step="inc" aria-label="Increase legs">&gt;</button>
+            </div>
+            <select id="nemesisSetupBestOf" class="setupHiddenControl" aria-hidden="true" tabindex="-1">
+              <option value="1">1</option>
+              <option value="3" selected>3</option>
+              <option value="5">5</option>
+              <option value="7">7</option>
+              <option value="9">9</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="setupblock">
+          <div class="setupTitleRow midalign">
+            <div class="setupTitle">Starting Player</div>
+          </div>
+          <div class="setupBtnRow twogrid" data-setup-group data-target="nemesisSetupStarter">
+            <button type="button" class="setupBtn" data-value="bull">Bull Throw</button>
+            <button type="button" class="setupBtn" data-value="random">Random</button>
+            <button type="button" class="setupBtn" data-value="p1">You</button>
+            <button type="button" class="setupBtn" data-value="p2">Nemesis</button>
+          </div>
+          <select id="nemesisSetupStarter" class="setupHiddenControl" aria-hidden="true" tabindex="-1">
+            <option value="bull">Bull Throw</option>
+            <option value="random" selected>Random</option>
+            <option value="p1">Player 1</option>
+            <option value="p2">Player 2</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row" style="justify-content:center;">
+        <button id="nemesisSetupBackBtn">Back</button>
+        <button id="nemesisSetupStartBtn">Start Match</button>
+      </div>
+
+      <div id="nemesisSetupMsg" class="nemesisMsg" aria-live="polite" style="margin-top:10px;"></div>
+    </div>
+  </div>
+
+<script type="module" src="/main.js"></script>
+
+  <div id="buildTag" class="build-tag"></div>
+
+
+<div id="bullResultModal" class="modal confirmModal hidden">
+  <div class="modal-card">
+    <h3 id="bullResultTitle"></h3>
+    <p id="bullResultText"></p>
+    <div class="modalActions">
+      <button id="bullStartGameBtn" class="greenbutton">Start Game</button>
+      <button id="bullRethrowBtn" class="bluebutton">Rethrow</button>
+      <button id="bullAbortBtn" class="redbutton danger">Abort Game</button>
+    </div>
+  </div>
+</div>
+	</div>
+
+	  <!-- Chat + Audits Panel -->
+	  <div id="auditChatPanel" class="card auditChatPanel hidden" aria-hidden="true">
+    <div class="auditChatHeader">
+      <h3 class="auditChatTitle">Chat &amp; Audits</h3>
+      <button id="auditChatCloseBtn" class="auditChatClose" type="button" aria-label="Close">✕</button>
+    </div>
+
+    <div id="auditChatFeed" class="auditChatFeed" role="log" aria-live="polite"></div>
+
+    <div class="auditChatComposer">
+      <textarea id="auditChatInput" class="auditChatInput" rows="1" placeholder="Write a message…"></textarea>
+      <button id="auditChatSendBtn" class="greenbutton auditChatSend" type="button">Send</button>
+	  </div>
+    </div>
+  </div>
+
+
+
+</body>
+
+</html>

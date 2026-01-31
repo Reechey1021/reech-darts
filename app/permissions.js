@@ -36,6 +36,14 @@ export function canUndoNow(state) {
 export function canScoreNow(state) {
   if (!state?.match || !state?.leg) return false;
 
+  // Nemesis (offline) mode: enforce strict turn-taking (no mutual control).
+  // Player can only submit on their own turn.
+  if (state?.nemesis?.enabled === true) {
+    if (state.leg.status !== "in_progress") return false;
+    if (state.pendingCheckout) return false;
+    return state.leg.currentPlayer === 0;
+  }
+
   // local: always
   if (state.match.gameType !== "online") return true;
 

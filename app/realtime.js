@@ -7,6 +7,7 @@ import { updateAuditFromState, renderAuditChat } from "./ui/auditChat.js";
 import { playClipsWebAudio, stopAllAudio } from "./audio/audio.js";
 import { applyFinishedMatchProfileUpdatesForMe } from "./userStats.js";
 import { nudgeVoiceAfterGameActivity } from "./input/voice.js";
+import { maybeHandleNemesisTurn, resetNemesisTurnScheduler } from "./nemesis/turns.js";
 
 // Call this whenever we move to a different game document.
 // Prevents stale audio IDs + seat-claim state leaking across lobbies.
@@ -14,6 +15,7 @@ export function resetRealtimeStateForGameSwitch() {
   app.seatClaimed = false;
   app.lastAudioId = null;
   stopAllAudio();
+  try { resetNemesisTurnScheduler(); } catch (_) {}
 }
 
 let lastAudioId = null;
@@ -137,6 +139,14 @@ export function bindGameListener() {
       try { updateAuditFromState(state, prev); } catch (e) { console.log("[audit] update failed", e); }
       app.latestState = state;
 
+      // Remember last active Nemesis game so we can resume on reload even if the URL loses the id (eg. rewrite rules).
+      try {
+        if (state?.nemesis?.enabled === true && state?.match && state?.match?.status !== "finished") {
+          const id = app.gameRef?.id || app.gameId;
+          if (id) localStorage.setItem("lastNemesisGameId", String(id));
+        }
+      } catch (_) {}
+
       // Keep Chrome/Edge Web Speech sessions alive in voice mode by nudging after score/turn changes.
       try { nudgeVoiceAfterGameActivity(prev, state); } catch (_) {}
 
@@ -226,6 +236,9 @@ export function bindGameListener() {
       maybeAutoOpenSetup(state);
 
       tryClaimSeat2(state);
+
+      // Nemesis (offline bot): auto-play when it is Nemesis' turn.
+      try { maybeHandleNemesisTurn(state); } catch (_) {}
 
       // Firestore-synced audio: every device plays the same event once
       if (state?.audio?.id && state.audio.id !== app.lastAudioId) {

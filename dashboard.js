@@ -7,6 +7,8 @@ import { initFirebase } from "./app/firebase.js";
 import { initAuth, onUserChanged, signOutUser, getActorId, getActorName } from "./app/auth.js";
 import { ensureUserProfile, updateMyProfile } from "./app/userProfile.js";
 import { acceptFriendRequest, cancelFriendRequest, declineFriendRequest, getFriendStateDb, removeFriend, sendFriendRequest, sendGameInvite, respondToGameInvite, listenForGameInvites } from "./app/friends.js";
+import { playSfxWebAudio } from "./app/audio/audio.js";
+import { initPageTransitions, softNavigate } from "./app/ui/pageTransitions.js";
 
 logBuildInfo();
 applyBuildTag();
@@ -119,14 +121,13 @@ async function createLobbyDoc({ lobbyType = "online" } = {}) {
 
 function goToGame(gameId, { openInvite = true, autoSetup = true } = {}) {
   if (!gameId) return;
-  const url = new URL(window.location.href);
-  url.pathname = url.pathname.replace(/\/dashboard\.html$/i, "/index.html");
-  url.search = "";
-  url.hash = "";
-  url.searchParams.set("game", gameId);
-  if (openInvite) url.searchParams.set("openInvite", "1");
-  if (autoSetup) url.searchParams.set("autoSetup", "1");
-  window.location.href = url.toString();
+  // Use query-string navigation so this works reliably on simple static servers
+  // (e.g. VS Code Live Server on localhost:5500) without requiring rewrite rules.
+  const params = new URLSearchParams();
+  params.set("game", gameId);
+  if (openInvite) params.set("openInvite", "1");
+  if (autoSetup) params.set("autoSetup", "1");
+  window.location.href = `/game/?${params.toString()}`;
 }
 
 function initInviteUiHandlers() {
@@ -162,12 +163,10 @@ function initInviteUiHandlers() {
         // Navigate to lobby WITHOUT showing the invite/copy-link modal.
         // (This is a friend-invite flow; the invite has already been sent.)
         // Auto-open match setup for the host.
-        const url = new URL(window.location.href);
-        url.pathname = url.pathname.replace(/dashboard\.html$/, "index.html");
-        url.search = "";
-        url.searchParams.set("game", gameId);
-        url.searchParams.set("setup", "1");
-        window.location.href = url.toString();
+        const params = new URLSearchParams();
+        params.set("game", gameId);
+        params.set("setup", "1");
+        window.location.href = `/game/?${params.toString()}`;
       } catch (e) {
         console.warn("Invite failed", e);
         if (typeof showFriendFeedback === "function") showFriendFeedback("Invite failed. Please try again.");
@@ -307,7 +306,11 @@ function startInviteListener() {
       incomingText.textContent = `${fromName} has invited you to a game.`;
     }
 
+    // Invite pop sound (best-effort)
+    playSfxWebAudio("/audio/sounds/GameInvite.mp3");
     openModal(incomingModal);
+    // Invite received SFX
+    playSfxWebAudio("/audio/sounds/GameInvite.mp3");
   });
 }
 
@@ -500,19 +503,18 @@ await newRef.set({
 });
 
 
-  // Go to index.html with game id
-  const url = new URL(window.location.href);
-  url.pathname = url.pathname.replace(/\/dashboard\.html$/i, "/index.html");
-  url.search = "";
-  url.hash = "";
-  url.searchParams.set("game", newId);
+  // Navigate using query-string form so this works on localhost static servers
+  // without requiring rewrite rules.
+  const params = new URLSearchParams();
+  params.set("game", newId);
   if (lobbyType === "online") {
-    url.searchParams.set("openInvite", "1");
-    url.searchParams.set("autoSetup", "1");
+    params.set("openInvite", "1");
+    params.set("autoSetup", "1");
   } else {
-    url.searchParams.set("setup", "1");
+    // Local games should jump straight into setup once the game listener attaches
+    params.set("setup", "1");
   }
-  window.location.href = url.toString();
+  window.location.href = `/game/?${params.toString()}`;
 }
 
 function renderWelcome(profile) {
@@ -617,6 +619,7 @@ function renderStats(profile) {
 function wireDashboardUI() {
   const playLocalCard = qs("dashPlayLocalCard");
   const playOnlineCard = qs("dashPlayOnlineCard");
+  const nemesisCard = qs("dashNemesisCard");
   const joinGameBtn = qs("dashJoinGameBtn");
   const settingsBtn = qs("dashSettingsBtn");
   const matchHistoryBtn = qs("dashMatchHistoryBtn");
@@ -1004,6 +1007,9 @@ const friendsOutgoingEmpty = qs("friendsOutgoingEmpty");
 const friendsOutgoingList = qs("friendsOutgoingList");
 const friendsListEmpty = qs("friendsListEmpty");
 const friendsList = qs("friendsList");
+const friendSearchUid = qs("friendSearchUid");
+const friendSearchAddBtn = qs("friendSearchAddBtn");
+const friendSearchMsg = qs("friendSearchMsg");
 
 // Friend feedback modal
 const friendFeedbackModal = qs("friendFeedbackModal");
@@ -1464,13 +1470,16 @@ function renderMatchHistory(stats) {
   });
 }
 
-  // Settings modal IDs (match dashboard.html)
+  // Settings modal IDs (match /dashboard)
   const settingsSave = qs("setSaveBtn");
   const settingsClose = qs("settingsCloseBtn");
   const signOutBtn = qs("settingsSignOutBtn");
   const dnInput = qs("setDisplayName");
   const eqInput = qs("setEquipment");
   const openChatDefaultChk = qs("setOpenChatByDefault");
+  const uidInput = qs("setUserUid");
+  const copyUidBtn = qs("copyUserUidBtn");
+
 
   function wireCard(el, fn) {
     if (!el) return;
@@ -1488,6 +1497,14 @@ function renderMatchHistory(stats) {
 
   wireCard(playLocalCard, async () => createLobbyAndGo({ lobbyType: "local" }));
   wireCard(playOnlineCard, async () => createLobbyAndGo({ lobbyType: "online" }));
+  wireCard(nemesisCard, () => {
+    // Slice 1: Nemesis configuration screen (logged-in users only)
+    softNavigate("/nemesis");
+  });
+  wireCard(nemesisCard, () => {
+    // Nemesis is for signed-in users only; dashboard is already gated.
+    softNavigate("/nemesis");
+  });
 
   // Match history open/close
 if (matchHistoryBtn) {
@@ -1539,9 +1556,64 @@ if (friendsBtn) {
     e.preventDefault();
     const data = await fetchMyFriendsData();
     renderFriendsModal(data);
+    if (friendSearchUid) friendSearchUid.value = "";
+    if (friendSearchMsg) { friendSearchMsg.textContent = ""; friendSearchMsg.classList.add("hidden"); friendSearchMsg.classList.remove("error"); }
     setFriendsVisible(true);
   });
 }
+
+function setFriendSearchMessage(msg, { isError = false } = {}) {
+  if (!friendSearchMsg) return;
+  friendSearchMsg.textContent = msg || "";
+  friendSearchMsg.classList.toggle("hidden", !msg);
+  friendSearchMsg.classList.toggle("error", !!isError);
+}
+
+async function addFriendByUid() {
+  const db = app.db;
+  const myUid = app.user?.uid || null;
+  if (!db || !myUid) return;
+
+  const raw = (friendSearchUid?.value || "").trim();
+  const uid = raw.replaceAll(/\s+/g, "");
+  if (friendSearchUid) friendSearchUid.value = uid;
+
+  if (!uid) return setFriendSearchMessage("Please enter a UID.", { isError: true });
+  if (uid === myUid) return setFriendSearchMessage("You can't add yourself.", { isError: true });
+  if (uid.length < 10 || uid.length > 128) return setFriendSearchMessage("That UID doesn't look valid.", { isError: true });
+
+  // Guardrails: already friends / pending
+  try {
+    const state = await getFriendStateDb(db, myUid, uid);
+    if (state === "friends") return setFriendSearchMessage("You're already friends with this user.");
+    if (state === "outgoing") return setFriendSearchMessage("Friend request already sent.");
+    if (state === "incoming") return setFriendSearchMessage("This user has already sent you a friend request.");
+  } catch {}
+
+  // Check user exists
+  const targetRef = db.collection("users").doc(uid);
+  const snap = await targetRef.get();
+  if (!snap.exists) return setFriendSearchMessage("There was no user found with this ID.", { isError: true });
+
+  await sendFriendRequest(db, myUid, uid);
+  setFriendSearchMessage("Friend request sent.");
+}
+
+if (friendSearchAddBtn) {
+  friendSearchAddBtn.addEventListener("click", async (e) => {
+    e.preventDefault();
+    await addFriendByUid();
+  });
+}
+if (friendSearchUid) {
+  friendSearchUid.addEventListener("keydown", async (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      await addFriendByUid();
+    }
+  });
+}
+
 if (friendsCloseBtn) friendsCloseBtn.addEventListener("click", () => setFriendsVisible(false));
 if (friendsModal) {
   friendsModal.addEventListener("click", (e) => {
@@ -1650,7 +1722,7 @@ if (oppDeclineFriendBtn) {
       return;
     }
 
-    window.location.href = `index.html?game=${encodeURIComponent(gid)}`;
+    window.location.href = `/game/?game=${encodeURIComponent(gid)}`;
   });
 
   }
@@ -1668,7 +1740,7 @@ if (oppDeclineFriendBtn) {
       e.preventDefault();
       setConfirmSignOutVisible(false);
       await signOutUser();
-      window.location.href = "./index.html";
+      window.location.href = "/index";
     });
   }
 
@@ -1687,9 +1759,34 @@ if (oppDeclineFriendBtn) {
       pendingTheme = getSavedTheme();
 applyTheme(pendingTheme, { persist: false });
 setThemePickerSelected(pendingTheme);
+      if (uidInput) uidInput.value = (app.user && app.user.uid) ? app.user.uid : "";
 setSettingsModalVisible(true);
     });
+  
+  if (copyUidBtn) {
+    copyUidBtn.addEventListener("click", async (e) => {
+      e.preventDefault();
+      const uid = uidInput?.value || "";
+      if (!uid) return;
+      try {
+        await navigator.clipboard.writeText(uid);
+        const prev = copyUidBtn.textContent;
+        copyUidBtn.textContent = "Copied";
+        setTimeout(() => { copyUidBtn.textContent = prev; }, 900);
+      } catch {
+        // Fallback for older browsers / permission issues
+        try {
+          uidInput?.select?.();
+          document.execCommand("copy");
+          const prev = copyUidBtn.textContent;
+          copyUidBtn.textContent = "Copied";
+          setTimeout(() => { copyUidBtn.textContent = prev; }, 900);
+        } catch {}
+      }
+    });
   }
+
+}
 
   if (settingsClose) {
     settingsClose.addEventListener("click", (e) => {
@@ -1748,6 +1845,7 @@ setSettingsModalVisible(false);
 (async () => {
   app.db = initFirebase();
   initThemePicker();
+  initPageTransitions();
   wireDashboardUI();
   initInviteUiHandlers();
 
@@ -1757,7 +1855,7 @@ setSettingsModalVisible(false);
     app.user = user;
 
     if (!user || user.isAnonymous) {
-      window.location.href = "./index.html";
+      window.location.href = "/index";
       return;
     }
 

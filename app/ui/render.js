@@ -6,6 +6,7 @@ import { calcLegStats, calcMatchStats, formatPills } from "../model/stats.js";
 import { renderBullMarkersFromState } from "../bull/ui.js";
 import { getActorId } from "../auth.js";
 import { isHost } from "../permissions.js";
+import { playSfxWebAudio } from "../audio/audio.js";
 
 // -----------------------------
 // Modal animation helpers
@@ -123,6 +124,12 @@ export function showSeatJoinToast(message, durationMs = 5000) {
     // trigger transition
     requestAnimationFrame(() => el.classList.add("show"));
 
+    // Best-effort SFX (non-fatal if blocked/unlocked)
+    playSfxWebAudio("/audio/sounds/LobbyJoin.mp3");
+
+    // SFX: someone joined the lobby
+    playSfxWebAudio("/audio/sounds/LobbyJoin.mp3");
+
     __seatToastTimer = setTimeout(() => {
       el.classList.remove("show");
       // allow slide-out transition to finish
@@ -148,6 +155,15 @@ export function showSeatLeaveToast(message, durationMs = 5000) {
 
     el.classList.remove("hidden");
     requestAnimationFrame(() => el.classList.add("show"));
+
+    // Best-effort SFX (non-fatal if blocked/unlocked)
+    playSfxWebAudio("/audio/sounds/LobbyLeave.mp3");
+
+    // Best-effort SFX (non-fatal if blocked/unlocked)
+    playSfxWebAudio("/audio/sounds/LobbyLeave.mp3");
+
+    // SFX: someone left the lobby
+    playSfxWebAudio("/audio/sounds/LobbyLeave.mp3");
 
     __seatToastTimer = setTimeout(() => {
       el.classList.remove("show");
@@ -228,6 +244,12 @@ export function setSetupModalVisible(visible) {
   visible ? openModal(modal) : closeModal(modal);
 }
 
+export function setNemesisMatchSetupModalVisible(visible) {
+  const modal = document.getElementById("nemesisMatchSetupModal");
+  if (!modal) return;
+  visible ? openModal(modal) : closeModal(modal);
+}
+
 export function setCheckoutModalVisible(visible) {
   const modal = document.getElementById("checkoutModal");
   if (!modal) return;
@@ -301,13 +323,15 @@ export function render(state) {
   const overlayText = document.getElementById("turnOverlayText");
   const overlayUndoBtn = document.getElementById("overlayUndoBtn");
   const overlayStartBtn = document.getElementById("overlayStartBtn");
+  const nemesisThoughtPopup = document.getElementById("nemesisThoughtPopup");
+  const nemesisThoughtPopupText = document.getElementById("nemesisThoughtPopupText");
   const gsOpenAuditChatBtn = document.getElementById("gsOpenAuditChatBtn");
 
   if (gsOpenAuditChatBtn) {
     const isOnline = state?.match?.gameType === "online";
     gsOpenAuditChatBtn.textContent = isOnline ? "Open Chat and Audits" : "Open Audits";
   }
-;
+
   const abortBullBtn = document.getElementById("abortBullBtn");
 
   // --- Throw for bull UI ---
@@ -376,6 +400,10 @@ export function render(state) {
   } else {
     setPhoto(p1Photo, null);
     setPhoto(p2Photo, null);
+    // Nemesis: show a fixed avatar/icon for Player 2.
+    if (state?.nemesis?.enabled === true) {
+      setPhoto(p2Photo, "../icons/Nemesis_icon.png");
+    }
   }
 
   const bullModalShouldShow =
@@ -468,8 +496,8 @@ export function render(state) {
   const undoAllowed = canUndoNow(state);
 
   if (overlay && overlayText) {
-    if (isOnline && !scoreAllowed && state?.match && state?.leg) {
-      const who = state.match.players[state.leg.currentPlayer]?.name || "the other player";
+    if ((isOnline && !scoreAllowed && state?.match && state?.leg) || (state?.nemesis?.enabled === true && state?.match && state?.leg && state.leg.status === "in_progress" && state.leg.currentPlayer === 1)) {
+      const who = state.match.players[state.leg.currentPlayer]?.name || (state.leg.currentPlayer === 1 ? "Nemesis" : "the other player");
       overlayText.textContent = `It’s ${who}’s turn`;
       overlay.classList.remove("hidden");
     } else {
@@ -478,6 +506,68 @@ export function render(state) {
   }
 
   if (overlayUndoBtn) overlayUndoBtn.disabled = !undoAllowed;
+
+  // Nemesis debug thoughts panel has been deprecated (use the seed link in Audits).
+
+  // Nemesis thought popup (rare, meaningful)
+  if (nemesisThoughtPopup && nemesisThoughtPopupText) {
+    const pop = state?.nemesis?.runtime?.popup;
+    const nowMs = Date.now();
+    const shouldShow = (state?.nemesis?.enabled === true) && (state?.nemesis?.showDialog !== false) &&
+      pop && typeof pop.text === "string" &&
+      Number.isFinite(Number(pop.expiresAt)) &&
+      nowMs < Number(pop.expiresAt);
+
+    if (shouldShow) {
+      // Render as an italicised quote (less "chat bubble", more "thought" vibe)
+      nemesisThoughtPopupText.textContent = `“${pop.text}”`;
+
+      // Restart animation when the message changes
+      const ts = String(pop.ts || "");
+      if (nemesisThoughtPopup.dataset.ts !== ts) {
+        nemesisThoughtPopup.dataset.ts = ts;
+        nemesisThoughtPopup.classList.remove("show");
+        // Force reflow to restart CSS animation
+        void nemesisThoughtPopup.offsetWidth;
+      }
+
+      nemesisThoughtPopup.classList.remove("hidden");
+      nemesisThoughtPopup.classList.add("show");
+
+      // Local hide timer (in case no further renders happen after expiry)
+      try {
+        if (window.__nemesisThoughtPopupTimer) clearTimeout(window.__nemesisThoughtPopupTimer);
+        const msLeft = Math.max(0, Number(pop.expiresAt) - nowMs + 50);
+        window.__nemesisThoughtPopupTimer = setTimeout(() => {
+          // Only hide if it's still the same message
+          const curTs = nemesisThoughtPopup?.dataset?.ts;
+          if (curTs === String(pop.ts || "")) {
+            nemesisThoughtPopup.classList.add("hidden");
+            nemesisThoughtPopup.classList.remove("show");
+          }
+        }, msLeft);
+      } catch (_) {}
+
+      // Tail positioning: aim toward Nemesis name tag
+      try {
+        const bubble = nemesisThoughtPopup.querySelector(".bubble");
+        const p2NameEl2 = document.getElementById("p2Name");
+        if (bubble && p2NameEl2) {
+          const b = bubble.getBoundingClientRect();
+          const n = p2NameEl2.getBoundingClientRect();
+          const targetX = (n.left + n.right) / 2;
+          let x = targetX - b.left;
+          x = Math.max(24, Math.min(b.width - 24, x));
+          bubble.style.setProperty("--tail-x", `${x}px`);
+        }
+      } catch (_) {}
+    } else {
+      nemesisThoughtPopup.classList.add("hidden");
+      nemesisThoughtPopup.classList.remove("show");
+    }
+  }
+
+
 
   // Reset overlay button visibility for in-match renders.
   if (overlayUndoBtn) overlayUndoBtn.classList.remove("hidden");
@@ -511,6 +601,13 @@ export function render(state) {
       }
       if (p2NameEl) {
         p2NameEl.textContent = state?.seat2Name || state?.lobby?.joiner?.name || "Player 2";
+        try {
+          const isNemesisGame = !!(state?.nemesis?.enabled) && ((state?.seat2Name || state?.lobby?.joiner?.name || "") === "Nemesis");
+          const p2NameRow = document.querySelector("#p2Box .nameRow");
+          if (p2NameRow) {
+            p2NameRow.classList.toggle("nemesisP2Name", isNemesisGame);
+          }
+        } catch (_) {}
       }
     }
 
@@ -689,6 +786,11 @@ export function render(state) {
   }
   if (p2NameEl) {
     p2NameEl.textContent = match.players[1].name;
+  try {
+    const isNemesisGame = !!(state?.nemesis?.enabled) && ((match.players?.[1]?.name || "") === "Nemesis");
+    const p2NameRow = document.querySelector("#p2Box .nameRow");
+    if (p2NameRow) p2NameRow.classList.toggle("nemesisP2Name", isNemesisGame);
+  } catch (_) {}
   }
 
   // Scores
@@ -738,6 +840,7 @@ export function render(state) {
 
   // Pending checkout modal
   if (state.pendingCheckout) {
+    if (state.pendingCheckout.suppressPrompt === true || state.pendingCheckout.actorId === 'nemesis' || (state?.nemesis?.enabled === true && state.pendingCheckout.player === 1)) { setCheckoutModalVisible(false); } else {
     // Only the player who triggered the checkout should see the confirmation modal.
     // (Other client should not be able to confirm someone else's checkout.)
     const me = getActorId();
@@ -821,6 +924,7 @@ export function render(state) {
     }
 
       setCheckoutModalVisible(true);
+    }
     }
   } else {
     setCheckoutModalVisible(false);

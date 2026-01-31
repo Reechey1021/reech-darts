@@ -6,6 +6,7 @@ import {
   submitScore,
   undoLast,
   startMatchFromSetup,
+  startMatchFromNemesisSetup,
   cancelCheckout,
   confirmCheckout,
   continueOrNewMatch,
@@ -200,7 +201,15 @@ export function wireUI() {
     let gameId = null;
     try {
       const url = new URL(txt, window.location.origin);
-      gameId = (url.searchParams.get("game") || "").trim() || null;
+      // Prefer pretty URLs: /game/<id>
+      const parts = url.pathname.split("/").filter(Boolean);
+      if (parts.length >= 2 && parts[0] === "game") {
+        gameId = (parts[1] || "").trim() || null;
+      }
+      // Back-compat: ?game=<id>
+      if (!gameId) {
+        gameId = (url.searchParams.get("game") || "").trim() || null;
+      }
     } catch {
       // allow pasting raw game id
       gameId = txt;
@@ -236,7 +245,7 @@ export function wireUI() {
     }
 
     // Navigate to the match
-    window.location.href = `index.html?game=${encodeURIComponent(gameId)}`;
+    window.location.href = `/index?game=${encodeURIComponent(gameId)}`;
   }
 
   if (joinGameConfirmBtn) {
@@ -296,7 +305,7 @@ export function wireUI() {
       try {
         await signInWithGoogle();
         // Go to dashboard for logged-in users.
-        window.location.href = "./dashboard.html";
+        window.location.href = "/dashboard";
       } catch (e) {
         console.error(e);
         showError("Google login failed.");
@@ -330,13 +339,16 @@ export function wireUI() {
   const overlayUndoBtn = document.getElementById("overlayUndoBtn");
   const overlayStartBtn = document.getElementById("overlayStartBtn");
   const inputModeBtn = document.getElementById("inputModeBtn");
+  const inputModePicker = document.getElementById("inputModePicker");
+  const pickKeypadModeBtn = document.getElementById("pickKeypadModeBtn");
+  const pickTableModeBtn = document.getElementById("pickTableModeBtn");
+  const pickVoiceModeBtn = document.getElementById("pickVoiceModeBtn");
   // Legacy mobile menu refs (no longer used)
 
   // ----------------------------
   // Input mode init + toggle
   // ----------------------------
   // Always start in keypad mode on page load.
-  // (We still cycle keypad -> dartpad -> voice -> keypad via the mode button.)
   try {
     app.inputMode = "keypad";
     localStorage.setItem("inputMode", "keypad");
@@ -346,28 +358,73 @@ export function wireUI() {
   // Voice UI init (safe no-op if unsupported)
   initVoiceUI();
 
+  function updateInputModePickerSelection() {
+    if (!inputModePicker) return;
+    const setSel = (el, on) => el && el.classList.toggle("selected", !!on);
+    setSel(pickKeypadModeBtn, app.inputMode === "keypad");
+    setSel(pickTableModeBtn, app.inputMode === "table");
+    setSel(pickVoiceModeBtn, app.inputMode === "voice");
+  }
+
+  function closeInputModePicker() {
+    if (!inputModePicker) return;
+    inputModePicker.classList.add("hidden");
+  }
+
+  function toggleInputModePicker() {
+    if (!inputModePicker) return;
+    const willOpen = inputModePicker.classList.contains("hidden");
+    if (willOpen) {
+      updateInputModePickerSelection();
+      inputModePicker.classList.remove("hidden");
+    } else {
+      closeInputModePicker();
+    }
+  }
+
+  function pickInputMode(next) {
+    closeInputModePicker();
+
+    // Leaving voice mode? Ensure we stop any active recognition.
+    if (app.inputMode === "voice" && next !== "voice") {
+      stopVoice();
+    }
+
+    setInputMode(next);
+    updateInputModePickerSelection();
+
+    if (next === "voice") {
+      // Auto-start listening when entering voice mode (runs inside this click gesture).
+      startVoiceAuto();
+    }
+  }
+
+  updateInputModePickerSelection();
+
   if (inputModeBtn) {
-    inputModeBtn.addEventListener("click", () => {
-      // keypad -> table -> voice -> keypad
-      const next =
-        app.inputMode === "keypad"
-          ? "table"
-          : app.inputMode === "table"
-            ? "voice"
-            : "keypad";
-
-      // Leaving voice mode? Ensure we stop any active recognition.
-      if (app.inputMode === "voice" && next !== "voice") {
-        stopVoice();
-      }
-
-      setInputMode(next);
-      if (next === "voice") {
-        // Auto-start listening when entering voice mode (runs inside the mode-switch click gesture).
-        startVoiceAuto();
-      }
+    inputModeBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      toggleInputModePicker();
     });
   }
+
+  if (pickKeypadModeBtn) pickKeypadModeBtn.addEventListener("click", () => pickInputMode("keypad"));
+  if (pickTableModeBtn) pickTableModeBtn.addEventListener("click", () => pickInputMode("table"));
+  if (pickVoiceModeBtn) pickVoiceModeBtn.addEventListener("click", () => pickInputMode("voice"));
+
+  // Close picker on outside click / Escape.
+  document.addEventListener("pointerdown", (e) => {
+    if (!inputModePicker || inputModePicker.classList.contains("hidden")) return;
+    if (inputModePicker.contains(e.target)) return;
+    if (inputModeBtn && inputModeBtn.contains(e.target)) return;
+    closeInputModePicker();
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    if (!inputModePicker || inputModePicker.classList.contains("hidden")) return;
+    closeInputModePicker();
+  });
 
   // ----------------------------
   // Dartpad (table mode) clicks
@@ -610,7 +667,11 @@ export function wireUI() {
     // Write a local, centered system line into the combined Chat & Audits feed.
     try {
       const s = app.latestState;
-      const seat = mySeatIndex(s);
+      let seat = mySeatIndex(s);
+      if (seat === null || seat === undefined) {
+        // Local/offline games do not have actor IDs; default to Player 1.
+        seat = 0;
+      }
       const name = s?.match?.players?.[seat]?.name || (seat === 0 ? "Player 1" : "Player 2");
       addAuditSystem(`${name} performed action: Undo.`);
     } catch (_) {}
@@ -660,7 +721,21 @@ export function wireUI() {
   });
 
 
-  // Setup modal controls (button-driven UI with hidden canonical form controls)
+  
+// Nemesis match setup modal buttons (used when clicking "New Game" during a Nemesis match)
+const nemesisSetupBackBtn = document.getElementById("nemesisSetupBackBtn");
+const nemesisSetupStartBtn = document.getElementById("nemesisSetupStartBtn");
+
+if (nemesisSetupBackBtn) nemesisSetupBackBtn.addEventListener("click", () => {
+  const modal = document.getElementById("nemesisMatchSetupModal");
+  if (modal) closeModal(modal);
+});
+
+if (nemesisSetupStartBtn) nemesisSetupStartBtn.addEventListener("click", () => {
+  startMatchFromNemesisSetup();
+});
+
+// Setup modal controls (button-driven UI with hidden canonical form controls)
   const setupPresetEl = document.getElementById("setupPreset");
   const setupCheckInEl = document.getElementById("setupCheckIn");
   const setupCheckOutEl = document.getElementById("setupCheckOut");
@@ -1001,7 +1076,14 @@ for (const stepper of setupSteppers) {
     confirmNewMatchOkBtn.addEventListener("click", () => {
       const modal = document.getElementById("confirmNewMatchModal");
       if (modal) closeModal(modal);
-      const setup = document.getElementById("setupModal");
+
+      // In a Nemesis game, "New Match" should open the Nemesis setup modal.
+      // Use the presence of the Nemesis config block (not names) to avoid
+      // accidentally triggering this for a human named "Nemesis".
+      const st = (typeof app !== "undefined") ? app.latestState : null;
+      const isNemesisGame = !!st?.nemesis?.enabled;
+      const setupId = isNemesisGame ? "nemesisMatchSetupModal" : "setupModal";
+      const setup = document.getElementById(setupId);
       if (setup) openModal(setup);
     });
   }
