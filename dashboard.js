@@ -128,7 +128,7 @@ function goToGame(gameId, { openInvite = true, autoSetup = true } = {}) {
   params.set("game", gameId);
   if (openInvite) params.set("openInvite", "1");
   if (autoSetup) params.set("autoSetup", "1");
-  window.location.href = withBase(`/game/?${params.toString()}`);
+  window.location.href = `/game/?${params.toString()}`;
 }
 
 function initInviteUiHandlers() {
@@ -167,7 +167,7 @@ function initInviteUiHandlers() {
         const params = new URLSearchParams();
         params.set("game", gameId);
         params.set("setup", "1");
-  window.location.href = withBase(`/game/?${params.toString()}`);
+        window.location.href = `/game/?${params.toString()}`;
       } catch (e) {
         console.warn("Invite failed", e);
         if (typeof showFriendFeedback === "function") showFriendFeedback("Invite failed. Please try again.");
@@ -515,7 +515,7 @@ await newRef.set({
     // Local games should jump straight into setup once the game listener attaches
     params.set("setup", "1");
   }
-  window.location.href = withBase(`/game/?${params.toString()}`);
+  window.location.href = `/game/?${params.toString()}`;
 }
 
 function renderWelcome(profile) {
@@ -1723,7 +1723,7 @@ if (oppDeclineFriendBtn) {
       return;
     }
 
-    window.location.href = withBase(`/game/?game=${encodeURIComponent(gid)}`);
+    window.location.href = `/game/?game=${encodeURIComponent(gid)}`;
   });
 
   }
@@ -1867,3 +1867,4 @@ setSettingsModalVisible(false);
     startInviteListener();
   });
 })();
+

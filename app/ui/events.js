@@ -1,5 +1,6 @@
 // app/ui/events.js
 import { app } from "../state.js";
+import { withBase } from "../routing.js";
 import { canScoreNow, canUndoNow, isHost, mySeatIndex } from "../permissions.js";
 import {
   openNewGameFlow,
@@ -17,7 +18,6 @@ import {
 } from "../actions.js";
 import { applyTheme, initThemeToggle, showError, hideError, setInviteModalVisible, setSetupModalVisible, setLobbyGateVisible, openModal, closeModal, render } from "./render.js";
 import { unlockAudioOnce } from "../audio/audio.js";
-import { withBase } from "../routing.js";
 import { initBullUI } from "../bull/ui.js";
 import { initAuditChatUI, isAuditChatInputFocused, addAuditSystem } from "./auditChat.js";
 import { signInWithGoogle, ensureAnonymousSignIn } from "../auth.js";
@@ -246,7 +246,7 @@ export function wireUI() {
     }
 
     // Navigate to the match
-    window.location.href = withBase(`/index/?game=${encodeURIComponent(gameId)}`);
+    window.location.href = `/index?game=${encodeURIComponent(gameId)}`;
   }
 
   if (joinGameConfirmBtn) {

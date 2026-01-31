@@ -29,12 +29,12 @@ export async function initAuth({ autoAnonymous = false } = {}) {
     console.warn("Auth persistence failed:", e);
   }
 
-
-  // Complete any pending Google redirect sign-in (helps on GitHub Pages / Safari)
+  // Complete any pending redirect sign-in (important for GitHub Pages / Safari).
   try {
     await app.auth.getRedirectResult();
   } catch (e) {
-    console.warn("Auth redirect result error:", e);
+    // Usually harmless (e.g., no pending redirect)
+    console.debug("No redirect result:", e?.message || e);
   }
 
   // Track user in app state
@@ -119,15 +119,17 @@ export function getActorName() {
 export async function signInWithGoogle() {
   const provider = new firebase.auth.GoogleAuthProvider();
 
-  // GitHub Pages often triggers COOP/COEP warnings with popup close behavior.
-  // Redirect is the most reliable flow there.
-  const isGitHubPages = window.location.hostname.endsWith("github.io");
+  const host = window.location.hostname || "";
+  const isGitHubPages = host.endsWith("github.io");
+
+  // GitHub Pages + modern COOP/COEP policies can make popup flows noisy/flaky.
+  // Redirect is the most reliable option there.
   if (isGitHubPages) {
     await app.auth.signInWithRedirect(provider);
     return;
   }
 
-  // Popup works on most desktop browsers; fallback to redirect if popup fails.
+  // Popup works well on localhost/normal hosts; fallback to redirect if popup fails.
   try {
     await app.auth.signInWithPopup(provider);
   } catch (e) {
@@ -136,11 +138,20 @@ export async function signInWithGoogle() {
   }
 }
 
+
 export async function signOutUser() {
   if (!app.auth) return;
+
+  // Prevent "auto-resume" loops after sign-out.
+  try {
+    localStorage.setItem("justSignedOut", "1");
+    localStorage.removeItem("lastNemesisGameId");
+    localStorage.removeItem("nemesisPendingGameId");
+    localStorage.removeItem("startOfflineOnLoad");
+  } catch (_) {}
+
   await app.auth.signOut();
 }
-
 // Simple helper for pages (like dashboard) that just want an auth listener.
 export function onUserChanged(cb) {
   if (!app.auth) app.auth = firebase.auth();

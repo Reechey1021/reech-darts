@@ -81,3 +81,7 @@ export function clearGameIdFromUrl() {
   url.searchParams.delete("game");
   window.history.replaceState({}, "", url.toString());
 }
+
+
+// Expose for any legacy/non-module code paths.
+try { window.withBase = withBase; } catch (_) {}

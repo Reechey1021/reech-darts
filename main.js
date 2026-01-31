@@ -35,6 +35,17 @@ if (!app.gameId) {
     // ignore
   }
 }
+
+// If you hit /game without a game id, you should not be here.
+// The lobby/login UI lives on /index.
+try {
+  const path = window.location.pathname || "";
+  const baseGame = withBase("/game");
+  const isGameRoot = path === baseGame || path === (baseGame + "/");
+  if (isGameRoot && !app.gameId) {
+    window.location.replace(withBase("/index"));
+  }
+} catch (_) {}
 app.gameRef = app.gameId ? app.db.collection("games").doc(app.gameId) : null;
 const qs = new URLSearchParams(window.location.search);
 const shouldOpenInvite = qs.get("openInvite") === "1";
@@ -47,48 +58,39 @@ initAuth({ autoAnonymous: Boolean(app.gameId) }).then(() => {
   wireUI();
   wireGlobalKeyboard();
 
-  if (!app.gameId) {
-    // Nemesis-only recovery: if the host drops the game id on reload, try to resume the last
-    // active Nemesis game WITHOUT a full page reload (prevents the "double refresh").
-    //
-    // Only do this on the /game root.
-    try {
-      const path = window.location.pathname || "";
-      const baseGame = withBase("/game");
-      const isGameRoot = path === baseGame || path === (baseGame + "/");
-      if (isGameRoot) {
-        const lastNemesis = (localStorage.getItem("lastNemesisGameId") || "").trim();
-        if (lastNemesis) {
-          // Hand off the id in case the host drops the query on navigation.
-          try { localStorage.setItem("nemesisPendingGameId", String(lastNemesis)); } catch (_) {}
-
-          // Set app state + URL in-place (no reload).
-          app.gameId = lastNemesis;
-          app.gameRef = app.db.collection("games").doc(lastNemesis);
-          setGameIdInUrl(lastNemesis);
-        }
-      }
-    } catch (_) {}
-
-    if (!app.gameId) {
-      // On /game with no active lobby id, show the lobby gate (host/join/offline).
-      setLobbyGateVisible(true);
-
-      // If the dedicated /index gate asked us to start offline immediately, do it once.
-      try {
-        const flag = localStorage.getItem("startOfflineOnLoad");
-        if (flag === "1") {
-          localStorage.removeItem("startOfflineOnLoad");
-          const playOfflineBtn = document.getElementById("playOfflineBtn");
-          if (playOfflineBtn) setTimeout(() => playOfflineBtn.click(), 0);
-        }
-      } catch (_) {
-        // ignore
-      }
-
+  // Index page rules:
+  // - Logged-in (Google) users should go straight to /dashboard.
+  // - Guests should stay on /index and use the lobby gate there.
+  try {
+    const path = window.location.pathname || "";
+    const baseIndex = withBase("/index");
+    const isIndex = path === baseIndex || path === (baseIndex + "/");
+    if (isIndex && app.user && !app.user.isAnonymous) {
+      window.location.replace(withBase("/dashboard"));
       return;
     }
+  } catch (_) {}
+
+  if (!app.gameId) {
+    // On /index (or any non-game deep link without a game id), show the lobby gate.
+    setLobbyGateVisible(true);
+
+    // If the dedicated /index gate asked us to start offline immediately, do it once.
+    try {
+      const flag = localStorage.getItem("startOfflineOnLoad");
+      if (flag === "1") {
+        localStorage.removeItem("startOfflineOnLoad");
+        const playOfflineBtn = document.getElementById("playOfflineBtn");
+        if (playOfflineBtn) setTimeout(() => playOfflineBtn.click(), 0);
+      }
+    } catch (_) {
+      // ignore
+    }
+
+    return;
   }
+
+
 
   // Direct invite links: guests must pick a display name before entering the lobby.
   // Anonymous Firebase auth gives us a uid, but we still require a user-chosen name.
