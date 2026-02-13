@@ -2394,6 +2394,192 @@ button:disabled,
   margin-top: 10px;
 }
 
+/* Arcade mini-keypads (Bull + ATC) are 2x2; prevents wrap/layout shift when labels change (e.g., S9→S10). */
+#bcKeypad, #atcKeypad {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.arcade.keypad, #dartTableArea {
+  grid-column: 1 / -1;
+}
+
+.readyroomcardswrapper {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.dashName.readyroom {font-size: 22px;}
+
+[data-role="readyInviteFriendsProxy"] {
+  cursor: pointer;
+}
+
+[data-role="readyCopyInviteProxy"] {
+  background: var(--accent) !important;
+
+}
+
+.readyroominnerwrapper {
+  display: flex;
+}
+
+.readyroomdashIdentity {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.readyDIwrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.readyroomprofileDash {
+  background: var(--card);
+  border-radius: 12px;
+  padding: 12px;
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  justify-content:center;
+}
+
+.Ready {
+  height: 26px;
+  border-radius: 6px;
+  font-weight: 800;
+  font-size: 14px;
+  padding: 6px 10px;
+  color: var(--chip-ink);
+  background: var(--submit-bg);
+}
+
+.NotReady {
+  height: 26px;
+  border-radius: 6px;
+  font-weight: 800;
+  font-size: 14px;
+  padding: 6px 10px;
+  color: var(--chip-ink);
+  background: var(--danger);
+}
+
+/* Ready Room invite placeholder (Arcade /arcade/play) */
+.readyRoomInviteAvatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.readyRoomInvitePlus {
+  font-size: 34px;
+  line-height: 1;
+  font-weight: 800;
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.readyRoomInviteAction {
+  cursor: pointer;
+  user-select: none;
+}
+
+.readyRoomInviteAction:focus {
+  outline: 2px solid rgba(255,255,255,0.25);
+  outline-offset: 2px;
+}
+
+/* Ensure the friends-invite panel stacks above the Ready Room and other overlays */
+#inviteFriendsModal {
+  z-index: 10050;
+}
+
+.arcadetwogrid {
+  display:grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.arcadestartbuttons {
+  display: flex;
+  flex-direction: row-reverse;
+  gap: 10px;
+  padding: 20px 0px;
+  justify-content: center;
+}
+
+.arcadesetupblock {
+  background: var(--card);
+  border-radius: 12px;
+  padding: 12px;
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  justify-content:space-between;
+  align-items: center;
+}
+
+.atcsetupgrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+#hsSetupFieldsLocalRoot, #hsSetupFieldsOnlineRoot, #raceSetupFieldsOnlineRoot, #raceSetupFieldsLocalRoot, #roundsSetupFieldsLocalRoot, #roundsSetupFieldsOnlineRoot {display:flex; flex-direction: column; align-items: center;}
+
+.arcadestart {background: var(--submit-bg) !important; color: var(--btn-bg); font-weight: 600;}
+
+.arcadecancel {background: var(--danger) !important; color: black; font-weight: 600;}
+
+.arcadelocal,
+.arcadeonline {
+  position: relative;
+  border-radius: 12px;
+  padding: 10px 18px;
+  border: 1px solid color-mix(in srgb, var(--btn-bg) 65%, white 5%);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--btn-bg) 85%, white 5%),
+      color-mix(in srgb, var(--btn-bg) 95%, black 15%)
+    );
+  color: var(--btn-text);
+  cursor: pointer;
+  text-align: center;
+  user-select: none;
+  backdrop-filter: blur(6px) saturate(130%);
+  -webkit-backdrop-filter: blur(6px) saturate(130%);
+  box-shadow:
+    inset 0 1px 0 var(--c_27defe),
+    0 0px 6px var(--c_8391d5);
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.2s ease;
+}
+
+.arcadelocal:hover,
+.arcadeonline:hover {
+  transform: translateY(-1px);
+}
+
+.arcadelocal:active,
+.arcadeonline:active {
+  transform: translateY(1px) scale(0.99);
+}
+
+.arcadelocal:focus-visible,
+.arcadeonline:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 3px var(--c_ad2e34),
+    0 0px 6px var(--c_cd433a);
+}
+
+
 button.key {
   padding: 14px 0;
   min-height: 70px;
@@ -2733,6 +2919,12 @@ button.iconOnly {
   flex-direction:column;
 }
 
+.setupBtnRow.arcade {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 200px));
+  justify-content: center;
+}
+
 .setupBtn {
   width: 100%;
   white-space: nowrap;
@@ -3065,6 +3257,29 @@ button.iconOnly {
     padding: 16px 8px;
     align-items:stretch;
   }
+
+
+  .ghostModeModal {
+    width: 100% !important;
+    max-width: 560px;
+    padding: 16px 10px;
+    align-items: stretch;
+  }
+  .ghostModeModal .mhGrid {
+    grid-template-columns: 60px 60px 60px 60px 90px 1fr !important;
+    justify-content: space-evenly;
+    text-align: center;
+  }
+  .ghostModeModal .mhGrid .ghostActions {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+  }
+  .ghostTokenBtn {
+    font-size: 11px;
+    padding: 6px 10px;
+  }
+
 
   #setEquipment {font-size:12px !important;}
 
@@ -3502,6 +3717,9 @@ body.dashboardPage {
     font-size: 10px !important;
   }
 
+  .dashName.readyroom {font-size: 16px;}
+
+  #readyRoomMeta {justify-content:center;}
 
   #undoBtn { padding: 8px 8px; font-size:12px !important; border-radius: 16px;}
   #submitBtn { padding: 8px 10px;}
@@ -4822,3 +5040,23 @@ input, textarea, [contenteditable="true"], [contenteditable=""] {
   -ms-user-select: text;
   user-select: text;
 }
+
+
+/* Handicap modal */
+.handicapGrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-top: 12px; }
+.handicapCol { padding: 10px; border-radius: 12px; background: rgba(255,255,255,0.04); }
+.handicapHeader { font-weight: 700; margin-bottom: 10px; }
+.handicapRow { margin-bottom: 12px; }
+.handicapLabel { font-size: 13px; opacity: 0.85; margin-bottom: 6px; }
+.setupBadge { font-size: 12px; padding: 6px 10px; border-radius: 999px; background: rgba(255,255,255,0.08); align-self: center; }
+.setupSecondaryBtn { opacity: 0.95; }
+.errorText { color: #ff7a7a; margin-top: 8px; }
+.subtleText { opacity: 0.75; font-size: 13px; margin-top: -4px; }
+#hcpP0Start, #hcpP1Start {max-width:150px;}
+#hcpP0Mult, #hcpP1Mult {max-width:50px;}
+.hiddenControl {display:none;}
+
+/* Ensure handicap modal overlays setup modal */
+#handicapModal { z-index: 9999; }
+
+.setupBtnRow.threegrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}

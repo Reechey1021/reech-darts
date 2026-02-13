@@ -2,12 +2,24 @@
 
 export function makeFreshLeg(mode, starterPlayer, rules = {}) {
   const checkInRule = rules?.checkIn || "straight";
-  const checkedIn = checkInRule !== "double";
+  const checkedInDefault = checkInRule !== "double";
+
+  const h = rules?.handicaps;
+  const useH = h?.enabled === true;
+
+  const p0 = useH ? (h?.p0 || {}) : {};
+  const p1 = useH ? (h?.p1 || {}) : {};
+
+  const p0Score = useH && Number.isFinite(Number(p0.startScore)) ? Number(p0.startScore) : mode;
+  const p1Score = useH && Number.isFinite(Number(p1.startScore)) ? Number(p1.startScore) : mode;
+
+  const p0CheckedIn = useH ? (String(p0.checkIn || checkInRule) !== "double") : checkedInDefault;
+  const p1CheckedIn = useH ? (String(p1.checkIn || checkInRule) !== "double") : checkedInDefault;
 
   return {
     players: [
-      { score: mode, checkedIn },
-      { score: mode, checkedIn },
+      { score: p0Score, checkedIn: p0CheckedIn },
+      { score: p1Score, checkedIn: p1CheckedIn },
     ],
     currentPlayer: starterPlayer,
     status: "in_progress", // "finished"
@@ -40,8 +52,16 @@ export function makeNewMatch({ mode, bestOf, p1Name, p2Name }) {
         trackCheckoutStats: true,
       },
 
+      // Handicaps: setup-only; ALWAYS reset for new matches
+      handicaps: {
+        enabled: false,
+        p0: { multiplier: 1, startScore: mode, checkIn: "straight", checkOut: "double", finish: "exact" },
+        p1: { multiplier: 1, startScore: mode, checkIn: "straight", checkOut: "double", finish: "exact" },
+      },
+
 
       // online stuff
+
       hostId: null,
       gameType: "single", // "single" | "online"
       seat1Id: null,

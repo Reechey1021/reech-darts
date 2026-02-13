@@ -124,6 +124,24 @@
           <button id="dashNemesisBtn" class="hidden" type="button">Play vs Nemesis</button>
         </div>
 
+        <div id="dashGhostCard" class="dashPlayCard dashPlayNemesis dashPlayCard--glow" role="button" tabindex="0" aria-label="Ghost Mode">
+          <img src="../img/icon_dart.png" class="dashboardGameIcon" alt="Ghost Mode" />
+          <div class="dashPlayText">
+            <div class="big">Ghost</div>
+            <div class="small">Replay a Leg</div>
+          </div>
+          <button id="dashGhostBtn" class="hidden" type="button">Ghost Mode</button>
+        </div>
+
+        <div id="dashArcadeCard" class="dashPlayCard dashPlayLocal dashPlayCard--glow" role="button" tabindex="0" aria-label="Arcade Mode">
+          <img src="../img/icon_dart.png" class="dashboardGameIcon" alt="Arcade" />
+          <div class="dashPlayText">
+            <div class="big">Arcade</div>
+            <div class="small">Mini-Games</div>
+          </div>
+          <button id="dashArcadeBtn" class="hidden" type="button">Arcade</button>
+        </div>
+
         <div id="dashMiscCard" class="dashMiscCardDiv">
           <div id="dashFriendsBtn" class="dashMiscCard dashFriends dashPlayCard--glow">
             <img src="../img/Friends.png" class="dashboardGameIcon">
@@ -163,6 +181,41 @@
     </div>
   </div>
 
+
+<!-- Ghost Mode modal -->
+<div id="ghostModeModal" class="modal hidden">
+  <div class="modal-card ghostModeModal">
+    <h2 style="margin-top:0;">Ghost Mode</h2>
+
+    <div class="mhGrid mhHeader ghostHeader">
+      <div>Name</div>
+      <div>In/Out</div>
+      <div>Started</div>
+      <div>Visits</div>
+      <div>Date</div>
+      <div></div>
+    </div>
+    <div id="ghostRows" class="mhRows"></div>
+
+    <div class="row" style="gap:10px; margin-top:12px; align-items:flex-end;">
+      <div style="flex:1;">
+        <label for="ghostImportName" style="display:block; font-size:12px; opacity:.8; margin-bottom:6px;">Name</label>
+        <input id="ghostImportName" type="text" placeholder="e.g. Friend challenge" maxlength="40" />
+      </div>
+      <div style="flex:2;">
+        <label for="ghostImportInput" style="display:block; font-size:12px; opacity:.8; margin-bottom:6px;">Paste Ghost Token</label>
+        <input id="ghostImportInput" type="text" placeholder="G1:501:S:D:S1:..." />
+      </div>
+      <button id="ghostImportBtn" class="secondary" type="button">Import</button>
+    </div>
+
+    <p id="ghostStatus" class="error hidden" style="margin-top:12px;"></p>
+
+    <div class="row" style="gap:10px; margin-top:12px;">
+      <button id="ghostCloseBtn" type="button">Close</button>
+    </div>
+  </div>
+</div>
 
 <!-- Stats History modal -->
 <div id="statsHistoryModal" class="modal hidden">

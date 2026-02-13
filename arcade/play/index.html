@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Reech Darts • Arcade</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@200;300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="../../icons/icon-192.png" />
+  <link rel="stylesheet" href="../../style.css" />
+</head>
+<body data-theme="cyan">
+
+  <!-- Slide-down toast (online join notifications) -->
+  <div id="seatJoinToast" class="topToast hidden" aria-live="polite">
+    <span id="seatJoinToastText">Player has joined the game</span>
+  </div>
+
+
+  <!-- Game + Audit/Chat wrapper (same layout model as /game/) -->
+  <div id="gameChatWrap" class="gameChatWrap">
+    <!-- Use the same card id as /game/ so the shared width/layout CSS applies -->
+    <div class="card gameCard" id="gameCard">
+      <div class="toprow">
+        <div id="arcadePlayMeta" class="gameMeta">Arcade</div>
+        <p id="status" class="hidden">—</p>
+        <div class="masterbuttons" id="masterbuttons">
+          <button id="gameSettingsBtn">Game Settings</button>
+</div>
+
+        <!-- Invite modal (same IDs as /game/) -->
+        <div id="inviteModal" class="modal hidden">
+          <div class="modal-card">
+            <h2>Invite link</h2>
+            <p id="inviteLinkText" style="word-break: break-all;"></p>
+            <p id="inviteCopyMsg" class="hidden" style="margin:6px 0 0; opacity:.85;">Link copied ✅</p>
+            <div class="row">
+              <button id="copyInviteBtn">Copy</button>
+              <button id="closeInviteBtn">Close</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Theme is controlled from the dashboard for signed-in users.
+             Button kept for compatibility but hidden. -->
+        <button id="themeToggleBtn" type="button" class="hidden">🌙</button>
+      </div>
+
+      <div class="scores" id="bcScores" data-role="arcadeScores">
+        <div class="player" id="bcP1Box" data-role="arcadeP1Box">
+          <div class="legsBadge hidden" id="bcP1Legs" data-role="arcadeP1Legs"> </div>
+          <div class="nameRow">
+            <img id="bcP1Photo" data-role="arcadeP1Photo" class="avatar hidden" alt="Player 1 photo" />
+            <span id="bcP1Name" data-role="arcadeP1Name" class="name">Player 1</span>
+          </div>
+          <div class="score" id="bcP1Score" data-role="arcadeP1Score">0</div>
+          <div class="stats" id="bcP1Stats" data-role="arcadeP1Stats"></div>
+        </div>
+
+        <div class="player" id="bcP2Box" data-role="arcadeP2Box">
+          <div class="legsBadge hidden" id="bcP2Legs" data-role="arcadeP2Legs"> </div>
+          <div class="nameRow">
+            <img id="bcP2Photo" data-role="arcadeP2Photo" class="avatar hidden" alt="Player 2 photo" />
+            <span id="bcP2Name" data-role="arcadeP2Name" class="name">Player 2</span>
+          </div>
+          <div class="score" id="bcP2Score" data-role="arcadeP2Score">0</div>
+          <div class="stats" id="bcP2Stats" data-role="arcadeP2Stats"></div>
+        </div>
+      </div>
+
+      <div class="hint" id="bcRoundHintRounds" data-role="arcadeRoundHintRounds">Round —</div>
+      <div class="hint" id="bcRoundHintDarts" data-role="arcadeRoundHintDarts">Darts —</div>
+
+      <div id="inputArea" class="inputArea">
+        <div id="turnOverlay" class="turnOverlay hidden">
+          <div id="turnOverlayText"></div>
+          <button id="overlayUndoBtn" class="overlayUndoBtn danger">Undo last score</button>
+        </div>
+
+      <div class="bcVisitEntry" id="bcVisitEntry" data-role="arcadeVisitEntry">
+        <div class="bcDartsRow">
+          <div class="bcDartSlot" id="bcDart1" data-role="arcadeDart1">—</div>
+          <div class="bcDartSlot" id="bcDart2" data-role="arcadeDart2">—</div>
+          <div class="bcDartSlot" id="bcDart3" data-role="arcadeDart3">—</div>
+        </div>
+
+        <div class="row" style="justify-content:center; gap:10px; flex-wrap:wrap; margin-top:10px;">
+          <button id="bcSubmitVisitBtn" data-role="arcadeSubmitVisitBtn" class="greenbutton autowidth" type="button" disabled>Submit Visit</button>
+          <button id="bcBackspaceVisitBtn" data-role="arcadeBackspaceVisitBtn" class="actionBtn autowidth" type="button" disabled>Backspace</button>
+          <button id="bcClearVisitBtn" data-role="arcadeClearVisitBtn" class="actionBtn autowidth" type="button" disabled>Clear</button>
+          <button id="bcUndoBtn" data-role="arcadeUndoBtn" class="actionBtn autowidth" type="button">Undo</button>
+        </div>
+      </div>
+
+
+      <div class="keypad" id="bcKeypad" data-role="arcadeKeypad" aria-label="Bull Challenge keypad">
+        <button class="key" id="bcOuterBtn" data-role="arcadeOuterBtn" data-hit="outer">Outer</button>
+        <button class="key" id="bcBullBtn" data-role="arcadeBullBtn" data-hit="bull">Bull</button>
+        <button class="key" id="bcMissBtn" data-role="arcadeMissBtn" data-hit="miss">Miss</button>
+      </div>
+
+      <div class="keypad hidden" id="atcKeypad" aria-label="Around the Clock keypad">
+        <button class="key" id="atcSingleBtn" type="button" data-hit="single">S1</button>
+        <button class="key" id="atcDoubleBtn" type="button" data-hit="double">D1</button>
+        <button class="key" id="atcTrebleBtn" type="button" data-hit="treble">T1</button>
+        <button class="key" id="atcMissBtn" type="button" data-hit="miss">Miss</button>
+      </div>
+      </div>
+
+      <p id="bcError" data-role="arcadeError" class="error hidden"></p>
+    
+
+      <!-- High Score input UI (shared classic keypad/dartpad) -->
+      <div id="hsInputArea" class="hidden">
+    <div class="actionGrid">
+  <div class="actionCell1">
+    <button id="inputModeBtn" class="iconBtn" title="Switch input mode" aria-label="Switch input mode">
+      <img class="inputModeBtnIcon" src="../../icons/input_white_icon.png" alt="Input mode" />
+    </button>
+
+    <!-- Input mode picker (opens from the input mode button) -->
+    <div id="inputModePicker" class="inputModePicker hidden" role="dialog" aria-label="Choose input mode">
+      <button id="pickKeypadModeBtn" class="inputModePickBtn" type="button" title="Keypad">⌨️</button>
+      <button id="pickTableModeBtn" class="inputModePickBtn" type="button" title="Table">🎯</button>
+    </div>
+    <button id="undoBtn" class="actionBtn">Undo</button>
+  </div>
+
+  <div class="actionCell2">
+    <input
+      id="scoreInput"
+      type="text"
+      inputmode="none"
+      placeholder=""
+      autocomplete="off"
+    />
+  </div>
+
+  <div class="actionCell3">
+    <button id="submitBtn" class="submitBtn">Submit</button>
+    <button id="quickCheckoutBtn"
+        class="checkoutBtn hidden"
+        aria-label="Checkout">
+  <svg
+    width="24"
+    height="24"
+    viewBox="0 0 24 16"
+    fill="none"
+    stroke="black"
+    stroke-width="4.5"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    aria-hidden="true">
+    <path d="M20 6L9 17l-5-5" />
+  </svg>
+</button>
+
+  </div>
+
+      <p id="error" class="error hidden"></p>
+      <div class="arcade keypad" id="keypad">
+        <button class="key" data-digit="1">1</button>
+        <button class="key" data-digit="2">2</button>
+        <button class="key" data-digit="3">3</button>
+      
+        <button class="key" data-digit="4">4</button>
+        <button class="key" data-digit="5">5</button>
+        <button class="key" data-digit="6">6</button>
+      
+        <button class="key" data-digit="7">7</button>
+        <button class="key" data-digit="8">8</button>
+        <button class="key" data-digit="9">9</button>
+      
+        <button class="key key-wide" id="keyClear">Clear</button>
+        <button class="key" data-digit="0">0</button>
+        <button class="key key-wide" id="keyBack">⌫</button>
+      </div>
+
+<div id="dartTableArea" class="hidden"><div id="dartPad" class="dartPad">
+    <!-- Top row -->
+    <button class="dartMultBtn selected" data-mult="S">Single</button>
+    <button class="dartMultBtn" data-mult="D">Double</button>
+    <button class="dartMultBtn" data-mult="T">Treble</button>
+    <button class="dartInstantBtn" data-instant="50">Bull</button>
+    <button class="dartInstantBtn" data-instant="25">Outer</button>
+
+    <!-- Numbers 1–20 (5 columns x 4 rows) -->
+    <button class="dartNumBtn" data-num="1">1</button>
+    <button class="dartNumBtn" data-num="2">2</button>
+    <button class="dartNumBtn" data-num="3">3</button>
+    <button class="dartNumBtn" data-num="4">4</button>
+    <button class="dartNumBtn" data-num="5">5</button>
+
+    <button class="dartNumBtn" data-num="6">6</button>
+    <button class="dartNumBtn" data-num="7">7</button>
+    <button class="dartNumBtn" data-num="8">8</button>
+    <button class="dartNumBtn" data-num="9">9</button>
+    <button class="dartNumBtn" data-num="10">10</button>
+
+    <button class="dartNumBtn" data-num="11">11</button>
+    <button class="dartNumBtn" data-num="12">12</button>
+    <button class="dartNumBtn" data-num="13">13</button>
+    <button class="dartNumBtn" data-num="14">14</button>
+    <button class="dartNumBtn" data-num="15">15</button>
+
+    <button class="dartNumBtn" data-num="16">16</button>
+    <button class="dartNumBtn" data-num="17">17</button>
+    <button class="dartNumBtn" data-num="18">18</button>
+    <button class="dartNumBtn" data-num="19">19</button>
+    <button class="dartNumBtn" data-num="20">20</button>
+
+    <!-- Final row -->
+    <button class="dartSpecialBtn" data-action="back">⌫ Back</button>
+    <button class="dartSpecialBtn" data-action="miss">MISS</button>
+  </div>
+</div>
+
+      
+      
+      <div id="voiceArea" class="hidden"></div>
+
+  </div>
+
+  
+</div>
+
+</div>
+
+    <!-- Chat + Audits Panel (same IDs as /game/) -->
+    <div id="auditChatPanel" class="card auditChatPanel hidden" aria-hidden="true">
+      <div class="auditChatHeader">
+        <h3 class="auditChatTitle">Chat &amp; Audits</h3>
+        <button id="auditChatCloseBtn" class="auditChatClose" type="button" aria-label="Close">✕</button>
+      </div>
+      <div id="auditChatFeed" class="auditChatFeed" role="log" aria-live="polite"></div>
+      <div class="auditChatComposer">
+        <textarea id="auditChatInput" class="auditChatInput" rows="1" placeholder="Write a message…"></textarea>
+        <button id="auditChatSendBtn" class="greenbutton auditChatSend" type="button">Send</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- End modal (winnerModal-style stats grid) -->
+  <div id="bcEndModal" data-role="arcadeEndModal" class="modal hidden" role="dialog" aria-label="Match ended">
+    <div class="modal-card">
+      <h2 id="bcEndTitle" data-role="arcadeEndTitle">Winner</h2>
+      <div id="matchStatsTabs" class="msTabs hidden"></div>
+      <div id="matchStatsGrid" class="matchEndStats"></div>
+
+      <!-- Legacy containers kept for compatibility (hidden) -->
+      <div id="arcadeLegacyEndStats" class="hidden">
+        <div class="setupLabel">Player 1</div>
+        <div id="bcEndP1" data-role="arcadeEndP1" class="small"></div>
+        <div class="setupLabel">Player 2</div>
+        <div id="bcEndP2" data-role="arcadeEndP2" class="small"></div>
+      </div>
+
+      <div class="row" style="justify-content:center; gap:10px;">
+        <button id="bcLeaveBtn" data-role="arcadeLeaveBtn" class="secondary" type="button">Leave</button>
+        <button id="bcRestartBtn" data-role="arcadeRestartBtn" type="button">Restart Match</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ATC Checkout confirm modal -->
+
+  <div id="atcCheckoutModal" class="modal hidden" role="dialog" aria-label="Confirm checkout">
+    <div class="modal-card">
+      <h2 style="margin:0 0 10px 0;">Checking out?</h2>
+      <p style="margin:0 0 16px 0; opacity:.85;">Confirm you meant to press <b>Bull</b> to end the game.</p>
+
+      <div class="setupButtons">
+        <button id="atcCheckoutCancelBtn" class="setupBtn secondary" type="button">Cancel</button>
+        <button id="atcCheckoutYesBtn" class="setupBtn" type="button">Yes, checkout</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ready Room modal (online lobby) -->
+  <div id="readyRoomModal" class="modal hidden">
+    <div class="modal-card" style="max-width:860px; text-align:center;">
+      <h2>Ready Room</h2>
+      <div id="readyRoomMeta" class="gameMeta" style="margin-top:14px; margin-bottom:20px; text-align: center !important"></div>
+      <p id="readyRoomSubtitle" style="opacity:.85; margin-top:0;">Waiting for both players…</p>
+
+      <div class="readyroomcardswrapper">
+        <div id="readyRoomP1Card" class="readyroomprofileDash" style="margin: 0px !important;"><div id="readyRoomP1Inner"></div></div>
+        <div id="readyRoomP2Card" class="readyroomprofileDash">
+          <div id="readyRoomP2Inner"></div>
+          <!-- Seat2 placeholder (host-only shows Copy Link action). Rendered by JS to match player card layout. -->
+          <div id="readySeat2EmptyTools" class="hidden">
+            <!-- Keep these IDs for existing invite/copy wiring; the UI is rendered into readyRoomP2Inner -->
+            <div id="readyInviteLinkText" class="hidden"></div>
+            <div id="readyInviteCopyMsg" class="hidden" style="margin:6px 0 0; opacity:.85;">Link copied ✅</div>
+            <button id="readyCopyInviteBtn" class="hidden" type="button">Copy link</button>
+            <button id="readyInviteFriendsBtn" class="hidden" type="button">Invite Friends</button>
+          </div>
+        </div>
+      </div>
+
+
+
+      <div class="row" style="justify-content:center; margin-top:16px; gap:10px; flex-wrap:wrap; flex-direction: row-reverse">
+        <button id="readyRoomReadyBtn" class="actionBtn autowidth greenbutton" type="button">Ready</button>
+        <button id="readyRoomLeaveBtn" class="actionBtn autowidth" type="button">Leave Match</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Game Settings -->
+  <div id="gameSettingsModal" class="modal hidden">
+    <div class="modal-card">
+      <h2>Game Settings</h2>
+      <div class="row padding" style="justify-content:center; flex-direction:column; gap:10px;">
+        <button id="gsNewGameBtn" class="actionBtn">New Game</button>
+        <button id="gsRestartGameBtn" class="actionBtn">Restart Game</button>
+        <button id="gsChangeGamemodeBtn" class="actionBtn">Change Gamemode</button>
+        <button id="gsOpenAuditChatBtn" class="actionBtn">Open Chat and Audits</button>
+        <button id="gsLeaveMatchBtn" class="actionBtn danger">Leave Match</button>
+        <button id="gsCloseBtn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="confirmRestartMatchModal" class="modal hidden">
+    <div class="modal-card">
+      <h2>Restart this game?</h2>
+      <p>This will reset the current match back to the start.</p>
+      <div class="row" style="justify-content:center;">
+        <button id="confirmRestartCancelBtn">Cancel</button>
+        <button id="confirmRestartOkBtn">Restart</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="confirmLeaveMatchModal" class="modal hidden">
+    <div class="modal-card">
+      <h2>Leave match?</h2>
+      <p>You will exit this lobby/match.</p>
+      <div class="row" style="justify-content:center;">
+        <button id="confirmLeaveCancelBtn">Cancel</button>
+        <button id="confirmLeaveOkBtn" class="actionBtn danger autowidth">Leave</button>
+      </div>
+    </div>
+  </div>
+
+  
+  <!-- Arcade mode pick (used from /arcade/; in-play New Game opens the correct setup directly) -->
+  <div id="arcadeModePickModal" class="modal hidden" role="dialog" aria-label="Choose local or online">
+    <div class="modal-card">
+      <h2 style="margin:0 0 10px 0;">Bull Challenge</h2>
+      <p style="opacity:.85; margin-top:0;">Choose how you want to play.</p>
+      <div class="arcadestartbuttons">
+        <button id="arcadePickLocalBtn" class="actionBtn" type="button" style="flex:1;min-width:140px;">Local</button>
+        <button id="arcadePickOnlineBtn" class="submitBtn" type="button" style="flex:1;min-width:140px;">Online</button>
+      </div>
+      <button id="arcadePickCancelBtn" class="actionBtn" type="button" style="margin-top:10px;width:100%;">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Bull Challenge Setup (Local) -->
+  <div id="arcadeSetupLocalModal" class="modal hidden" role="dialog" aria-label="Bull Challenge setup local">
+    <div class="modal-card">
+      <h2 id="arcadeLocalSetupTitle" style="margin:0 0 10px 0;">Arcade • Local</h2>
+
+      <!-- Around the Clock options (shown only when mode is ATC) -->
+      <div id="atcSetupFieldsLocal" class="hidden" style="margin-bottom:12px;"></div>
+      <!-- High Score options (shown only when mode is High Score) -->
+      
+      <div id="roundsSetupFieldsLocal" class="hidden" style="margin-bottom:12px;"></div>
+
+      <div id="raceSetupFieldsLocal" class="hidden" style="margin-bottom:12px;"></div>
+
+
+      <div id="hsSetupFieldsLocal" class="hidden" style="margin-bottom:12px;"></div>
+
+      <!-- Bull Challenge options (shown when mode is Bull Challenge) -->
+      <div id="bullSetupFieldsLocal" style="margin-bottom:12px;"></div>
+
+      <div class="arcadestartbuttons">
+        <button id="arcadeLocalStartMatchBtn" class="arcadestart" type="button">Start Match</button>
+        <button id="arcadeLocalCancelBtn" class="arcadecancel" type="button" style="margin-top:10px;width:100%;">Cancel</button>
+      </div>
+
+
+    </div>
+  </div>
+
+  <!-- Bull Challenge Setup (Online) -->
+  <div id="arcadeSetupOnlineModal" class="modal hidden" role="dialog" aria-label="Bull Challenge setup online">
+    <div class="modal-card">
+      <h2 id="arcadeOnlineSetupTitle" style="margin:0 0 10px 0;">Arcade • Online</h2>
+
+      <!-- Around the Clock options (shown only when mode is ATC) -->
+      <div id="atcSetupFieldsOnline" class="hidden" style="margin-bottom:12px;"></div>
+      <!-- High Score options (shown only when mode is High Score) -->
+      
+      <div id="roundsSetupFieldsOnline" class="hidden" style="margin-bottom:12px;"></div>
+
+      <div id="raceSetupFieldsOnline" class="hidden" style="margin-bottom:12px;"></div>
+
+
+      <div id="hsSetupFieldsOnline" class="hidden" style="margin-bottom:12px;"></div>
+
+      <!-- Bull Challenge options (shown when mode is Bull Challenge) -->
+      <div id="bullSetupFieldsOnline" style="margin-bottom:12px;"></div>
+
+      <div class="arcadestartbuttons">
+        <button id="arcadeOnlineStartMatchBtn" class="arcadestart" type="button">Start Match</button>
+        <button id="arcadeOnlineCancelBtn" class="arcadecancel" type="button">Cancel</button>
+      </div>
+
+
+    </div>
+  </div>
+
+
+  <!-- Change Gamemode modal (Phase 3 foundation; will be populated later) -->
+  <div id="changeGamemodeModal" class="modal hidden" role="dialog" aria-label="Change Gamemode">
+    <div class="modal-card" style="max-width:520px;">
+      <h2 style="margin:0 0 10px 0;">Change Gamemode</h2>
+      <p style="opacity:.85; margin-top:0;">More arcade modes are coming soon. For now you can switch back to Bull Challenge.</p>
+      <div class="row" style="justify-content:center; flex-direction:column; gap:10px; margin-top:12px;">
+        <button id="cgBullBtn" class="actionBtn">Bull Challenge</button>
+        <button id="cgAtcBtn" class="actionBtn">Around the Clock</button>
+        <button id="cgHighScoreBtn" class="actionBtn">High Score</button>
+        <button id="cgRoundsBtn" class="actionBtn">Rounds</button>
+        <button id="cgRaceBtn" class="actionBtn">Race</button>
+        <button id="cgCloseBtn" class="actionBtn">Close</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Invite Friends (from Ready Room) -->
+  <div id="inviteFriendsModal" class="modal hidden" role="dialog" aria-label="Invite friends">
+    <div class="modal-card" style="max-width:720px;">
+      <h2 style="margin:0 0 10px 0;">Invite Friends</h2>
+      <p style="opacity:.85; margin-top:0;">Invite a friend to join Seat 2. They will receive a game invite notification.</p>
+      <div id="inviteFriendsEmpty" class="mutedRow hidden" style="margin:10px 0;">No friends yet.</div>
+      <div id="inviteFriendsList" class="friendsList"></div>
+      <div class="row" style="justify-content:center; margin-top:14px;">
+        <button id="inviteFriendsCloseBtn" class="actionBtn autowidth" type="button">Close</button>
+      </div>
+    </div>
+  </div>
+
+
+
+  <!-- High Score input UI (shared classic keypad/dartpad) -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script type="module" src="./arcadeMain.js"></script>
+</body>
+</html>

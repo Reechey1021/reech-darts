@@ -1,6 +1,6 @@
 // app/routing.js
 
-const KNOWN_PAGES = new Set(["index", "dashboard", "nemesis", "game"]);
+const KNOWN_PAGES = new Set(["index", "dashboard", "nemesis", "game", "arcade"]);
 
 export function getBasePrefix() {
   // Supports GitHub Pages project sites like /<repo>/<page>/...

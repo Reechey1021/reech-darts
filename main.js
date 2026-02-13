@@ -36,14 +36,19 @@ if (!app.gameId) {
   }
 }
 
-// If you hit /game without a game id, you should not be here.
-// The lobby/login UI lives on /index.
+// If you hit a dedicated play page without a game id, you should not be here.
+// The lobby/login UI lives on /index and Arcade selection lives on /arcade.
 try {
   const path = window.location.pathname || "";
   const baseGame = withBase("/game/");
+  const baseArcadePlay = withBase("/arcade/play/");
   const isGameRoot = path === baseGame || path === (baseGame + "/");
+  const isArcadePlayRoot = path === baseArcadePlay || path === (baseArcadePlay + "/");
   if (isGameRoot && !app.gameId) {
     window.location.replace(withBase("/index/"));
+  }
+  if (isArcadePlayRoot && !app.gameId) {
+    window.location.replace(withBase("/arcade/"));
   }
 } catch (_) {}
 app.gameRef = app.gameId ? app.db.collection("games").doc(app.gameId) : null;
@@ -54,7 +59,49 @@ const shouldAutoSetup = qs.get("autoSetup") === "1";
 // Auth:
 // - If we are entering a lobby/game URL, we need a uid for rules + seat logic (anonymous is fine).
 // - If we're on the landing page (no ?game=), do NOT auto-create anon accounts.
-initAuth({ autoAnonymous: Boolean(app.gameId) }).then(() => {
+initAuth({ autoAnonymous: Boolean(app.gameId) }).then(async () => {
+  // ---------------------------------------------------------------------
+  // Runtime split (Phase 1)
+  // - Classic games live on /game/
+  // - Arcade games live on /arcade/play/
+  // We keep links stable via ?game=<id> and redirect to the correct
+  // runtime page based on the game document's `runtime` field.
+  // ---------------------------------------------------------------------
+
+  // If we have a game id, ensure we're on the correct runtime page *before*
+  // wiring UI and starting realtime listeners.
+  if (app.gameId && app.gameRef) {
+    try {
+      const snap = await app.gameRef.get();
+      if (snap.exists) {
+        const data = snap.data() || {};
+        const runtime = (data.runtime || "classic").toLowerCase();
+
+        const path = window.location.pathname || "";
+        const baseGame = withBase("/game/");
+        const baseArcadePlay = withBase("/arcade/play/");
+        const isGamePage = path === baseGame || path === (baseGame + "/");
+        const isArcadePlayPage = path === baseArcadePlay || path === (baseArcadePlay + "/");
+
+        if (runtime === "arcade" && isGamePage) {
+          const url = new URL(window.location.href);
+          url.pathname = baseArcadePlay;
+          window.location.replace(url.toString());
+          return;
+        }
+
+        if (runtime !== "arcade" && isArcadePlayPage) {
+          const url = new URL(window.location.href);
+          url.pathname = baseGame;
+          window.location.replace(url.toString());
+          return;
+        }
+      }
+    } catch (_) {
+      // ignore and continue; realtime listener will handle missing docs UX.
+    }
+  }
+
   wireUI();
   wireGlobalKeyboard();
 

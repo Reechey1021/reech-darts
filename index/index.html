@@ -85,16 +85,27 @@
 </div>
 
 
-<!-- Seat 2 waiting modal (online lobby) -->
-<div id="seat2WaitingModal" class="modal hidden">
-  <div class="modal-card" style="max-width:520px; text-align:center;">
-    <h2>Waiting for host…</h2>
-    <p style="opacity:.85; margin-top:0;">Waiting for host to start match…</p>
-    <div class="row" style="justify-content:center; margin-top:14px; gap:10px;">
-      <button id="seat2WaitingLeaveBtn" class="actionBtn">Leave Match</button>
+<!-- Ready Room modal (online lobby) -->
+<div id="readyRoomModal" class="modal hidden">
+  <div class="modal-card" style="max-width:860px; text-align:center;">
+    <h2>Ready Room</h2>
+    <p id="readyRoomSubtitle" style="opacity:.85; margin-top:0;">Waiting for both players to get ready…</p>
+
+    <div class="row" style="justify-content:space-between; gap:14px; margin-top:16px; flex-wrap:wrap;">
+      <div id="readyRoomP1Card" class="profileDash" style="flex:1; min-width:280px; text-align:left;"></div>
+      <div id="readyRoomP2Card" class="profileDash" style="flex:1; min-width:280px; text-align:left;"></div>
+    </div>
+
+    <div id="readyRoomMeta" class="gameMeta" style="margin-top:14px;"></div>
+
+    <div class="row" style="justify-content:center; margin-top:16px; gap:10px; flex-wrap:wrap;">
+      <button id="readyRoomReadyBtn" class="actionBtn autowidth greenbutton" type="button">Ready</button>
+      <button id="readyRoomLeaveBtn" class="actionBtn autowidth" type="button">Leave Match</button>
     </div>
   </div>
 </div>
+
+
 
 
 
@@ -304,6 +315,7 @@
       <div id="matchStatsGrid" class="matchEndStats"></div>
       <div class="row" style="justify-content:center; gap:10px;">
         <button id="winnerLeaveBtn" class="secondary hidden" type="button">Leave</button>
+        <button id="winnerSaveGhostBtn" class="secondary" type="button">Save Ghost</button>
         <button id="winnerNewGameBtn">New Game</button>
       </div>
     </div>
@@ -596,7 +608,13 @@
         </div>
       </div>
 
-      <div class="row">
+      
+<div class="row">
+  <button id="setupHandicapsBtn" class="setupSecondaryBtn">Handicaps</button>
+  <div id="setupHandicapsBadge" class="setupBadge hidden">Handicaps active</div>
+</div>
+
+<div class="row">
         <button id="setupCancelBtn">Cancel</button>
         <button id="setupStartBtn">Start Match</button>
       </div>
@@ -607,7 +625,153 @@
   </div>
   
   
-  <div id="checkInModal" class="modal hidden">
+  
+<div id="handicapModal" class="modal hidden">
+  <div class="modal-card handicapCard">
+    <h2>Handicaps</h2>
+    <p class="subtleText">Handicaps are only available in Casual matches. They reset every new match.</p>
+
+    <div class="handicapGrid">
+      <div class="handicapCol">
+        <div class="handicapHeader" id="hcpP1Name">Player 1</div>
+
+        <div class="handicapRow">
+          <div class="handicapLabel">Score multiplier</div>
+          <div class="setupStepper" data-setup-stepper data-target="hcpP0Mult" data-values="0.5,0.66,0.75,0.9,1.0,1.1,1.25,1.33,1.5,1.75,2.0">
+            <button type="button" class="setupStepBtn" data-step="dec" aria-label="Decrease multiplier">&lt;</button>
+            <div class="setupStepValue" data-stepper-value>—</div>
+            <button type="button" class="setupStepBtn" data-step="inc" aria-label="Increase multiplier">&gt;</button>
+          </div>
+          <select id="hcpP0Mult" class="setupHiddenControl" aria-hidden="true" tabindex="-1">
+            <option value="0.5">0.5</option><option value="0.66">0.66</option><option value="0.75">0.75</option><option value="0.9">0.9</option><option value="1.0">1.0</option><option value="1.1">1.1</option><option value="1.25">1.25</option><option value="1.33">1.33</option><option value="1.5">1.5</option><option value="1.75">1.75</option><option value="2.0">2.0</option>
+          </select>
+        </div>
+
+        <div class="handicapRow">
+          <div class="handicapLabel">Starting score</div>
+          <div class="setupStepper" data-setup-stepper data-target="hcpP0Start" data-values="121,301,501,701">
+            <button type="button" class="setupStepBtn" data-step="dec" aria-label="Decrease starting score">&lt;</button>
+            <div class="setupStepValue" data-stepper-value>—</div>
+            <button type="button" class="setupStepBtn" data-step="inc" aria-label="Increase starting score">&gt;</button>
+          </div>
+          <select id="hcpP0Start" class="setupHiddenControl" aria-hidden="true" tabindex="-1">
+            <option value="121">121</option><option value="301">301</option><option value="501">501</option><option value="701">701</option>
+          </select>
+        </div>
+
+        <div class="handicapRow">
+          <div class="handicapLabel">Check-in</div>
+          <div class="btnGroup" data-control="hcpP0CheckIn">
+            <button type="button" data-value="straight">Straight</button>
+            <button type="button" data-value="double">Double</button>
+          </div>
+          <select id="hcpP0CheckIn" class="hiddenControl" aria-hidden="true" tabindex="-1">
+            <option value="straight" selected>Straight</option>
+            <option value="double">Double</option>
+          </select>
+        </div>
+
+        <div class="handicapRow">
+          <div class="handicapLabel">Check-out</div>
+          <div class="btnGroup" data-control="hcpP0CheckOut">
+            <button type="button" data-value="straight">Straight</button>
+            <button type="button" data-value="double">Double</button>
+          </div>
+          <select id="hcpP0CheckOut" class="hiddenControl" aria-hidden="true" tabindex="-1">
+            <option value="straight">Straight</option>
+            <option value="double" selected>Double</option>
+          </select>
+        </div>
+
+        <div class="handicapRow">
+          <div class="handicapLabel">Finish</div>
+          <div class="btnGroup" data-control="hcpP0Finish">
+            <button type="button" data-value="exact">Exact</button>
+            <button type="button" data-value="goover">Go over</button>
+          </div>
+          <select id="hcpP0Finish" class="hiddenControl" aria-hidden="true" tabindex="-1">
+            <option value="exact" selected>Exact</option>
+            <option value="goover">Go over</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="handicapCol">
+        <div class="handicapHeader" id="hcpP2Name">Player 2</div>
+
+        <div class="handicapRow">
+          <div class="handicapLabel">Score multiplier</div>
+          <div class="setupStepper" data-setup-stepper data-target="hcpP1Mult" data-values="0.5,0.66,0.75,0.9,1.0,1.1,1.25,1.33,1.5,1.75,2.0">
+            <button type="button" class="setupStepBtn" data-step="dec" aria-label="Decrease multiplier">&lt;</button>
+            <div class="setupStepValue" data-stepper-value>—</div>
+            <button type="button" class="setupStepBtn" data-step="inc" aria-label="Increase multiplier">&gt;</button>
+          </div>
+          <select id="hcpP1Mult" class="setupHiddenControl" aria-hidden="true" tabindex="-1">
+            <option value="0.5">0.5</option><option value="0.66">0.66</option><option value="0.75">0.75</option><option value="0.9">0.9</option><option value="1.0">1.0</option><option value="1.1">1.1</option><option value="1.25">1.25</option><option value="1.33">1.33</option><option value="1.5">1.5</option><option value="1.75">1.75</option><option value="2.0">2.0</option>
+          </select>
+        </div>
+
+        <div class="handicapRow">
+          <div class="handicapLabel">Starting score</div>
+          <div class="setupStepper" data-setup-stepper data-target="hcpP1Start" data-values="121,301,501,701">
+            <button type="button" class="setupStepBtn" data-step="dec" aria-label="Decrease starting score">&lt;</button>
+            <div class="setupStepValue" data-stepper-value>—</div>
+            <button type="button" class="setupStepBtn" data-step="inc" aria-label="Increase starting score">&gt;</button>
+          </div>
+          <select id="hcpP1Start" class="setupHiddenControl" aria-hidden="true" tabindex="-1">
+            <option value="121">121</option><option value="301">301</option><option value="501">501</option><option value="701">701</option>
+          </select>
+        </div>
+
+        <div class="handicapRow">
+          <div class="handicapLabel">Check-in</div>
+          <div class="btnGroup" data-control="hcpP1CheckIn">
+            <button type="button" data-value="straight">Straight</button>
+            <button type="button" data-value="double">Double</button>
+          </div>
+          <select id="hcpP1CheckIn" class="hiddenControl" aria-hidden="true" tabindex="-1">
+            <option value="straight" selected>Straight</option>
+            <option value="double">Double</option>
+          </select>
+        </div>
+
+        <div class="handicapRow">
+          <div class="handicapLabel">Check-out</div>
+          <div class="btnGroup" data-control="hcpP1CheckOut">
+            <button type="button" data-value="straight">Straight</button>
+            <button type="button" data-value="double">Double</button>
+          </div>
+          <select id="hcpP1CheckOut" class="hiddenControl" aria-hidden="true" tabindex="-1">
+            <option value="straight">Straight</option>
+            <option value="double" selected>Double</option>
+          </select>
+        </div>
+
+        <div class="handicapRow">
+          <div class="handicapLabel">Finish</div>
+          <div class="btnGroup" data-control="hcpP1Finish">
+            <button type="button" data-value="exact">Exact</button>
+            <button type="button" data-value="goover">Go over</button>
+          </div>
+          <select id="hcpP1Finish" class="hiddenControl" aria-hidden="true" tabindex="-1">
+            <option value="exact" selected>Exact</option>
+            <option value="goover">Go over</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <button id="hcpResetBtn" class="setupSecondaryBtn">Reset</button>
+      <div style="flex:1"></div>
+      <button id="hcpCancelBtn">Cancel</button>
+      <button id="hcpSaveBtn">Save</button>
+    </div>
+    <div id="hcpError" class="errorText hidden"></div>
+  </div>
+</div>
+
+<div id="checkInModal" class="modal hidden">
     <div class="modal-card">
       <h2 id="checkInTitle">Check-in</h2>
       <p id="checkInBody">Did you hit the double?</p>

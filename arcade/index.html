@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Reech Darts • Arcade</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../style.css" />
+</head>
+
+<body class="dashboardPage">
+  <div class="dashboardShell">
+    <header class="dashHeader">
+      <div class="dashUser">
+        <button id="arcadeBackBtn" class="dashSettingsBtn" type="button" aria-label="Back">←</button>
+        <div class="dashUserMeta">
+          <div class="dashHello">Arcade Mode</div>
+          <div class="dashName" style="opacity:.8;font-size:14px;">Mini-games (Local + Online)</div>
+        </div>
+      </div>
+      <div style="width:48px;"></div>
+    </header>
+
+    <main class="dashMain">
+      <section class="dashPlayCol" style="margin-top: 6px;">
+        <div id="arcadeBullCard" class="dashPlayCard dashPlayLocal dashPlayCard--glow" role="button" tabindex="0" aria-label="Bull Challenge">
+          <img src="../img/icon_dart.png" class="dashboardGameIcon" alt="Bull Challenge" />
+          <div class="dashPlayText">
+            <div class="big">Bull Challenge</div>
+            <div class="small">Outer=1 • Bull=2</div>
+          </div>
+        </div>
+        <div id="arcadeAtcCard" class="dashPlayCard dashPlayLocal dashPlayCard--glow" role="button" tabindex="0" aria-label="Around the Clock">
+          <img src="../img/icon_dart.png" class="dashboardGameIcon" alt="Around the Clock" />
+          <div class="dashPlayText">
+            <div class="big">Around the Clock</div>
+            <div class="small">Hit 1→20</div>
+          </div>
+        </div>
+        <div id="arcadeHighScoreCard" class="dashPlayCard dashPlayLocal dashPlayCard--glow" role="button" tabindex="0" aria-label="High Score">
+          <img src="../img/icon_dart.png" class="dashboardGameIcon" alt="High Score" />
+          <div class="dashPlayText">
+            <div class="big">High Score</div>
+            <div class="small">Most points in X rounds</div>
+          </div>
+        </div>
+
+        
+        <div id="arcadeRoundsCard" class="dashPlayCard dashPlayLocal dashPlayCard--glow" role="button" tabindex="0" aria-label="Rounds">
+          <img src="../img/icon_dart.png" class="dashboardGameIcon" alt="Rounds" />
+          <div class="dashPlayText">
+            <div class="big">Rounds</div>
+            <div class="small">Win visits • First to X</div>
+          </div>
+        </div>
+
+        <div id="arcadeRaceCard" class="dashPlayCard dashPlayLocal dashPlayCard--glow" role="button" tabindex="0" aria-label="Race">
+          <img src="../img/icon_dart.png" class="dashboardGameIcon" alt="Race" />
+          <div class="dashPlayText">
+            <div class="big">Race</div>
+            <div class="small">First to target score</div>
+          </div>
+        </div>
+
+    <div class="dashPlayArrow">▶</div>
+  </div>
+</div>
+
+        </div>
+      </section>
+    </main>
+  </div>
+
+  
+  <!-- Mode pick modal -->
+  <div id="arcadeModePickModal" class="modal" role="dialog" aria-label="Choose local or online">
+    <div class="modal-card">
+      <h2 style="margin:0 0 10px 0;">Bull Challenge</h2>
+      <p style="opacity:.85; margin-top:0;">Choose how you want to play.</p>
+      <div class="arcadestartbuttons">
+        <div id="arcadePickLocalBtn" class="arcadelocal" role="button" tabindex="0">Local</div>
+        <div id="arcadePickOnlineBtn" class="arcadeonline" role="button" tabindex="0">Online</div>
+      </div>
+      <button id="arcadePickCancelBtn" class="arcadecancel" type="button">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Bull Challenge Setup (Local) -->
+  <div id="arcadeSetupLocalModal" class="modal" role="dialog" aria-label="Bull Challenge setup local">
+    <div class="modal-card">
+      <h2 style="margin:0 0 10px 0;">Bull Challenge • Local</h2>
+
+      <div id="bullSetupFieldsLocalRoot"></div>
+
+      <div class="arcadestartbuttons">
+        <button id="arcadeLocalStartMatchBtn" class="arcadestart" type="button" >Start Match</button>
+        <button id="arcadeLocalCancelBtn" class="arcadecancel" type="button">Cancel</button>
+      </div>
+
+
+    </div>
+  </div>
+
+  <!-- Bull Challenge Setup (Online) -->
+  <div id="arcadeSetupOnlineModal" class="modal" role="dialog" aria-label="Bull Challenge setup online">
+    <div class="modal-card">
+      <h2 style="margin:0 0 10px 0;">Bull Challenge • Online</h2>
+
+      <div id="bullSetupFieldsOnlineRoot"></div>
+
+      <div class="arcadestartbuttons">
+        <button id="arcadeOnlineStartMatchBtn" class="arcadestart" type="button">Start Match</button>
+        <button id="arcadeOnlineCancelBtn" class="arcadecancel" type="button">Cancel</button>
+      </div>
+
+
+    </div>
+  </div>
+
+
+  
+  <!-- Around the Clock: Mode pick modal -->
+  <div id="atcModePickModal" class="modal" role="dialog" aria-label="Choose local or online">
+    <div class="modal-card">
+      <h2 style="margin:0 0 10px 0;">Around the Clock</h2>
+      <p style="opacity:.85; margin-top:0;">Choose how you want to play.</p>
+      <div class="arcadestartbuttons">
+        <div id="atcPickLocalBtn" class="arcadelocal" role="button" tabindex="0">Local</div>
+        <div id="atcPickOnlineBtn" class="arcadeonline" role="button" tabindex="0">Online</div>
+      </div>
+      <button id="atcPickCancelBtn" class="arcadecancel" type="button">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Around the Clock Setup (Local) -->
+  <div id="atcSetupLocalModal" class="modal" role="dialog" aria-label="Around the Clock setup local">
+    <div class="modal-card">
+      <h2 style="margin:0 0 10px 0;">Around the Clock • Local</h2>
+
+      <div id="atcSetupFieldsLocalRoot"></div>
+
+      <div class="arcadestartbuttons">
+        <button id="atcLocalStartMatchBtn" class="arcadestart" type="button">Start Match</button>
+        <button id="atcLocalCancelBtn" class="arcadecancel" type="button">Cancel</button>
+      </div>
+
+
+    </div>
+  </div>
+
+  <!-- Around the Clock Setup (Online) -->
+  <div id="atcSetupOnlineModal" class="modal" role="dialog" aria-label="Around the Clock setup online">
+    <div class="modal-card">
+      <h2 style="margin:0 0 10px 0;">Around the Clock • Online</h2>
+
+      <div id="atcSetupFieldsOnlineRoot"></div>
+
+      <div class="arcadestartbuttons">
+        <button id="atcOnlineStartMatchBtn" class="arcadestart" type="button">Start Match</button>
+        <button id="atcOnlineCancelBtn" class="arcadecancel" type="button">Cancel</button>
+      </div>
+
+
+    </div>
+  </div>
+  
+  <!-- High Score: Mode pick modal -->
+  <div id="hsModePickModal" class="modal" role="dialog" aria-label="Choose local or online">
+    <div class="modal-card">
+      <h2 style="margin:0 0 10px 0;">High Score</h2>
+      <p style="opacity:.85; margin-top:0;">Choose how you want to play.</p>
+      <div class="arcadestartbuttons">
+        <div id="hsPickLocalBtn" class="arcadelocal" role="button" tabindex="0">Local</div>
+        <div id="hsPickOnlineBtn" class="arcadeonline" role="button" tabindex="0">Online</div>
+      </div>
+      <button id="hsPickCancelBtn" class="arcadecancel" type="button">Cancel</button>
+    </div>
+  </div>
+
+  <!-- High Score Setup (Local) -->
+  <div id="hsSetupLocalModal" class="modal" role="dialog" aria-label="High Score setup local">
+    <div class="modal-card">
+      <h2 style="margin:0 0 10px 0;">High Score • Local</h2>
+      <div id="hsSetupFieldsLocalRoot"></div>
+      <div class="arcadestartbuttons">
+        <button id="hsLocalStartMatchBtn" class="arcadestart" type="button">Start Match</button>
+        <button id="hsLocalCancelBtn" class="arcadecancel" type="button">Cancel</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- High Score Setup (Online) -->
+  <div id="hsSetupOnlineModal" class="modal" role="dialog" aria-label="High Score setup online">
+    <div class="modal-card">
+      <h2 style="margin:0 0 10px 0;">High Score • Online</h2>
+      <div id="hsSetupFieldsOnlineRoot"></div>
+      <div class="arcadestartbuttons">
+        <button id="hsOnlineStartMatchBtn" class="arcadestart" type="button">Start Match</button>
+        <button id="hsOnlineCancelBtn" class="arcadecancel" type="button">Cancel</button>
+      </div>
+
+    </div>
+  </div>
+
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script type="module" src="../arcade.js"></script>
+
+
+  <div id="incomingInviteModal" class="modal hidden">
+  <div class="modal-card" style="max-width:520px;">
+    <h3 style="margin-top:0;">Game invite</h3>
+    <div id="incomingInviteText" style="opacity:.95; margin:10px 0 14px 0;">—</div>
+    <div class="row" style="gap:10px; justify-content:center;">
+      <button id="incomingInviteOkBtn" class="actionBtn autowidth bluebutton" type="button" style="display:none;">OK</button>
+      <button id="incomingInviteDeclineBtn" class="actionBtn autowidth redbutton" type="button">Decline</button>
+      <button id="incomingInviteAcceptBtn" class="actionBtn autowidth greenbutton" type="button">Accept</button>
+    </div>
+  </div>
+</div>
+
+
+  <!-- Rounds: mode pick -->
+  <div id="roundsModePickModal" class="modal" role="dialog" aria-label="Choose local or online">
+    <div class="modal-card">
+      <h2 style="margin:0 0 10px 0;">Rounds</h2>
+      <p style="opacity:.85; margin-top:0;">Choose how you want to play.</p>
+      <div class="arcadestartbuttons">
+        <div id="roundsPickLocalBtn" class="arcadelocal" role="button" tabindex="0">Local</div>
+        <div id="roundsPickOnlineBtn" class="arcadeonline" role="button" tabindex="0">Online</div>
+      </div>
+      <button id="roundsPickCancelBtn" class="arcadecancel" type="button">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Rounds: local setup -->
+  <div id="roundsSetupLocalModal" class="modal" role="dialog" aria-label="Rounds local setup">
+    <div class="modal-card">
+      <h2 style="margin:0 0 10px 0;">Rounds (Local)</h2>
+      <div id="roundsSetupFieldsLocalRoot"></div>
+      <div class="arcadestartbuttons">
+        <button id="roundsStartLocalBtn" class="arcadestart" type="button">Start Match</button>
+        <button id="roundsLocalCancelBtn" class="arcadecancel" type="button">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rounds: online setup -->
+  <div id="roundsSetupOnlineModal" class="modal" role="dialog" aria-label="Rounds online setup">
+    <div class="modal-card">
+      <h2 style="margin:0 0 10px 0;">Rounds (Online)</h2>
+      <div id="roundsSetupFieldsOnlineRoot"></div>
+      <div class="arcadestartbuttons">
+        <button id="roundsStartOnlineBtn" class="arcadestart" type="button">Start Lobby</button>
+        <button id="roundsOnlineCancelBtn" class="arcadecancel" type="button">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+
+
+<!-- Race: pick local/online -->
+<div id="raceModePickModal" class="modal" role="dialog" aria-label="Race choose mode">
+  <div class="modal-card">
+    <h2 style="margin:0 0 10px 0;">Race</h2>
+    <p style="margin:0 0 14px 0;opacity:0.9;">Choose Local or Online</p>
+    <div class="arcadestartbuttons">
+      <div id="racePickLocalBtn" class="arcadelocal" role="button" tabindex="0">Local</div>
+      <div id="racePickOnlineBtn" class="arcadeonline" role="button" tabindex="0">Online</div>
+    </div>
+    <div>
+      <button id="racePickCancelBtn" class="arcadecancel" type="button">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Race: local setup -->
+<div id="raceSetupLocalModal" class="modal" role="dialog" aria-label="Race local setup">
+  <div class="modal-card">
+    <h2 style="margin:0 0 10px 0;">Race (Local)</h2>
+    <div id="raceSetupFieldsLocalRoot"></div>
+    <div class="arcadestartbuttons">
+      <button id="raceStartLocalBtn" class="arcadestart" type="button">Start Match</button>
+      <button id="raceLocalCancelBtn" class="arcadecancel" type="button">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Race: online setup -->
+<div id="raceSetupOnlineModal" class="modal" role="dialog" aria-label="Race online setup">
+  <div class="modal-card">
+    <h2 style="margin:0 0 10px 0;">Race (Online)</h2>
+    <div id="raceSetupFieldsOnlineRoot"></div>
+    <div class="arcadestartbuttons">
+      <button id="raceStartOnlineBtn" class="arcadestart" type="button">Start Match</button>
+      <button id="raceOnlineCancelBtn" class="arcadecancel" type="button">Cancel</button>
+    </div>
+  </div>
+</div>
+
+
+</body>
+</html>

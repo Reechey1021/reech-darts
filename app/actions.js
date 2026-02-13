@@ -4,6 +4,7 @@ import { getActorId, getActorName } from "./auth.js";
 import { setGameIdInUrl, clearGameIdFromUrl, withBase } from "./routing.js";
 import { bindGameListener, resetRealtimeStateForGameSwitch } from "./realtime.js";
 import { makeNewMatch, makeFreshLeg, starterForLeg } from "./model/match.js";
+import { encodeGhostToken, parseGhostToken, saveGhostNamed, hasGhost } from "./ghosts/ghosts.js";
 import {
   IMPOSSIBLE_TURN_SCORES,
 } from "./model/constants.js";
@@ -25,6 +26,48 @@ import { makeRng } from "./nemesis/rng.js";
 import { showError, safeFocusScoreInput, setLobbyGateVisible, setInviteModalVisible, setSetupModalVisible, setNemesisMatchSetupModalVisible, setConfirmNewMatchModalVisible, setWinnerModalVisible } from "./ui/render.js";
 import { canScoreNow, mySeatIndex, isHost } from "./permissions.js";
 import { clearDarts } from "./input/dartpad.js";
+
+// ---------------------------------------------------------------------------
+// Ghost Mode helpers
+// ---------------------------------------------------------------------------
+// We intentionally derive scored visit totals from leg.history using before/after
+// deltas so it remains correct for busts and double-in (where an entered score may
+// not be counted).
+function scoredVisitsForPlayer(leg, playerIdx) {
+  const out = [];
+  if (!leg || !Array.isArray(leg.history)) return out;
+  for (const h of leg.history) {
+    if (!h || h.player !== playerIdx) continue;
+    const before = Number(h.before);
+    const after = Number(h.after);
+    if (!Number.isFinite(before) || !Number.isFinite(after)) {
+      out.push(0);
+      continue;
+    }
+    // Busts score 0 (even if entered was non-zero).
+    if (h.bust === true) {
+      out.push(0);
+      continue;
+    }
+    const delta = before - after;
+    out.push(Number.isFinite(delta) && delta > 0 ? Math.max(0, Math.min(180, Math.floor(delta))) : 0);
+  }
+  return out;
+}
+
+function checkoutDartsUsedForPlayer(leg, playerIdx) {
+  if (!leg || !Array.isArray(leg.history)) return null;
+  // Find the last checkout entry for this player.
+  for (let i = leg.history.length - 1; i >= 0; i--) {
+    const h = leg.history[i];
+    if (!h || h.player !== playerIdx) continue;
+    if (h.checkout === true && Number.isFinite(Number(h.dartsUsed))) {
+      const du = Math.floor(Number(h.dartsUsed));
+      return du >= 1 && du <= 3 ? du : null;
+    }
+  }
+  return null;
+}
 // ---------- Routing / switching ----------
 export function switchToGame(newGameId) {
   const id = String(newGameId || "").trim();
@@ -82,6 +125,9 @@ export async function createNewGameAndShowInvite({ lobbyType = "online", openInv
     updatedAt: now,
     expiresAt,
     status: "lobby",
+
+    // Runtime split: classic darts games are played on /game/
+    runtime: "classic",
 
     lobbyType,
 
@@ -154,7 +200,7 @@ export async function leaveMatch() {
 
     if (app.gameRef && state && state.lobbyType === "online") {
       // Lobby (no active match yet)
-      if (state.status === "lobby" && !state.match) {
+      if ((state.status === "lobby" || state.status === "readyroom") && !state.match) {
         if (actorId && state.seat1Id && actorId === state.seat1Id) {
           // Host leaving: close lobby so joiners can't enter
           await app.gameRef.update({
@@ -261,6 +307,18 @@ await app.db.runTransaction(async (tx) => {
       // Preserve extra match-level fields
       fresh.match.starting = match.starting || "random";
       fresh.match.competition = match.competition || "casual";
+
+// Handicaps NEVER carry over into a new match
+try {
+  const r = fresh.match.rules || {};
+  fresh.match.handicaps = {
+    enabled: false,
+    p0: { multiplier: 1, startScore: fresh.match.mode, checkIn: r.checkIn || "straight", checkOut: r.checkOut || "double", finish: "exact" },
+    p1: { multiplier: 1, startScore: fresh.match.mode, checkIn: r.checkIn || "straight", checkOut: r.checkOut || "double", finish: "exact" },
+  };
+} catch (_) {}
+
+
       // Preserve mutual control EXACTLY for online matches.
       // (Any non-online game type should behave local-only.)
       fresh.match.allowMutualControl =
@@ -385,27 +443,115 @@ export async function startMatchFromSetup() {
         ? (String(lobby.seat2Name || "Nemesis").trim() || "Nemesis")
         : (lobbyType === "local" ? p2Input : (String(joinerName).trim() || "Player 2"));
 
+      // Seat 2 may join after setup; Ready Room handles consent + gating for online games.
       const seat2 = lobby.seat2Id || lobby?.match?.seat2Id || lobby?.lobby?.joiner?.actorId;
-      if (lobbyType === "online" && !seat2) {
-        throw new Error("Waiting for Player 2 to join…");
-      }
 
 
-      const state = makeNewMatch({ mode, bestOf, p1Name, p2Name });
-      // Rules (stored; gameplay behavior unchanged in Stage 1)
-      state.match.rules = {
+      const rulesPayload = {
         preset,
         checkIn,
         checkOut,
         trackCheckoutStats,
       };
-      // Initialize per-player check-in state for the leg (Straight In => already checked in; Double In => must check in)
-      const _checkedInInit = checkIn !== "double";
-      if (state.leg && Array.isArray(state.leg.players)) {
-        state.leg.players = state.leg.players.map(p => ({ ...p, checkedIn: _checkedInInit }));
+
+      // Handicaps (Casual only; never persisted; reset each new match)
+      const competitionIsRanked = String(competition) === "competitive";
+      const hcpEnabledCandidate = !competitionIsRanked && String(preset) === "x01";
+      const readHcpPlayer = (idx) => {
+        const multEl = document.getElementById(idx === 0 ? "hcpP0Mult" : "hcpP1Mult");
+        const startEl = document.getElementById(idx === 0 ? "hcpP0Start" : "hcpP1Start");
+        const inEl = document.getElementById(idx === 0 ? "hcpP0CheckIn" : "hcpP1CheckIn");
+        const outEl = document.getElementById(idx === 0 ? "hcpP0CheckOut" : "hcpP1CheckOut");
+        const finEl = document.getElementById(idx === 0 ? "hcpP0Finish" : "hcpP1Finish");
+        const mult = Number(String(multEl?.value || "1").replace("x","").trim());
+        const startScore = Number(startEl?.value || mode);
+        const hIn = String(inEl?.value || checkIn);
+        const hOut = String(outEl?.value || checkOut);
+        const finish = String(finEl?.value || "exact");
+        return {
+          multiplier: (Number.isFinite(mult) && mult > 0) ? mult : 1,
+          startScore: (Number.isFinite(startScore) && startScore > 0) ? Math.round(startScore) : mode,
+          checkIn: hIn,
+          checkOut: hOut,
+          finish: finish === "goover" ? "goover" : "exact",
+        };
+      };
+
+      const defaultP = { multiplier: 1, startScore: mode, checkIn, checkOut, finish: "exact" };
+      const p0H = hcpEnabledCandidate ? readHcpPlayer(0) : { ...defaultP };
+      const p1H = hcpEnabledCandidate ? readHcpPlayer(1) : { ...defaultP };
+
+      const differs = (p) => {
+        return Math.abs(Number(p.multiplier) - 1) > 1e-9 ||
+          Number(p.startScore) !== Number(mode) ||
+          String(p.checkIn) !== String(checkIn) ||
+          String(p.checkOut) !== String(checkOut) ||
+          String(p.finish) !== "exact";
+      };
+      const handicapsActive = hcpEnabledCandidate && (differs(p0H) || differs(p1H));
+
+      const handicapsPayload = {
+        enabled: handicapsActive,
+        p0: p0H,
+        p1: p1H,
+      };
+
+      // Handicaps disable doubles tracking (setup enforces it too, but double-enforce server-side)
+      if (handicapsActive) {
+        rulesPayload.trackCheckoutStats = false;
       }
 
+      // Online (non-Nemesis): move into Ready Room instead of starting immediately.
+      if (lobbyType === "online" && !isNemesis) {
+        const ready = {};
+        if (lobby.seat1Id) ready[lobby.seat1Id] = false;
+        if (lobby.seat2Id) ready[lobby.seat2Id] = false;
 
+        lobby.readyRoom = {
+          setup: {
+            mode,
+            bestOf,
+            starterChoice,
+            rules: rulesPayload,
+            handicaps: handicapsPayload,
+            competition,
+            allowMutualControl,
+          },
+          ready,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        };
+
+        lobby.status = "readyroom";
+        lobby.updatedAt = new Date();
+        lobby.expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+        // Preserve lobby name fields for UI
+        lobby.seat1Name = lobby.seat1Name || p1Name;
+        lobby.seat2Name = lobby.seat2Name || (lobby.seat2Id ? p2Name : null);
+
+        tx.set(app.gameRef, lobby);
+        return;
+      }
+
+      const state = makeNewMatch({ mode, bestOf, p1Name, p2Name });
+      // Rules
+      state.match.rules = { ...rulesPayload };
+
+      // Handicaps
+      state.match.handicaps = { ...handicapsPayload };
+
+      // Initialize leg players with per-player start score + check-in state
+      if (state.leg && Array.isArray(state.leg.players)) {
+        const p0H = handicapsPayload.p0 || {};
+        const p1H = handicapsPayload.p1 || {};
+        const p0CheckedIn = String(p0H.checkIn || checkIn) !== "double";
+        const p1CheckedIn = String(p1H.checkIn || checkIn) !== "double";
+        state.leg.players = [
+          { ...state.leg.players[0], score: Number(p0H.startScore || mode), checkedIn: p0CheckedIn },
+          { ...state.leg.players[1], score: Number(p1H.startScore || mode), checkedIn: p1CheckedIn },
+        ];
+      }
 
       // Persist mode
       state.match.gameType = lobbyType; // "online" | "local"
@@ -511,6 +657,213 @@ export async function startMatchFromSetup() {
     showError(e?.message || "Could not start match.");
   }
 }
+
+
+// ----------------------------
+// Ready Room (online pre-game)
+// ----------------------------
+export async function toggleReadyRoom() {
+  if (!app.gameRef) return;
+  const actorId = getActorId();
+  if (!actorId) return;
+
+  try {
+    await app.db.runTransaction(async (tx) => {
+      const snap = await tx.get(app.gameRef);
+      const state = snap.data();
+      if (!state) return;
+      if (state.status !== "readyroom" || state.match) return;
+
+      state.readyRoom = state.readyRoom || {};
+      state.readyRoom.ready = state.readyRoom.ready || {};
+      const cur = !!state.readyRoom.ready[actorId];
+      state.readyRoom.ready[actorId] = !cur;
+      state.readyRoom.updatedAt = Date.now();
+      state.updatedAt = new Date();
+
+      tx.set(app.gameRef, state);
+    });
+  } catch (e) {
+    console.warn("toggleReadyRoom failed", e);
+    showError("Could not update ready state.");
+  }
+}
+
+// Host-only: return to setup (cancels Ready Room and resets readiness)
+export async function cancelReadyRoomBackToSetup() {
+  if (!app.gameRef) return;
+  const actorId = getActorId();
+  if (!actorId) return;
+
+  try {
+    await app.db.runTransaction(async (tx) => {
+      const snap = await tx.get(app.gameRef);
+      const state = snap.data();
+      if (!state) return;
+      if (state.status !== "readyroom" || state.match) return;
+
+      const hostId = state.seat1Id || state?.lobby?.host?.actorId || null;
+      if (!hostId || hostId !== actorId) return;
+
+      state.status = "lobby";
+      state.readyRoom = null;
+      state.updatedAt = new Date();
+
+      tx.set(app.gameRef, state);
+    });
+  } catch (e) {
+    console.warn("cancelReadyRoomBackToSetup failed", e);
+    showError("Could not go back.");
+  }
+}
+
+// Host-only: if both players are ready, start the match from the stored setup.
+export async function maybeStartMatchFromReadyRoom() {
+  if (!app.gameRef) return false;
+  const actorId = getActorId();
+  if (!actorId) return false;
+
+  try {
+    let didStart = false;
+
+    await app.db.runTransaction(async (tx) => {
+      const snap = await tx.get(app.gameRef);
+      const lobby = snap.data() || {};
+      if (lobby.status !== "readyroom" || lobby.match) return;
+
+      const hostId = lobby.seat1Id || lobby?.lobby?.host?.actorId || null;
+      if (!hostId || hostId !== actorId) return;
+
+      const seat1Id = lobby.seat1Id || hostId;
+      const seat2Id = lobby.seat2Id || lobby?.lobby?.joiner?.actorId || null;
+      if (!seat2Id) return;
+
+      const ready = lobby?.readyRoom?.ready || {};
+      if (!(ready[seat1Id] === true && ready[seat2Id] === true)) return;
+
+      const setup = lobby?.readyRoom?.setup || null;
+      if (!setup) return;
+
+      const mode = Number(setup.mode || 501);
+      const bestOf = Number(setup.bestOf || 3);
+      const starterChoice = String(setup.starterChoice || "random");
+
+      const rulesPayload = setup.rules || {};
+      const preset = String(rulesPayload.preset || "x01");
+      const checkIn = String(rulesPayload.checkIn || "straight");
+      const checkOut = String(rulesPayload.checkOut || "double");
+      const trackCheckoutStats = !!rulesPayload.trackCheckoutStats;
+
+      const competition = String(setup.competition || "casual");
+      const allowMutualControl = !!setup.allowMutualControl;
+
+      const hostName = lobby?.lobby?.host?.name || lobby.seat1Name || "Player 1";
+      const joinerName = lobby?.lobby?.joiner?.name || lobby.seat2Name || "Player 2";
+      const p1Name = String(hostName).trim() || "Player 1";
+      const p2Name = String(joinerName).trim() || "Player 2";
+
+      const state = makeNewMatch({ mode, bestOf, p1Name, p2Name });
+
+      // Rules + Handicaps
+      state.match.rules = { preset, checkIn, checkOut, trackCheckoutStats };
+
+      const handicapsPayload = setup.handicaps || { enabled: false, p0: { multiplier: 1, startScore: mode, checkIn, checkOut, finish: "exact" }, p1: { multiplier: 1, startScore: mode, checkIn, checkOut, finish: "exact" } };
+      state.match.handicaps = handicapsPayload;
+
+      if (handicapsPayload?.enabled) {
+        state.match.rules.trackCheckoutStats = false;
+      }
+
+      // Initialize leg players with per-player start score + check-in state
+      if (state.leg && Array.isArray(state.leg.players)) {
+        const p0H = handicapsPayload.p0 || {};
+        const p1H = handicapsPayload.p1 || {};
+        const p0CheckedIn = String(p0H.checkIn || checkIn) !== "double";
+        const p1CheckedIn = String(p1H.checkIn || checkIn) !== "double";
+        state.leg.players = [
+          { ...state.leg.players[0], score: Number(p0H.startScore || mode), checkedIn: p0CheckedIn },
+          { ...state.leg.players[1], score: Number(p1H.startScore || mode), checkedIn: p1CheckedIn },
+        ];
+      }
+
+      // Match meta
+      state.match.competition = competition;
+      state.match.allowMutualControl = allowMutualControl;
+
+      // Attach player identity + photos from lobby actors
+      const hostUid = lobby?.lobby?.host?.uid || null;
+      const joinerUid = lobby?.lobby?.joiner?.uid || null;
+      state.match.players[0].uid = hostUid;
+      state.match.players[1].uid = joinerUid;
+
+      const hostPhotoURL = lobby?.lobby?.host?.photoURL || lobby.seat1PhotoURL || null;
+      const joinerPhotoURL = lobby?.lobby?.joiner?.photoURL || lobby.seat2PhotoURL || null;
+      state.match.players[0].photoURL = hostPhotoURL;
+      state.match.players[1].photoURL = joinerPhotoURL;
+      state.match.seat1PhotoURL = hostPhotoURL;
+      state.match.seat2PhotoURL = joinerPhotoURL;
+
+      // Starter selection
+      state.match.starting = starterChoice;
+      if (starterChoice === "p1") {
+        state.match.starterLeg1 = 0;
+        state.leg.currentPlayer = 0;
+      } else if (starterChoice === "p2") {
+        state.match.starterLeg1 = 1;
+        state.leg.currentPlayer = 1;
+      } else if (starterChoice === "bull") {
+        state.match.bull = initBullState();
+        state.match.starterLeg1 = 0;
+        state.leg.currentPlayer = 0;
+      }
+
+      // Lifecycle + seating
+      state.expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      state.status = "active";
+      state.match.hostId = hostId;
+      state.match.gameType = "online";
+      state.match.seat1Id = seat1Id;
+      state.match.seat2Id = seat2Id;
+
+      // Match start audio (if not bull)
+      if (starterChoice !== "bull") {
+        const starterName = (state.match?.players?.[state.leg.currentPlayer]?.name) || "";
+        const clips = [];
+        const nameClip = nameClipForDisplayName(starterName);
+        if (nameClip) {
+          clips.push(nameClip);
+          clips.push("/audio/phrases/ThrowFirst.mp3");
+        } else {
+          clips.push("/audio/phrases/match_start.mp3");
+        }
+        setAudioEvent(state, clips);
+      }
+
+      // Write back into existing doc while preserving lobby metadata
+      const next = {
+        ...lobby,
+        lobbyType: "online",
+        match: state.match,
+        leg: state.leg,
+        audio: state.audio || null,
+        pendingCheckout: null,
+        status: state.status,
+        expiresAt: state.expiresAt,
+        updatedAt: new Date(),
+        readyRoom: null,
+      };
+
+      tx.set(app.gameRef, next);
+      didStart = true;
+    });
+
+    return didStart;
+  } catch (e) {
+    console.error("maybeStartMatchFromReadyRoom failed", e);
+    return false;
+  }
+}
+
 
 export async function startMatchFromNemesisSetup() {
   if (!app.gameRef) {
@@ -649,7 +1002,18 @@ export async function submitScore() {
     }
     entered = app.dartThrows.reduce((a, b) => a + (Number(b) || 0), 0);
   } else {
-    entered = Number(inputEl?.value);
+    // Handicap preview writes the input as "raw → effective".
+    // We always treat the LEFT side as the authoritative raw score.
+    const rawVal = String(inputEl?.value || "").trim();
+    // If nothing was entered, treat as "No score" (0) like the original behavior.
+    if (rawVal === "") {
+      entered = 0;
+    } else if (rawVal.includes("→") && typeof app.__rawScoreInput === "string" && app.__rawScoreInput.trim() !== "") {
+      entered = Number(app.__rawScoreInput);
+    } else {
+      const m = rawVal.match(/-?\d+(?:\.\d+)?/);
+      entered = m ? Number(m[0]) : NaN;
+    }
   }
 
   if (!Number.isFinite(entered) || entered < 0 || entered > 180) {
@@ -663,12 +1027,10 @@ export async function submitScore() {
   }
 
   
-  // DEBUG: check-in prompt tracing
+  // Keep raw score buffer tidy (used by handicap preview in keypad mode)
   try {
-    const st0 = app.latestState;
-    const rule0 = st0?.match?.rules || {};
-    console.log("[checkin] submitScore entered=", entered, "checkIn=", rule0.checkIn, "trackCheckoutStats=", rule0.trackCheckoutStats, "currentPlayer=", st0?.leg?.currentPlayer, "p.checkedIn=", st0?.leg?.players?.[st0?.leg?.currentPlayer]?.checkedIn);
-  } catch (e) { console.log("[checkin] debug preamble failed", e); }
+    if (!String(inputEl?.value || "").includes("→")) app.__rawScoreInput = "";
+  } catch (_) {}
 
   // Pre-prompt for Double-In tracking (never prompt inside a Firestore transaction).
   app.__checkInDecision = null;
@@ -792,6 +1154,8 @@ try {
   app.__checkoutAttemptDecision = null;
 }
 
+
+
 await app.db.runTransaction(async (tx) => {
     const snap = await tx.get(app.gameRef);
     const state = snap.data();
@@ -829,9 +1193,21 @@ await app.db.runTransaction(async (tx) => {
     const p = state.leg.currentPlayer;
     const playerObj = state.leg.players[p] || {};
     const oldScore = playerObj.score;
-    const checkOutRule = state.match?.rules?.checkOut || "double";
-    const checkInRule = state.match?.rules?.checkIn || "straight";
-    const trackCheckoutStats = state.match?.rules?.trackCheckoutStats === true;
+
+    const matchRules = state.match?.rules || {};
+    const h = state.match?.handicaps;
+    const ph = (h && h.enabled === true) ? (h["p" + p] || {}) : null;
+
+    const multiplier = Number(ph?.multiplier ?? 1);
+    const enteredEffective = (Number.isFinite(multiplier) && multiplier > 0)
+      ? Math.round(Number(entered) * multiplier)
+      : Number(entered);
+
+    const finishRule = String(ph?.finish || "exact"); // "exact" | "goover"
+    const checkOutRule = String(ph?.checkOut || matchRules.checkOut || "double");
+    const checkInRule = String(ph?.checkIn || matchRules.checkIn || "straight");
+    const trackCheckoutStats = matchRules.trackCheckoutStats === true;
+
 
     const checkedInBefore = playerObj.checkedIn !== false; // default true for old legs
     let checkedInAfter = checkedInBefore;
@@ -857,18 +1233,21 @@ await app.db.runTransaction(async (tx) => {
       }
     }
 
-    const newScore = oldScore - entered;
-    if (isImpossibleCheckout(oldScore, entered, checkOutRule)) {
+    const newScore = oldScore - enteredEffective;
+    if (Math.abs((Number.isFinite(multiplier)?multiplier:1) - 1) < 1e-9 && finishRule !== "goover" && isImpossibleCheckout(oldScore, enteredEffective, checkOutRule)) {
       showError("This checkout is not possible");
       return;
     }
 
     // Checkout confirmation path
-    if (newScore === 0) {
+    if (newScore === 0 || (finishRule === "goover" && newScore <= 0)) {
       state.pendingCheckout = {
         player: p,
         actorId: getActorId(),
-        entered,
+        entered: enteredEffective,
+        enteredRaw: entered,
+        multiplier,
+        finishRule,
         before: oldScore,
         minDarts: minDartsForCheckout(oldScore, checkOutRule),
         at: new Date(),
@@ -916,9 +1295,8 @@ checkoutAttemptDartsOnDouble: (() => {
 })(),
     });
 
-    if (!bust) {
-      state.leg.players[p].score = newScore;
-    }
+    // Update current player's remaining score
+    state.leg.players[p].score = bust ? oldScore : newScore;
 
     // Apply checked-in state (double-in)
     if (state.match?.rules?.checkIn === "double") {
@@ -928,7 +1306,7 @@ checkoutAttemptDartsOnDouble: (() => {
     state.leg.currentPlayer = (state.leg.currentPlayer + 1) % 2;
 
     // Audio: score + (optional) require
-    const scoreCallType = bust || entered === 0 ? "no_score" : "number";
+    const scoreCallType = bust || enteredEffective === 0 ? "no_score" : "number";
 
     const nextP = state.leg.currentPlayer;
     // Prefer seat names (most consistently updated), fall back to players[].name.
@@ -939,7 +1317,7 @@ checkoutAttemptDartsOnDouble: (() => {
 
     const clips = buildVisitClips({
       scoreCallType,
-      entered,
+      entered: enteredEffective,
       nextPlayerName: nextName,
       nextRemaining,
       nextIsNemesis: !!(state?.nemesis?.enabled) && (nextP === 1),
@@ -1238,6 +1616,12 @@ leg.players[p].score = 0;
       match.legs.push({
         winner: p,
         checkoutScore: oldScore,
+      starter: starterForLeg(match),
+      // Firestore does not support nested arrays, so store flat arrays per player.
+      visitsScoredP0: scoredVisitsForPlayer(leg, 0),
+      visitsScoredP1: scoredVisitsForPlayer(leg, 1),
+      checkoutDartsUsedP0: checkoutDartsUsedForPlayer(leg, 0),
+      checkoutDartsUsedP1: checkoutDartsUsedForPlayer(leg, 1),
         players: [s0, s1],
         finishedAt: new Date(),
       });
@@ -1351,12 +1735,14 @@ export async function confirmCheckout(dartsUsed, dartsOnDouble = null) {
     const oldScore = leg.players[p].score;
     const entered = pc.entered;
     const newScore = oldScore - entered;
+    const finishRule = String(pc.finishRule || "exact");
 
-    if (newScore !== 0) {
+    if (!(newScore === 0 || (finishRule === "goover" && newScore <= 0))) {
       state.pendingCheckout = null;
       tx.set(app.gameRef, state);
       return;
     }
+
 
     leg.history.push({
       player: p,
@@ -1441,6 +1827,12 @@ export async function confirmCheckout(dartsUsed, dartsOnDouble = null) {
       winner: p,
       // For match-end recap (e.g., highest checkout)
       checkoutScore: oldScore,
+      starter: starterForLeg(match),
+      // Firestore does not support nested arrays, so store flat arrays per player.
+      visitsScoredP0: scoredVisitsForPlayer(leg, 0),
+      visitsScoredP1: scoredVisitsForPlayer(leg, 1),
+      checkoutDartsUsedP0: checkoutDartsUsedForPlayer(leg, 0),
+      checkoutDartsUsedP1: checkoutDartsUsedForPlayer(leg, 1),
       players: [s0, s1],
       finishedAt: new Date(),
     });
@@ -1461,12 +1853,13 @@ export async function confirmCheckout(dartsUsed, dartsOnDouble = null) {
     const winnerName = (match.players?.[p]?.name) || "";
     const winnerNameClip = nameClipForDisplayName(winnerName);
 
+    const isNemesisWinner = !!(state?.nemesis?.enabled) && p === 1;
     if (match.status === "finished") {
       // Match finish announcement.
       // The shipped audio pack has the spoken content for GameShot/GameShotMatch
-      // swapped, so reference GameShot.mp3 here.
-      const isNemesisWinner = !!(state?.nemesis?.enabled) && p === 1;
-      const clips = [isNemesisWinner ? "/audio/phrases/nemesis_matchend.mp3" : "/audio/phrases/GameShot.mp3"];
+      // Match finish announcement.
+      // Use GameShotMatch for match end; GameShot for leg end.
+      const clips = [isNemesisWinner ? "/audio/phrases/nemesis_matchend.mp3" : "/audio/phrases/GameShotMatch.mp3"];
       if (!isNemesisWinner) {
         if (winnerNameClip) clips.push(winnerNameClip);
         clips.push("/audio/phrases/Congratulations.mp3");
@@ -1474,10 +1867,9 @@ export async function confirmCheckout(dartsUsed, dartsOnDouble = null) {
       setAudioEvent(state, clips);
     } else {
       // Leg finish announcement.
-      // The shipped audio pack has the spoken content for GameShot/GameShotMatch
-      // swapped, so reference GameShotMatch.mp3 here.
-      const isNemesisWinner = !!(state?.nemesis?.enabled) && p === 1;
-      const clips = [isNemesisWinner ? "/audio/phrases/nemesis_gameend.mp3" : "/audio/phrases/GameShotMatch.mp3"];
+      // Leg finish announcement.
+      // Use GameShot for leg end; GameShotMatch reserved for match end.
+      const clips = [isNemesisWinner ? "/audio/phrases/nemesis_gameend.mp3" : "/audio/phrases/GameShot.mp3"];
       if (!isNemesisWinner) {
         if (winnerNameClip) clips.push(winnerNameClip);
       }
@@ -1550,7 +1942,7 @@ export async function continueOrNewMatch() {
     if (match.status === "finished") return;
 
     const starter = starterForLeg(match);
-    state.leg = makeFreshLeg(match.mode, starter, match.rules);
+    state.leg = makeFreshLeg(match.mode, starter, { ...match.rules, handicaps: match.handicaps });
     state.pendingCheckout = null;
 
     // Nemesis: play "game on" when Nemesis starts the leg.
@@ -1657,4 +2049,344 @@ export async function undoLast() {
     state.updatedAt = new Date();
     tx.set(app.gameRef, state);
   });
+}
+
+// ---------------------------
+// Ghost Mode (local-only tokens)
+// ---------------------------
+
+export async function startGhostMatchFromToken(token) {
+  const parsed = parseGhostToken(token);
+  if (!parsed.ok) return { ok: false, reason: parsed.reason || "INVALID" };
+  if (!app.gameRef) return { ok: false, reason: "NO_GAME" };
+
+  // Start immediately from lobby (no setup screen).
+  await app.db.runTransaction(async (tx) => {
+    const snap = await tx.get(app.gameRef);
+    const state = snap.data();
+    if (!state || state.status !== "lobby") return;
+
+    const p1Name = getActorName() || "You";
+    const p2Name = "Your Ghost";
+
+    const matchWrap = makeNewMatch({
+      mode: parsed.startScore,
+      bestOf: 1,
+      p1Name,
+      p2Name,
+    });
+
+    // Apply rules from token
+    matchWrap.match.rules = {
+      preset: "x01",
+      checkIn: parsed.inRule,
+      checkOut: parsed.outRule,
+      trackCheckoutStats: true,
+    };
+
+    // Force deterministic starter based on token: if recorded player started, ghost starts (seat 2).
+    // So: startedFlag=1 => starter is seat 2; else seat 1.
+    const starter = parsed.started ? 1 : 0;
+    matchWrap.match.starterLeg1 = starter;
+    matchWrap.leg = makeFreshLeg(parsed.startScore, starter, matchWrap.match.rules);
+
+    // Mark ghost mode in match state
+    matchWrap.match.gameType = "single";
+    matchWrap.match.hostId = getActorId();
+    matchWrap.match.seat1Id = getActorId();
+    matchWrap.match.seat2Id = null;
+
+    matchWrap.match.ghost = {
+      enabled: true,
+      token: parsed.token,
+      visits: parsed.visits,
+      checkoutDartsUsed: parsed.checkoutDartsUsed,
+      index: 0,
+    };
+
+    state.status = "in_game";
+    state.match = matchWrap.match;
+    state.leg = matchWrap.leg;
+    state.pendingCheckout = null;
+    state.updatedAt = new Date();
+
+    tx.set(app.gameRef, state);
+  });
+
+  return { ok: true };
+}
+
+export async function submitGhostScore() {
+  if (!app.gameRef) return;
+  await app.db.runTransaction(async (tx) => {
+    const snap = await tx.get(app.gameRef);
+    const state = snap.data();
+    if (!state?.match || !state?.leg) return;
+    if (state.pendingCheckout) return;
+
+    const match = state.match;
+    const leg = state.leg;
+
+    if (match?.ghost?.enabled !== true) return;
+    if (leg.status !== "in_progress") return;
+    if (leg.currentPlayer !== 1) return; // ghost is seat 2
+
+    const ghost = match.ghost || {};
+    const visits = Array.isArray(ghost.visits) ? ghost.visits : [];
+    const idx = Math.max(0, Math.min(visits.length, Number(ghost.index || 0)));
+
+    // No more scripted visits => end (ghost wins if you haven't checked out).
+    if (idx >= visits.length) {
+      leg.status = "finished";
+      leg.winner = 1;
+    } else {
+      const entered = Math.max(0, Math.min(180, Math.round(Number(visits[idx]) || 0)));
+      const p = 1;
+      const oldScore = leg.players[p].score;
+      const checkOutRule = match.rules?.checkOut || "double";
+
+      const newScore = oldScore - entered;
+
+      // If this is the final scripted visit AND token includes checkout darts,
+      // treat it as a deterministic checkout (no UI prompt).
+      const isLast = (idx === visits.length - 1);
+      const du = isLast ? Number(ghost.checkoutDartsUsed || null) : null;
+      const willCheckout = isLast && [1,2,3].includes(du);
+
+      if (willCheckout) {
+        leg.history.push({
+          player: p,
+          entered,
+          bust: false,
+          before: oldScore,
+          after: 0,
+          dartsUsed: du,
+          at: new Date(),
+          checkout: true,
+          // For match-end stats: a checkout implies an opportunity + an attempt.
+          checkoutOpportunity: true,
+          attemptedCheckout: true,
+          // For double-out stats, count the winning dart as 1 dart on double.
+          checkoutAttemptDartsOnDouble: 1,
+          checkoutDartsOnDouble: 1,
+        });
+
+        leg.players[p].score = 0;
+        leg.status = "finished";
+        leg.winner = p;
+      } else {
+        // Normal scoring path (no prompts for ghost).
+        const bust = isBustScore(newScore, checkOutRule);
+
+        leg.history.push({
+          player: p,
+          entered,
+          bust,
+          before: oldScore,
+          after: bust ? oldScore : newScore,
+          dartsUsed: 3,
+          at: new Date(),
+          checkout: false,
+        });
+
+        if (!bust) {
+          leg.players[p].score = newScore;
+        }
+
+        // Advance turn
+        leg.currentPlayer = (leg.currentPlayer + 1) % 2;
+
+        // If this was the last scripted visit and we did not check out, end the leg now (ghost wins).
+        if (isLast) {
+          leg.status = "finished";
+          leg.winner = 1;
+        }
+      }
+
+      ghost.index = idx + 1;
+      match.ghost = ghost;
+
+      // Firestore-synced audio callouts for Ghost visits (Nemesis-style).
+      // Only announce when the leg continues (avoid "requires 0" on finishes).
+      try {
+        if (leg.status === "in_progress") {
+          const nextP = leg.currentPlayer;
+          const nextRemaining = Number(leg.players?.[nextP]?.score ?? 0);
+          const nextName = (nextP === 0)
+            ? (match.seat1Name || "Player 1")
+            : (match.seat2Name || "Player 2");
+          const clips = buildVisitClips({
+            scoreCallType: match.rules?.scoreCallType ?? "standard",
+            entered,
+            nextPlayerName: nextName,
+            nextRemaining,
+            nextIsNemesis: false,
+            checkOutRule: match.rules?.checkOut ?? "double",
+          });
+          setAudioEvent(state, clips);
+        }
+      } catch (e) { /* non-fatal */ }
+
+    }
+
+    // If leg ended, aggregate into match summary in the same format as confirmCheckout.
+    if (leg.status === "finished" && typeof leg.winner === "number") {
+      const pWin = leg.winner;
+      const s0 = calcLegStats(leg, 0);
+      const s1 = calcLegStats(leg, 1);
+
+      // Ensure checkout opportunity stats exist for auto-resolved Ghost legs
+      // (Ghost checkouts do not go through the manual checkout prompt path).
+      try {
+        const trackingOn2 = match.rules?.trackCheckoutStats === true;
+        const checkOutRule2 = match.rules?.checkOut || "double";
+        if (trackingOn2 && checkOutRule2 === "double") {
+          const checkoutOpp2 = [0, 0];
+          const checkoutDoublesThrown2 = [0, 0];
+          const checkoutDoublesHit2 = [0, 0];
+          for (const h of (leg.history || [])) {
+            if (!h || (h.player !== 0 && h.player !== 1)) continue;
+            const pIdx = h.player;
+            const isOpp = h.checkoutOpportunity === true || h.checkout === true;
+            if (isOpp) checkoutOpp2[pIdx] += 1;
+            if (h.attemptedCheckout === true) {
+              checkoutDoublesThrown2[pIdx] += Number(h.checkoutAttemptDartsOnDouble || 0);
+            }
+            if (h.checkout === true) {
+              checkoutDoublesHit2[pIdx] += 1;
+              checkoutDoublesThrown2[pIdx] += Number(h.checkoutDartsOnDouble || 0);
+            }
+          }
+          s0.checkoutOpp = checkoutOpp2[0];
+          s1.checkoutOpp = checkoutOpp2[1];
+          s0.checkoutDoublesThrown = checkoutDoublesThrown2[0];
+          s1.checkoutDoublesThrown = checkoutDoublesThrown2[1];
+          s0.checkoutDoublesHit = checkoutDoublesHit2[0];
+          s1.checkoutDoublesHit = checkoutDoublesHit2[1];
+        }
+      } catch (_) {}
+
+      // Minimal tracking summaries (keep compatible with match-end stats)
+      match.legs = match.legs || [];
+      match.legsWon = match.legsWon || [0, 0];
+
+      match.legs.push({
+        winner: pWin,
+        checkoutScore: (pWin === 1 && match.ghost?.checkoutDartsUsed) ? (leg.history?.[leg.history.length - 1]?.before || 0) : 0,
+        starter: starterForLeg(match),
+        // Firestore does not support nested arrays, so store flat arrays per player.
+        visitsScoredP0: scoredVisitsForPlayer(leg, 0),
+        visitsScoredP1: scoredVisitsForPlayer(leg, 1),
+        checkoutDartsUsedP0: checkoutDartsUsedForPlayer(leg, 0),
+        checkoutDartsUsedP1: checkoutDartsUsedForPlayer(leg, 1),
+        players: [s0, s1],
+        finishedAt: new Date(),
+      });
+
+      match.legsWon[pWin] += 1;
+      match.status = "finished";
+      match.winner = pWin;
+
+      state.pendingCheckout = null;
+    }
+
+    state.updatedAt = new Date();
+    tx.set(app.gameRef, state);
+  });
+}
+
+// Build a Ghost token from the leg currently shown in the winner modal.
+// This is safe to call even if the match moves on; callers can hold onto
+// the returned token and save it later.
+export async function prepareGhostFromWinnerModalView() {
+  const state = app.latestState;
+  if (!state?.match) return { ok: false, reason: "NO_STATE" };
+
+  const match = state.match;
+  const myIdx = mySeatIndex(state);
+
+  // Determine which leg is being viewed in the winner modal:
+  // - Between legs: always current leg in state.leg
+  // - Match finished: only allow saving when a Leg tab is selected.
+  const matchFinished = match.status === "finished";
+  const tab = app.matchStatsTab || "final";
+
+  let startScore = Number(match.mode || 501);
+  let inRule = match.rules?.checkIn || "straight";
+  let outRule = match.rules?.checkOut || "double";
+  let starter = null;
+  let visits = [];
+  let checkoutDartsUsed = null;
+  let winnerIdx = null;
+  let targetIdx = null;
+
+  if (!matchFinished) {
+    const leg = state.leg;
+    if (!leg) return { ok: false, reason: "NO_LEG" };
+    if (typeof leg.winner !== "number") return { ok: false, reason: "NO_WINNER" };
+
+    starter = starterForLeg(match);
+    winnerIdx = leg.winner;
+    targetIdx = winnerIdx;
+
+    // Online: you can only save your own leg, and only if you won.
+    if (match.gameType === "online" && myIdx !== winnerIdx) return { ok: false, reason: "NOT_WINNER" };
+
+    visits = scoredVisitsForPlayer(leg, targetIdx);
+    checkoutDartsUsed = checkoutDartsUsedForPlayer(leg, targetIdx);
+  } else {
+    if (!tab.startsWith("leg-")) return { ok: false, reason: "SELECT_LEG" };
+    const legNum = Number(tab.split("-")[1] || "0");
+    const legSum = (match.legs || [])[Math.max(0, legNum - 1)];
+    if (!legSum) return { ok: false, reason: "NO_LEG" };
+
+    starter = typeof legSum.starter === "number" ? legSum.starter : ((match.starterLeg1 + (legNum - 1)) % 2);
+    winnerIdx = typeof legSum.winner === "number" ? legSum.winner : null;
+    if (winnerIdx == null) return { ok: false, reason: "NO_WINNER" };
+    targetIdx = winnerIdx;
+
+    if (match.gameType === "online" && myIdx !== winnerIdx) return { ok: false, reason: "NOT_WINNER" };
+
+    const vs = (targetIdx === 0) ? legSum.visitsScoredP0 : legSum.visitsScoredP1;
+    visits = Array.isArray(vs) ? vs : [];
+    const cdu = (targetIdx === 0) ? legSum.checkoutDartsUsedP0 : legSum.checkoutDartsUsedP1;
+    checkoutDartsUsed = Number.isFinite(Number(cdu)) ? Number(cdu) : null;
+  }
+
+  // Ghost Mode only supports won legs (must have a checkout dart count).
+  if (!(Number.isFinite(Number(checkoutDartsUsed)) && Number(checkoutDartsUsed) >= 1 && Number(checkoutDartsUsed) <= 3)) {
+    return { ok: false, reason: "NO_CHECKOUT" };
+  }
+
+  // If the WINNING player has any handicap applied, do not allow saving as ghost.
+try {
+  const h = match.handicaps;
+  if (h && h.enabled === true) {
+    const ph = h["p" + targetIdx] || {};
+    const differs = (Math.abs(Number(ph.multiplier || 1) - 1) > 1e-9) ||
+      (Number(ph.startScore || startScore) !== Number(startScore)) ||
+      (String(ph.checkIn || inRule) !== String(inRule)) ||
+      (String(ph.checkOut || outRule) !== String(outRule)) ||
+      (String(ph.finish || "exact") !== "exact");
+    if (differs) return { ok: false, reason: "HANDICAP_WINNER" };
+  }
+} catch (_) {}
+
+const started = (targetIdx === starter);
+  const tok = encodeGhostToken({ startScore, inRule, outRule, started, visits, checkoutDartsUsed });
+
+  const exists = await hasGhost(tok);
+  if (exists) return { ok: false, reason: "DUPLICATE", token: tok };
+
+  return { ok: true, token: tok };
+}
+
+// Persist a previously prepared Ghost token under a user-provided name.
+
+
+
+
+export async function savePreparedGhostToken(token, name) {
+  const res = await saveGhostNamed(token, name);
+  return res;
 }

@@ -411,7 +411,11 @@ export function buildVisitClips({ scoreCallType, entered, nextPlayerName, nextRe
   if (scoreCallType === "no_score") {
     clips.push("/audio/phrases/no_score.mp3");
   } else {
-    clips.push(`/audio/numbers/${pad3(entered)}.mp3`);
+    const n = Number(entered);
+    // Handicap multipliers can exceed 180; if we don’t have audio for it, stay silent.
+    if (Number.isFinite(n) && n >= 0 && n <= 180) {
+      clips.push(`/audio/numbers/${pad3(n)}.mp3`);
+    }
   }
 
   // require call if next player is on a checkout

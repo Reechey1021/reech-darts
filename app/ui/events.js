@@ -15,8 +15,12 @@ import {
   createLocalGameAndOpenSetup,
   leaveMatch,
   restartMatch,
+  prepareGhostFromWinnerModalView,
+  savePreparedGhostToken,
+  toggleReadyRoom,
+  cancelReadyRoomBackToSetup,
 } from "../actions.js";
-import { applyTheme, initThemeToggle, showError, hideError, setInviteModalVisible, setSetupModalVisible, setLobbyGateVisible, openModal, closeModal, render } from "./render.js";
+import { applyTheme, initThemeToggle, showError, hideError, setInviteModalVisible, setSetupModalVisible, setLobbyGateVisible, openModal, closeModal, render, showSeatJoinToast } from "./render.js";
 import { unlockAudioOnce } from "../audio/audio.js";
 import { initBullUI } from "../bull/ui.js";
 import { initAuditChatUI, isAuditChatInputFocused, addAuditSystem } from "./auditChat.js";
@@ -24,6 +28,7 @@ import { signInWithGoogle, ensureAnonymousSignIn } from "../auth.js";
 import { setGuestDisplayName } from "../profile.js";
 import { openProfileModalForPlayerIndex as openProfileForPlayer } from "./profileModal.js";
 import { initProfileModalUI as wireProfileModalClose } from "./profileModal.js";
+import { sendGameInvite } from "../friends.js";
 import {
   setInputMode,
   setMult,
@@ -288,16 +293,203 @@ export function wireUI() {
   if (copyInviteBtn) {
     copyInviteBtn.addEventListener("click", async () => {
       const text = document.getElementById("inviteLinkText")?.textContent || "";
-      try { await navigator.clipboard.writeText(text); } catch { }
-
-      const msg = document.getElementById("inviteCopyMsg");
-      if (msg) {
-        msg.classList.remove("hidden");
-        clearTimeout(window.__inviteCopyTimer);
-        window.__inviteCopyTimer = setTimeout(() => msg.classList.add("hidden"), 1500);
+      try {
+        await navigator.clipboard.writeText(text);
+        const old = copyInviteBtn.innerText;
+        copyInviteBtn.innerText = "Copied ✓";
+        copyInviteBtn.disabled = true;
+        setTimeout(() => {
+          copyInviteBtn.innerText = old;
+          copyInviteBtn.disabled = false;
+        }, 1200);
+      } catch (_) {
+        // Fallback: briefly show the existing inline message if present.
+        const msg = document.getElementById("inviteCopyMsg");
+        if (msg) {
+          msg.classList.remove("hidden");
+          clearTimeout(window.__inviteCopyTimer);
+          window.__inviteCopyTimer = setTimeout(() => msg.classList.add("hidden"), 1500);
+        }
       }
     });
   }
+
+  // ----------------------------
+  // Ready Room: Invite Friends (Classic /game/ runtime)
+  // ----------------------------
+  const inviteFriendsModal = document.getElementById("inviteFriendsModal");
+  const inviteFriendsList = document.getElementById("inviteFriendsList");
+  const inviteFriendsEmpty = document.getElementById("inviteFriendsEmpty");
+  const inviteFriendsCloseBtn = document.getElementById("inviteFriendsCloseBtn");
+
+  const openInviteFriendsModal = async () => {
+    if (!inviteFriendsModal) return;
+    if (inviteFriendsList) inviteFriendsList.innerHTML = "";
+    if (inviteFriendsEmpty) {
+      inviteFriendsEmpty.textContent = "No friends yet.";
+      inviteFriendsEmpty.classList.add("hidden");
+    }
+
+    const uid = (app.user && !app.user.isAnonymous) ? app.user.uid : null;
+    if (!uid || !app.db) {
+      if (inviteFriendsEmpty) {
+        inviteFriendsEmpty.textContent = "Sign in to invite friends.";
+        inviteFriendsEmpty.classList.remove("hidden");
+      }
+      openModal(inviteFriendsModal);
+      return;
+    }
+
+    try {
+      const snap = await app.db.collection("users").doc(uid).collection("friends").get();
+      const rows = [];
+      snap.forEach((doc) => {
+        const f = doc.data() || {};
+        rows.push({
+          uid: doc.id,
+          name: f.name || f.displayName || f.username || f.handle || "Friend",
+          photoURL: f.photoURL || f.photoUrl || null,
+        });
+      });
+
+      if (!rows.length) {
+        if (inviteFriendsEmpty) {
+          inviteFriendsEmpty.textContent = "No friends yet.";
+          inviteFriendsEmpty.classList.remove("hidden");
+        }
+      } else if (inviteFriendsList) {
+        inviteFriendsList.innerHTML = rows.map((f) => {
+          const img = f.photoURL ? `<img class="dashAvatar" src="${f.photoURL}" alt="Friend photo" />` : `<div class="dashAvatar hidden"></div>`;
+          return `
+            <div class="readyroomdashIdentity" style="justify-content:space-between; margin:10px 0;">
+              <div class="readyDIwrapper">
+                ${img}
+                <div>
+                  <div class="dashName" style="font-size:20px;">${f.name}</div>
+                </div>
+              </div>
+              <button class="actionBtn autowidth" type="button" data-invite-uid="${f.uid}">Invite</button>
+            </div>
+          `;
+        }).join("");
+      }
+    } catch (err) {
+      console.error(err);
+      if (inviteFriendsEmpty) {
+        inviteFriendsEmpty.textContent = "Could not load friends.";
+        inviteFriendsEmpty.classList.remove("hidden");
+      }
+    }
+
+    openModal(inviteFriendsModal);
+  };
+
+  if (inviteFriendsCloseBtn && inviteFriendsModal) {
+    inviteFriendsCloseBtn.addEventListener("click", () => closeModal(inviteFriendsModal));
+  }
+
+  if (inviteFriendsList) {
+    inviteFriendsList.addEventListener("click", (e) => {
+      const btn = e.target && e.target.closest ? e.target.closest("button[data-invite-uid]") : null;
+      if (!btn) return;
+      const toUid = btn.getAttribute("data-invite-uid") || "";
+      const fromUid = (app.user && !app.user.isAnonymous) ? app.user.uid : null;
+      if (!toUid || !fromUid || !app.db || !app.gameId) return;
+
+      const fromName = (app.user.displayName || app.user.email || "Player");
+      const fromPhotoURL = (app.user && !app.user.isAnonymous) ? (app.user.photoURL || null) : null;
+
+      (async () => {
+        try {
+          btn.disabled = true;
+          await sendGameInvite(app.db, fromUid, toUid, app.gameId, { fromName, fromPhotoURL, mode: "classic" });
+          btn.textContent = "Invited";
+        } catch (err) {
+          console.error(err);
+          showError(err?.message || String(err));
+          btn.disabled = false;
+        }
+      })();
+    });
+  }
+
+  // Seat2 placeholder proxies ("+" opens invite friends; "Copy Link" copies direct invite URL)
+  try {
+    const rr = document.getElementById("readyRoomModal");
+    if (rr) {
+      const copyLink = async () => {
+        if (!app.gameId) return;
+        const url = new URL(window.location.href);
+        url.searchParams.set("game", app.gameId);
+        url.searchParams.delete("openInvite");
+        url.searchParams.delete("autoSetup");
+        url.searchParams.delete("setup");
+        try {
+          await navigator.clipboard.writeText(url.toString());
+        } catch (_) {
+          // fallback
+          try {
+            const ta = document.createElement("textarea");
+            ta.value = url.toString();
+            ta.style.position = "fixed";
+            ta.style.opacity = "0";
+            document.body.appendChild(ta);
+            ta.focus();
+            ta.select();
+            document.execCommand("copy");
+            document.body.removeChild(ta);
+          } catch (_) {}
+        }
+      };
+
+      rr.addEventListener("click", (e) => {
+        const inv = e.target && e.target.closest ? e.target.closest('[data-role="readyInviteFriendsProxy"]') : null;
+        if (inv) {
+          e.preventDefault();
+          openInviteFriendsModal();
+          return;
+        }
+        const cpy = e.target && e.target.closest ? e.target.closest('[data-role="readyCopyInviteProxy"]') : null;
+        if (cpy) {
+          e.preventDefault();
+          try {
+            const orig = (cpy.dataset && cpy.dataset.origText) ? cpy.dataset.origText : (cpy.textContent || "Copy Link");
+            if (cpy.dataset && !cpy.dataset.origText) cpy.dataset.origText = orig;
+            cpy.textContent = "Copied";
+            if (cpy.__copiedTimer) clearTimeout(cpy.__copiedTimer);
+            cpy.__copiedTimer = setTimeout(() => {
+              try { cpy.textContent = (cpy.dataset && cpy.dataset.origText) ? cpy.dataset.origText : "Copy Link"; } catch (_) {}
+            }, 1200);
+          } catch (_) {}
+          copyLink();
+        }
+      });
+
+      rr.addEventListener("keydown", (e) => {
+        if (!(e.key === "Enter" || e.key === " ")) return;
+        const inv = e.target && e.target.closest ? e.target.closest('[data-role="readyInviteFriendsProxy"]') : null;
+        if (inv) {
+          e.preventDefault();
+          openInviteFriendsModal();
+          return;
+        }
+        const cpy = e.target && e.target.closest ? e.target.closest('[data-role="readyCopyInviteProxy"]') : null;
+        if (cpy) {
+          e.preventDefault();
+          try {
+            const orig = (cpy.dataset && cpy.dataset.origText) ? cpy.dataset.origText : (cpy.textContent || "Copy Link");
+            if (cpy.dataset && !cpy.dataset.origText) cpy.dataset.origText = orig;
+            cpy.textContent = "Copied";
+            if (cpy.__copiedTimer) clearTimeout(cpy.__copiedTimer);
+            cpy.__copiedTimer = setTimeout(() => {
+              try { cpy.textContent = (cpy.dataset && cpy.dataset.origText) ? cpy.dataset.origText : "Copy Link"; } catch (_) {}
+            }, 1200);
+          } catch (_) {}
+          copyLink();
+        }
+      });
+    }
+  } catch (_) {}
 
 
   // Google login
@@ -317,7 +509,8 @@ export function wireUI() {
   // Main UI refs
   const gameSettingsBtn = document.getElementById("gameSettingsBtn");
   const leaveMatchBtn = document.getElementById("leaveMatchBtn");
-  const seat2WaitingLeaveBtn = document.getElementById("seat2WaitingLeaveBtn");
+  const readyRoomReadyBtn = document.getElementById("readyRoomReadyBtn");
+  const readyRoomLeaveBtn = document.getElementById("readyRoomLeaveBtn");
 
   // Confirm Leave modal
   const confirmLeaveMatchModal = document.getElementById("confirmLeaveMatchModal");
@@ -428,6 +621,7 @@ export function wireUI() {
   });
 
   // ----------------------------
+
   // Dartpad (table mode) clicks
   // ----------------------------
   const dartPad = document.getElementById("dartPad");
@@ -491,9 +685,26 @@ export function wireUI() {
       if (!btn) return;
 
       const digit = btn.getAttribute("data-digit");
-      if (digit !== null) {
-        scoreInputEl.value = (scoreInputEl.value + digit).slice(0, 3);
-      }
+if (digit !== null) {
+  // Handicap-aware score input: keep a raw numeric buffer and display "raw → effective"
+  const st = app.latestState;
+  const p = st?.leg?.currentPlayer ?? 0;
+  const mult = Number(st?.match?.handicaps?.["p" + p]?.multiplier ?? 1);
+  const usePreview = Number.isFinite(mult) && Math.abs(mult - 1) > 1e-9;
+
+  if (usePreview) {
+    const raw = String(app.__rawScoreInput || "");
+    const nextRaw = (raw + digit).slice(0, 3);
+    app.__rawScoreInput = nextRaw;
+    const rawNum = Number(nextRaw || 0);
+    const effective = Math.round(rawNum * mult);
+    scoreInputEl.value = nextRaw ? `${nextRaw} → ${effective}` : "";
+  } else {
+    // Normal behaviour
+    scoreInputEl.value = (scoreInputEl.value + digit).slice(0, 3);
+  }
+}
+
     });
   }
 
@@ -502,6 +713,7 @@ export function wireUI() {
       if (app.inputMode !== "keypad") return;
       if (!canScoreNow(app.latestState)) return;
 
+      app.__rawScoreInput = "";
       scoreInputEl.value = "";
     });
   }
@@ -511,7 +723,22 @@ export function wireUI() {
       if (app.inputMode !== "keypad") return;
       if (!canScoreNow(app.latestState)) return;
 
-      scoreInputEl.value = scoreInputEl.value.slice(0, -1);
+      const st = app.latestState;
+const p = st?.leg?.currentPlayer ?? 0;
+const mult = Number(st?.match?.handicaps?.["p" + p]?.multiplier ?? 1);
+const usePreview = Number.isFinite(mult) && Math.abs(mult - 1) > 1e-9;
+
+if (usePreview) {
+  const raw = String(app.__rawScoreInput || "");
+  const nextRaw = raw.slice(0, -1);
+  app.__rawScoreInput = nextRaw;
+  const rawNum = Number(nextRaw || 0);
+  const effective = Math.round(rawNum * mult);
+  scoreInputEl.value = nextRaw ? `${nextRaw} → ${effective}` : "";
+} else {
+  scoreInputEl.value = scoreInputEl.value.slice(0, -1);
+}
+
     });
   }
 
@@ -620,12 +847,30 @@ export function wireUI() {
   }
 
   // Seat 2 lobby waiting modal: leave without confirmation (quick exit)
-  if (seat2WaitingLeaveBtn) {
-    seat2WaitingLeaveBtn.addEventListener("click", (e) => {
-      e.preventDefault();
-      leaveMatch();
+
+  // Ready Room (online pre-game)
+  if (readyRoomReadyBtn) {
+    readyRoomReadyBtn.addEventListener("click", async (ev) => {
+      ev.preventDefault();
+      await toggleReadyRoom();
     });
   }
+
+  if (readyRoomLeaveBtn) {
+    readyRoomLeaveBtn.addEventListener("click", async (ev) => {
+      ev.preventDefault();
+      const st = app.latestState;
+      const host = isHost(st);
+
+      if (host) {
+        await cancelReadyRoomBackToSetup();
+        setSetupModalVisible(true);
+      } else {
+        await leaveMatch();
+      }
+    });
+  }
+
 
   // Existing: Leave inside Game Settings modal (host will use this)
   if (gsLeaveBtn) {
@@ -657,7 +902,32 @@ export function wireUI() {
         updateDartUI();
       }
 
-      if (scoreInputEl) scoreInputEl.value = String(remaining);
+      // Handicap multiplier: submitScore() will apply multiplier after submission.
+      // For Quick Checkout we want the EFFECTIVE score to equal the remaining score,
+      // so we inject a raw value that rounds to the target after multiplication.
+      let rawToEnter = remaining;
+      try {
+        const h = state?.match?.handicaps;
+        const ph = (h && h.enabled === true) ? (h["p" + p] || {}) : null;
+        const mult = Number(ph?.multiplier ?? 1);
+        const useMult = Number.isFinite(mult) && mult > 0 && Math.abs(mult - 1) > 1e-9;
+        if (useMult) {
+          const target = remaining;
+          let cand = Math.round(target / mult);
+          cand = Math.max(0, Math.min(180, cand));
+          const eff = (x) => Math.round(Number(x) * mult);
+          if (eff(cand) !== target) {
+            for (const d of [1,-1,2,-2,3,-3,4,-4,5,-5,6,-6,7,-7,8,-8,9,-9,10,-10]) {
+              const c2 = Math.max(0, Math.min(180, cand + d));
+              if (eff(c2) === target) { cand = c2; break; }
+            }
+          }
+          rawToEnter = cand;
+        }
+      } catch (_) {}
+
+      try { app.__rawScoreInput = ""; } catch (_) {}
+      if (scoreInputEl) scoreInputEl.value = String(rawToEnter);
       submitScore();
     });
   }
@@ -743,6 +1013,29 @@ if (nemesisSetupStartBtn) nemesisSetupStartBtn.addEventListener("click", () => {
   const setupCompetitionEl = document.getElementById("setupCompetition");
   const setupAllowMutualControlEl = document.getElementById("setupAllowMutualControl");
   const setupTrackCheckoutStatsEl = document.getElementById("setupTrackCheckoutStats");
+  const setupHandicapsBtn = document.getElementById("setupHandicapsBtn");
+  let setupHandicapsBtnWrap = null;
+  if (setupHandicapsBtn && !setupHandicapsBtn.parentElement?.classList?.contains("tooltipWrap")) {
+    // Disabled buttons don't show title tooltips reliably; wrap in a span so hover works.
+    const wrap = document.createElement("span");
+    wrap.className = "tooltipWrap";
+    wrap.style.display = "inline-block";
+    setupHandicapsBtn.parentNode.insertBefore(wrap, setupHandicapsBtn);
+    wrap.appendChild(setupHandicapsBtn);
+    setupHandicapsBtnWrap = wrap;
+  } else if (setupHandicapsBtn) {
+    setupHandicapsBtnWrap = setupHandicapsBtn.parentElement;
+  }
+
+  const setupHandicapsBadge = document.getElementById("setupHandicapsBadge");
+  const setupModalEl = document.getElementById("setupModal");
+  const handicapModal = document.getElementById("handicapModal");
+  const hcpCancelBtn = document.getElementById("hcpCancelBtn");
+  const hcpSaveBtn = document.getElementById("hcpSaveBtn");
+  const hcpResetBtn = document.getElementById("hcpResetBtn");
+  const hcpErrorEl = document.getElementById("hcpError");
+  const hcpP1NameEl = document.getElementById("hcpP1Name");
+  const hcpP2NameEl = document.getElementById("hcpP2Name");
 
   const setupCheckInFieldEl = document.getElementById("setupCheckInField");
   const setupCheckOutFieldEl = document.getElementById("setupCheckOutField");
@@ -881,9 +1174,181 @@ for (const stepper of setupSteppers) {
     }
   }
 
+  
+
+// ----------------------------
+// Handicaps (setup-only, never persisted)
+// ----------------------------
+const HANDICAP_STEPS = [0.5, 0.66, 0.75, 0.9, 1.0, 1.1, 1.25, 1.33, 1.5, 1.75, 2.0];
+
+function showHcpError(msg) {
+  if (!hcpErrorEl) return;
+  hcpErrorEl.textContent = msg || "";
+  hcpErrorEl.classList.toggle("hidden", !msg);
+}
+
+function getSetupDefaultsForHandicap() {
+  const mode = Number(document.getElementById("setupMode")?.value || 501);
+  const checkIn = String(document.getElementById("setupCheckIn")?.value || "straight");
+  const checkOut = String(document.getElementById("setupCheckOut")?.value || "double");
+  return { mode, checkIn, checkOut };
+}
+
+function parseMultiplier(v) {
+  const n = Number(String(v).replace("x","").trim());
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return n;
+}
+
+function setStepperValue(inputId, n) {
+  const el = document.getElementById(inputId);
+  if (!el) return;
+  el.value = String(n);
+}
+
+function setSelectValue(id, value) {
+  const sel = document.getElementById(id);
+  if (!sel) return;
+  sel.value = value;
+  // update visual button group
+  const group = document.querySelector(`.btnGroup[data-control="${id}"]`);
+  if (group) {
+    Array.from(group.querySelectorAll("button")).forEach(b => {
+      b.classList.toggle("selected", String(b.getAttribute("data-value")) === String(value));
+    });
+  }
+}
+
+function readHandicapFromUI(playerIdx) {
+  const d = getSetupDefaultsForHandicap();
+  const mult = parseMultiplier(document.getElementById(playerIdx === 0 ? "hcpP0Mult" : "hcpP1Mult")?.value);
+  const start = Number(document.getElementById(playerIdx === 0 ? "hcpP0Start" : "hcpP1Start")?.value || d.mode);
+  const checkIn = String(document.getElementById(playerIdx === 0 ? "hcpP0CheckIn" : "hcpP1CheckIn")?.value || d.checkIn);
+  const checkOut = String(document.getElementById(playerIdx === 0 ? "hcpP0CheckOut" : "hcpP1CheckOut")?.value || d.checkOut);
+  const finish = String(document.getElementById(playerIdx === 0 ? "hcpP0Finish" : "hcpP1Finish")?.value || "exact");
+  return { multiplier: mult ?? 1, startScore: start, checkIn, checkOut, finish };
+}
+
+function handicapIsActive() {
+  const d = getSetupDefaultsForHandicap();
+  const p0 = readHandicapFromUI(0);
+  const p1 = readHandicapFromUI(1);
+
+  const isDefault = (p) => {
+    const sameStart = Number(p.startScore) === Number(d.mode);
+    const sameIn = String(p.checkIn) === String(d.checkIn);
+    const sameOut = String(p.checkOut) === String(d.checkOut);
+    const sameFinish = String(p.finish) === "exact";
+    const sameMult = Math.abs(Number(p.multiplier) - 1) < 1e-9;
+    return sameStart && sameIn && sameOut && sameFinish && sameMult;
+  };
+
+  return !(isDefault(p0) && isDefault(p1));
+}
+
+function applyHandicapBadgeAndDoublesLock() {
+  const active = handicapIsActive();
+  if (setupHandicapsBadge) setupHandicapsBadge.classList.toggle("hidden", !active);
+
+  // When ANY handicap is active, disable Track doubles / checkout stats in setup
+  if (setupTrackCheckoutStatsEl) {
+    if (active) {
+      setupTrackCheckoutStatsEl.checked = false;
+      setupTrackCheckoutStatsEl.disabled = true;
+    } else {
+      setupTrackCheckoutStatsEl.disabled = false;
+    }
+    syncToggleFromControl("setupTrackCheckoutStats");
+  }
+}
+
+function resetHandicapsToDefault() {
+  const d = getSetupDefaultsForHandicap();
+
+  setStepperValue("hcpP0Mult", 1);
+  setStepperValue("hcpP1Mult", 1);
+  try { syncStepperFromControl("hcpP0Mult"); } catch (_) {}
+  try { syncStepperFromControl("hcpP1Mult"); } catch (_) {}
+
+  const p0Start = document.getElementById("hcpP0Start");
+  const p1Start = document.getElementById("hcpP1Start");
+  if (p0Start) p0Start.value = String(d.mode);
+  if (p1Start) p1Start.value = String(d.mode);
+  try { syncStepperFromControl("hcpP0Start"); } catch (_) {}
+  try { syncStepperFromControl("hcpP1Start"); } catch (_) {}
+
+  setSelectValue("hcpP0CheckIn", d.checkIn);
+  setSelectValue("hcpP1CheckIn", d.checkIn);
+  setSelectValue("hcpP0CheckOut", d.checkOut);
+  setSelectValue("hcpP1CheckOut", d.checkOut);
+
+  setSelectValue("hcpP0Finish", "exact");
+  setSelectValue("hcpP1Finish", "exact");
+
+  showHcpError("");
+  applyHandicapBadgeAndDoublesLock();
+}
+
+function openHandicapModal() {
+  if (!handicapModal) return;
+  // Populate defaults every time setup is opened for a new match.
+  if (!app.__handicapsInitialized) {
+    resetHandicapsToDefault();
+    app.__handicapsInitialized = true;
+  } else {
+    // Ensure start score tracks current setupMode if no custom overrides were made
+    // (keeps it intuitive when user changes 301/501 then opens handicaps)
+    const d = getSetupDefaultsForHandicap();
+    const p0Start = document.getElementById("hcpP0Start");
+    const p1Start = document.getElementById("hcpP1Start");
+    if (p0Start && (p0Start.value === "" || Number(p0Start.value) === Number(app.__lastSetupMode || d.mode))) p0Start.value = String(d.mode);
+    if (p1Start && (p1Start.value === "" || Number(p1Start.value) === Number(app.__lastSetupMode || d.mode))) p1Start.value = String(d.mode);
+    try { syncStepperFromControl("hcpP0Start"); } catch (_) {}
+    try { syncStepperFromControl("hcpP1Start"); } catch (_) {}
+  }
+  openModal(handicapModal);
+  showHcpError("");
+  applyHandicapBadgeAndDoublesLock();
+}
+
+function closeHandicapModal() {
+  if (!handicapModal) return;
+  closeModal(handicapModal);
+  showHcpError("");
+}
+
+
+// When setup modal opens for a new match, handicaps must reset to defaults (never persisted).
+if (setupModalEl) {
+  setupModalEl.addEventListener("modalopen", () => {
+    app.__handicapsInitialized = false;
+    resetHandicapsToDefault();
+
+    // Update column headers with latest player names if available
+    try {
+      const p1 = (document.getElementById("setupP1")?.value || "Player 1").trim() || "Player 1";
+      const p2 = (document.getElementById("setupP2")?.value || "Player 2").trim() || "Player 2";
+      if (hcpP1NameEl) hcpP1NameEl.textContent = p1;
+      if (hcpP2NameEl) hcpP2NameEl.textContent = p2;
+    } catch (_) {}
+  });
+}
+
   function applyCompetitionRules() {
     if (!setupCompetitionEl || !setupAllowMutualControlEl) return;
     const ranked = String(setupCompetitionEl.value) === "competitive";
+    if (setupHandicapsBtn) {
+      setupHandicapsBtn.disabled = ranked;
+      setupHandicapsBtn.classList.toggle("disabled", ranked);
+      // Hover hint only when disabled
+      (setupHandicapsBtnWrap || setupHandicapsBtn).title = ranked ? "Unavailable in Ranked mode." : "";
+    }
+    if (ranked) {
+      // Ranked disables handicaps entirely
+      resetHandicapsToDefault();
+      if (setupHandicapsBadge) setupHandicapsBadge.classList.add("hidden");
+      app.__handicapsInitialized = true;
+    }
     if (ranked) {
       setupAllowMutualControlEl.value = "no";
       syncGroupFromControl("setupAllowMutualControl");
@@ -991,7 +1456,103 @@ for (const stepper of setupSteppers) {
     helpIcons.forEach(h => h.classList.remove("showTip"));
   });
 
-  if (setupStartBtn) setupStartBtn.addEventListener("click", startMatchFromSetup);
+  
+if (setupHandicapsBtn) {
+  setupHandicapsBtn.addEventListener("click", () => {
+    // Only allow in Casual; ranked is disabled in applyCompetitionRules
+    openHandicapModal();
+  });
+}
+
+if (handicapModal) {
+  handicapModal.addEventListener("click", (e) => {
+    const t = e.target;
+    if (!(t instanceof Element)) return;
+
+    // Button-group controls
+    const btn = t.closest("button");
+    if (btn && btn.closest(".btnGroup")) {
+      const group = btn.closest(".btnGroup");
+      const controlId = group.getAttribute("data-control");
+      const val = btn.getAttribute("data-value");
+      if (controlId && val) {
+        setSelectValue(controlId, val);
+        applyHandicapBadgeAndDoublesLock();
+      }
+      return;
+    }
+
+    // Click outside card to close
+    if (t === handicapModal) closeHandicapModal();
+  });
+}
+
+if (hcpCancelBtn) hcpCancelBtn.addEventListener("click", () => closeHandicapModal());
+if (hcpResetBtn) hcpResetBtn.addEventListener("click", () => resetHandicapsToDefault());
+
+// Stepper buttons
+function stepMultiplier(playerIdx, dir) {
+  const inputId = playerIdx === 0 ? "hcpP0Mult" : "hcpP1Mult";
+  const el = document.getElementById(inputId);
+  const current = parseMultiplier(el?.value) ?? 1;
+  // Choose nearest step then move
+  let i = 0;
+  let best = Infinity;
+  for (let k=0;k<HANDICAP_STEPS.length;k++) {
+    const d = Math.abs(HANDICAP_STEPS[k] - current);
+    if (d < best) { best = d; i = k; }
+  }
+  const nextIdx = Math.max(0, Math.min(HANDICAP_STEPS.length - 1, i + dir));
+  setStepperValue(inputId, HANDICAP_STEPS[nextIdx]);
+  applyHandicapBadgeAndDoublesLock();
+}
+const p0Down = document.getElementById("hcpP0MultDown");
+const p0Up = document.getElementById("hcpP0MultUp");
+const p1Down = document.getElementById("hcpP1MultDown");
+const p1Up = document.getElementById("hcpP1MultUp");
+if (p0Down) p0Down.addEventListener("click", () => stepMultiplier(0, -1));
+if (p0Up) p0Up.addEventListener("click", () => stepMultiplier(0, +1));
+if (p1Down) p1Down.addEventListener("click", () => stepMultiplier(1, -1));
+if (p1Up) p1Up.addEventListener("click", () => stepMultiplier(1, +1));
+
+// Inputs: live validation + doubles lock
+["hcpP0Mult","hcpP1Mult","hcpP0Start","hcpP1Start","setupMode","setupCheckIn","setupCheckOut"].forEach((id) => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const handler = () => {
+    if (id === "setupMode") app.__lastSetupMode = Number(el.value || 501);
+    applyHandicapBadgeAndDoublesLock();
+    // Keep any steppers in sync (handicap modal uses steppers too)
+    try { syncStepperFromControl(id); } catch (_) {}
+  };
+  el.addEventListener("input", handler);
+  el.addEventListener("change", handler);
+});
+
+if (hcpSaveBtn) {
+  hcpSaveBtn.addEventListener("click", () => {
+    showHcpError("");
+    const p0 = readHandicapFromUI(0);
+    const p1 = readHandicapFromUI(1);
+
+    const badMult = (p) => !Number.isFinite(Number(p.multiplier)) || Number(p.multiplier) <= 0;
+    if (badMult(p0) || badMult(p1)) {
+      showHcpError("Multiplier must be greater than 0.");
+      return;
+    }
+    const badStart = (p) => !Number.isFinite(Number(p.startScore)) || Number(p.startScore) < 1;
+    if (badStart(p0) || badStart(p1)) {
+      showHcpError("Starting score must be 1 or more.");
+      return;
+    }
+    // Saved (we simply close; values live in the setup DOM)
+    closeHandicapModal();
+    applyHandicapBadgeAndDoublesLock();
+  });
+}
+
+if (setupStartBtn) setupStartBtn.addEventListener("click", () => { app.__handicapsInitialized = true; startMatchFromSetup(); });
+
 
   // Checkout modal
   const checkoutCancelBtn = document.getElementById("checkoutCancelBtn");
@@ -1055,6 +1616,131 @@ for (const stepper of setupSteppers) {
   const winnerNewGameBtn = document.getElementById("winnerNewGameBtn");
   if (winnerNewGameBtn) {
     winnerNewGameBtn.addEventListener("click", continueOrNewMatch);
+  }
+
+  const wireGhostSave = (el) => {
+    if (!el) return;
+    el.addEventListener("click", async () => {
+      // Step 1: prepare token from the currently-viewed leg.
+      // Step 2: ask for a name. Step 3: save by token (even if the match advances).
+      try {
+        const st = app.latestState;
+        if (st?.match?.handicaps?.enabled === true) {
+          showError("Save Ghost is disabled when Handicap Mode is active.");
+          return;
+        }
+        const prep = await prepareGhostFromWinnerModalView();
+        if (!prep || !prep.ok) {
+          if (prep && prep.reason === "DUPLICATE") {
+            showError("You already have this leg saved.");
+          } else if (prep && prep.reason === "SELECT_LEG") {
+            showError("Select a leg tab to save.");
+          } else if (prep && (prep.reason === "NOT_WINNER" || prep.reason === "NO_CHECKOUT")) {
+            showError("Only winning legs can be saved.");
+          } else {
+            showError("Couldn't prepare replay.");
+          }
+          return;
+        }
+
+        // Stash token for the name modal. This must survive if host clicks Continue.
+        window.__pendingGhostToken = prep.token;
+
+        const m = document.getElementById("ghostNameModal");
+        const inp = document.getElementById("ghostNameInput");
+        const err = document.getElementById("ghostNameError");
+        if (err) { err.innerText = ""; err.classList.add("hidden"); }
+        if (inp) {
+          inp.value = "";
+          inp.focus();
+        }
+        if (m) openModal(m);
+      } catch (e) {
+        console.warn("prepare ghost failed", e);
+        showError("Couldn't prepare replay.");
+      }
+    });
+
+  };
+
+  const winnerSaveGhostBtn = document.getElementById("winnerSaveGhostBtn");
+  wireGhostSave(winnerSaveGhostBtn);
+
+  // Ghost naming modal controls
+  const ghostNameModal = document.getElementById("ghostNameModal");
+  const ghostNameInput = document.getElementById("ghostNameInput");
+  const ghostNameError = document.getElementById("ghostNameError");
+  const ghostNameCancelBtn = document.getElementById("ghostNameCancelBtn");
+  const ghostNameSaveBtn = document.getElementById("ghostNameSaveBtn");
+
+  const setGhostNameError = (msg) => {
+    if (!ghostNameError) return;
+    if (msg) {
+      ghostNameError.innerText = msg;
+      ghostNameError.classList.remove("hidden");
+    } else {
+      ghostNameError.innerText = "";
+      ghostNameError.classList.add("hidden");
+    }
+  };
+
+  if (ghostNameCancelBtn) {
+    ghostNameCancelBtn.addEventListener("click", () => {
+      try { window.__pendingGhostToken = ""; } catch (_) {}
+      setGhostNameError("");
+      if (ghostNameModal) closeModal(ghostNameModal);
+    });
+  }
+
+  if (ghostNameSaveBtn) {
+    ghostNameSaveBtn.addEventListener("click", async () => {
+      const tok = String(window.__pendingGhostToken || "").trim();
+      const nm = String(ghostNameInput?.value || "").trim();
+      if (!tok) { setGhostNameError("No replay selected."); return; }
+      if (!nm) { setGhostNameError("Please enter a name."); return; }
+
+      ghostNameSaveBtn.disabled = true;
+      const oldText = ghostNameSaveBtn.innerText;
+      ghostNameSaveBtn.innerText = "Saving...";
+      let savedOk = false;
+      try {
+        const res = await savePreparedGhostToken(tok, nm);
+        if (res && res.ok) {
+          savedOk = true;
+          // Subtle in-UI confirmation without browser dialogs.
+          ghostNameSaveBtn.innerText = "Saved ✓";
+          try { window.__pendingGhostToken = ""; } catch (_) {}
+          setGhostNameError("");
+          setTimeout(() => {
+            if (ghostNameModal) closeModal(ghostNameModal);
+            ghostNameSaveBtn.innerText = oldText;
+            ghostNameSaveBtn.disabled = false;
+          }, 500);
+
+          // If the winner modal button is still visible, make it clear it's saved.
+          if (winnerSaveGhostBtn && !winnerSaveGhostBtn.classList.contains("hidden")) {
+            winnerSaveGhostBtn.innerText = "Saved ✓";
+            winnerSaveGhostBtn.disabled = true;
+          }
+          return;
+        }
+        if (res && res.reason === "DUPLICATE") {
+          setGhostNameError("You already have this replay saved.");
+        } else if (res && res.reason === "NAME_REQUIRED") {
+          setGhostNameError("Please enter a name.");
+        } else {
+          setGhostNameError("Couldn't save replay.");
+        }
+      } catch (e) {
+        console.warn("save ghost named failed", e);
+        setGhostNameError("Couldn't save replay.");
+      } finally {
+        if (!savedOk) {
+          ghostNameSaveBtn.innerText = oldText;
+          ghostNameSaveBtn.disabled = false;
+        }
+      }
+    });
   }
 
   const winnerLeaveBtn = document.getElementById("winnerLeaveBtn");

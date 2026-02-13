@@ -1,12 +1,27 @@
 // app/ui/render.js
 import { app } from "../state.js";
-import { canScoreNow, canUndoNow, canEditScores, mySeatIndex } from "../permissions.js";
+import { canScoreNow, canUndoNow, canEditScores, mySeatIndex, isHost } from "../permissions.js";
 import { checkoutSuggestion, minDartsForCheckout, isPossibleCheckout } from "../model/rules.js";
 import { calcLegStats, calcMatchStats, formatPills } from "../model/stats.js";
 import { renderBullMarkersFromState } from "../bull/ui.js";
 import { getActorId } from "../auth.js";
-import { isHost } from "../permissions.js";
 import { playSfxWebAudio } from "../audio/audio.js";
+
+
+
+// Online UX: brief lockout on host Continue between legs so seat-2 can save a ghost.
+let continueLockInterval = null;
+let continueLockEndsAtMs = 0;
+let continueLockKey = null;
+
+function clearContinueLock() {
+  if (continueLockInterval) {
+    clearInterval(continueLockInterval);
+    continueLockInterval = null;
+  }
+  continueLockEndsAtMs = 0;
+  continueLockKey = null;
+}
 
 // -----------------------------
 // Modal animation helpers
@@ -26,6 +41,7 @@ export function openModal(modal) {
   modal.classList.remove("hidden");
   modal.style.display = "flex";
   // Allow the browser to apply display before transitioning
+  try { modal.dispatchEvent(new CustomEvent("modalopen")); } catch (_) {}
   requestAnimationFrame(() => {
     modal.classList.remove("is-closing");
     modal.classList.add("is-open");
@@ -274,10 +290,15 @@ export function setConfirmNewMatchModalVisible(visible) {
   visible ? openModal(modal) : closeModal(modal);
 }
 
-export function setSeat2WaitingModalVisible(visible) {
-  const modal = document.getElementById("seat2WaitingModal");
+export function setReadyRoomModalVisible(visible) {
+  const modal = document.getElementById("readyRoomModal");
   if (!modal) return;
   visible ? openModal(modal) : closeModal(modal);
+}
+
+// Back-compat no-op (seat2WaitingModal removed)
+export function setSeat2WaitingModalVisible(_visible) {
+  // intentionally empty
 }
 
 export function safeFocusScoreInput() {
@@ -355,13 +376,17 @@ export function render(state) {
     if (leaveBtn) leaveBtn.classList.add("hidden");
   }
 
-  // --- Seat 2 waiting-for-host modal (online lobby only) ---
-  // Show for any non-host device that has opened the lobby link.
+  // --- Ready Room modal (online lobby only) ---
+  // When the host completes setup, both players move into a Ready Room where
+  // each must consent (Ready) before the match starts.
   const me = getActorId();
-  const iAmNonHostViewer = !!me && me !== (state?.seat1Id || state?.lobby?.host?.actorId || state?.match?.seat1Id);
-  const iAmSeat2 = !!me && (me === state?.seat2Id || me === state?.match?.seat2Id || me === state?.lobby?.joiner?.actorId);
-  const seat2Waiting = online && state?.status === "lobby" && !host && (iAmSeat2 || (!state?.seat2Id && iAmNonHostViewer));
-  setSeat2WaitingModalVisible(!!seat2Waiting);
+  const readyRoomVisible = online && state?.status === "readyroom" && !state?.match && !!me;
+  setReadyRoomModalVisible(!!readyRoomVisible);
+
+  // If Ready Room is visible, render the two player cards + meta snippet.
+  if (readyRoomVisible) {
+    try { renderReadyRoom(state, me); } catch (_) {}
+  }
 
   // --- Player photos (Google profile photo) ---
   // Online only. Local games should not show Google avatars.
@@ -496,8 +521,8 @@ export function render(state) {
   const undoAllowed = canUndoNow(state);
 
   if (overlay && overlayText) {
-    if ((isOnline && !scoreAllowed && state?.match && state?.leg) || (state?.nemesis?.enabled === true && state?.match && state?.leg && state.leg.status === "in_progress" && state.leg.currentPlayer === 1)) {
-      const who = state.match.players[state.leg.currentPlayer]?.name || (state.leg.currentPlayer === 1 ? "Nemesis" : "the other player");
+    if ((isOnline && !scoreAllowed && state?.match && state?.leg) || (state?.nemesis?.enabled === true && state?.match && state?.leg && state.leg.status === "in_progress" && state.leg.currentPlayer === 1) || (state?.match?.ghost?.enabled === true && state?.match && state?.leg && state.leg.status === "in_progress" && state.leg.currentPlayer === 1)) {
+      const who = state.match.players[state.leg.currentPlayer]?.name || (state.leg.currentPlayer === 1 ? (state?.match?.ghost?.enabled === true ? "Your Ghost" : (state?.nemesis?.enabled === true ? "Nemesis" : "the other player")) : "the other player");
       overlayText.textContent = `It’s ${who}’s turn`;
       overlay.classList.remove("hidden");
     } else {
@@ -588,8 +613,10 @@ export function render(state) {
   const matchStatsGrid = document.getElementById("matchStatsGrid");
   const matchStatsTabs = document.getElementById("matchStatsTabs");
   const winnerNewGameBtn = document.getElementById("winnerNewGameBtn");
+  const winnerSaveGhostBtn = document.getElementById("winnerSaveGhostBtn");
 
   if (!state || !state.match || !state.leg) {
+    if (winnerSaveGhostBtn) winnerSaveGhostBtn.classList.add("hidden");
     // Lobby/no-active-match UI.
     // Populate seat names early for ONLINE lobbies only (so it doesn't show Player 1/2 until match start).
     // Local games should keep their setup-driven names.
@@ -626,10 +653,15 @@ export function render(state) {
     if (inputArea) inputArea.classList.add("locked");
     if (overlay && overlayText) {
       const canStart = isHost(state);
-      overlayText.textContent = canStart ? "Press New Game to start" : "Waiting for host to start";
-      overlay.classList.remove("hidden");
-      if (overlayUndoBtn) overlayUndoBtn.classList.add("hidden");
-      if (startBtn) startBtn.classList.toggle("hidden", !canStart);
+      if (state?.status === "readyroom") {
+        // Ready Room has its own modal UI; keep the overlay hidden.
+        overlay.classList.add("hidden");
+      } else {
+        overlayText.textContent = canStart ? "Press New Game to start" : "Waiting for host to start";
+        overlay.classList.remove("hidden");
+        if (overlayUndoBtn) overlayUndoBtn.classList.add("hidden");
+        if (startBtn) startBtn.classList.toggle("hidden", !canStart);
+      }
     }
 
     const scoreInput = document.getElementById("scoreInput");
@@ -668,6 +700,17 @@ export function render(state) {
   const submitBtn = document.getElementById("submitBtn");
   const quickCheckoutBtn = document.getElementById("quickCheckoutBtn");
   const undoBtn = document.getElementById("undoBtn");
+  // Clear score input (and raw handicap buffer) when the turn advances.
+  try {
+    const leg = state?.leg;
+    const key = `${leg?.currentPlayer ?? ""}-${leg?.history?.length ?? ""}-${leg?.winner ?? ""}`;
+    if (app.__lastTurnKey !== key) {
+      app.__lastTurnKey = key;
+      if (scoreInput) scoreInput.value = "";
+      app.__rawScoreInput = "";
+    }
+  } catch (_) {}
+
 
   if (readOnly) {
     if (scoreInput) scoreInput.disabled = true;
@@ -1265,6 +1308,87 @@ if (matchStatsGrid) {
       }
     }
 
+
+    // Ghost save button. Hidden during Ghost Mode games.
+    {
+      const isGhostGame = match?.ghost?.enabled === true;
+      const matchFinishedNow = match.status === "finished";
+      const tab = app.matchStatsTab || "final";
+
+      const shouldSelectLeg = matchFinishedNow && !tab.startsWith("leg-");
+
+      // Only winning legs can be saved.
+      let winnerIdx = null;
+      if (!matchFinishedNow) {
+        winnerIdx = (typeof state?.leg?.winner === "number") ? state.leg.winner : null;
+      } else if (tab.startsWith("leg-")) {
+        const legNum = Number(tab.split("-")[1] || "0");
+        const legSum = (match.legs || [])[Math.max(0, legNum - 1)];
+        winnerIdx = (legSum && typeof legSum.winner === "number") ? legSum.winner : null;
+      }
+
+      const myIdx = mySeatIndex(state);
+      const canSaveOnline = match.gameType !== "online" || (winnerIdx != null && winnerIdx === myIdx);
+      const handicapsActive = match?.handicaps?.enabled === true;
+
+      if (isGhostGame) {
+        if (winnerSaveGhostBtn) winnerSaveGhostBtn.classList.add("hidden");
+      } else if (handicapsActive) {
+        // Handicap Mode: never allow saving ghosts (keeps ghosts "pure").
+        if (winnerSaveGhostBtn) {
+          winnerSaveGhostBtn.classList.add("hidden");
+          winnerSaveGhostBtn.disabled = true;
+        }
+      } else if (shouldSelectLeg) {
+        if (winnerSaveGhostBtn) {
+          winnerSaveGhostBtn.classList.remove("hidden");
+          winnerSaveGhostBtn.disabled = true;
+          winnerSaveGhostBtn.innerText = "Select a Leg to Save";
+        }
+      } else if (!canSaveOnline || winnerIdx == null) {
+        // Online: hide if you didn't win the selected leg.
+        if (winnerSaveGhostBtn) winnerSaveGhostBtn.classList.add("hidden");
+      } else {
+        if (winnerSaveGhostBtn) {
+          winnerSaveGhostBtn.classList.remove("hidden");
+          winnerSaveGhostBtn.disabled = false;
+          winnerSaveGhostBtn.innerText = "Save Ghost";
+        }
+      }
+    }
+
+    // Online host lock: 5s delay before enabling Continue between legs.
+    if (winnerNewGameBtn) {
+      const needLock = match.gameType === "online" && !matchFinished && isHost(state) && winnerNewGameBtn.innerText.toLowerCase().includes("continue");
+      const legKey = `${match.legs?.length || 0}-${state?.leg?.history?.length || 0}-${state?.leg?.winner ?? ""}`;
+      if (needLock) {
+        if (continueLockKey !== legKey) {
+          clearContinueLock();
+          continueLockKey = legKey;
+          continueLockEndsAtMs = Date.now() + 5000;
+        }
+        const tick = () => {
+          const leftMs = continueLockEndsAtMs - Date.now();
+          const left = Math.max(0, Math.ceil(leftMs / 1000));
+          if (left > 0) {
+            winnerNewGameBtn.disabled = true;
+            winnerNewGameBtn.innerText = `Continue (${left})`;
+          } else {
+            winnerNewGameBtn.disabled = false;
+            winnerNewGameBtn.innerText = "Continue (Next Leg)";
+            clearContinueLock();
+          }
+        };
+        tick();
+        if (!continueLockInterval) {
+          continueLockInterval = setInterval(tick, 250);
+        }
+      } else {
+        // No lock needed; ensure normal state.
+        if (continueLockKey) clearContinueLock();
+        winnerNewGameBtn.disabled = false;
+      }
+    }
     if (winnerLeaveBtn) {
       if (matchFinished) winnerLeaveBtn.classList.remove("hidden");
       else winnerLeaveBtn.classList.add("hidden");
@@ -1277,4 +1401,192 @@ if (matchStatsGrid) {
     if (statusEl) statusEl.innerText = `${whoName} to throw`;
     setWinnerModalVisible(false);
   }
+}
+
+// ----------------------------
+// Ready Room rendering (online)
+// ----------------------------
+function formatReadyRoomMeta(setup) {
+  if (!setup) return "";
+  const parts = [];
+  if (setup.mode) parts.push(String(setup.mode));
+  if (setup.bestOf) parts.push(`Best of ${setup.bestOf}`);
+  const r = setup.rules || {};
+  if (r.preset && r.preset !== "x01") parts.push(String(r.preset).toUpperCase());
+  if (r.checkIn) parts.push(`${String(r.checkIn)} in`);
+  if (r.checkOut) parts.push(`${String(r.checkOut)} out`);
+  if (setup.handicaps && setup.handicaps.enabled) parts.push("Handicaps on");
+  if (setup.allowMutualControl === true) parts.push("Mutual control");
+  return parts.filter(Boolean).join(" · ");
+}
+
+function readyRoomCardHtml({ title, name, photoURL, stats, ready }) {
+  const s = stats || {};
+  const matches = Number(s.matches || 0);
+  const totalPoints = Number(s.totalPoints || 0);
+  const totalDarts = Number(s.totalDarts || 0);
+  const checkoutThrown = Number(s.checkoutDoublesThrown || 0);
+  const checkoutHit = Number(s.checkoutDoublesHit || 0);
+
+  const tda = totalDarts ? Math.round((totalPoints / totalDarts) * 3) : null;
+  const checkoutPct = checkoutThrown ? Math.round((checkoutHit / checkoutThrown) * 100) : null;
+
+  const tdaText = (tda === null) ? "—" : String(tda);
+  const coText = (checkoutPct === null) ? "—" : `${checkoutPct}%`;
+  const mText = (stats ? String(matches) : "—");
+
+  const badge = ready ? `<span class="dashWL w" style="margin-left:8px; padding:6px 10px;">READY</span>`
+                      : `<span class="dashWL l" style="margin-left:8px; padding:6px 10px;">NOT READY</span>`;
+
+  const img = photoURL
+    ? `<img class="dashAvatar" src="${photoURL}" alt="Player photo" />`
+    : `<div class="dashAvatar hidden"></div>`;
+
+  return `
+    <div class="dashIdentity" style="margin-bottom:14px; justify-content:space-between;">
+      <div class="row" style="display:flex; align-items:center; gap:10px;">
+        ${img}
+        <div>
+          <div class="dashWelcome">${title || "Player"}</div>
+          <div class="dashName" style="font-size:22px;">${name || "—"}</div>
+        </div>
+      </div>
+      <div>${badge}</div>
+    </div>
+
+    <section class="dashStatsCard profile" style="padding-top:10px;">
+      <div class="dashStatsTitle" style="font-size:18px;">STATS</div>
+      <div class="dashStatTiles" aria-label="Key statistics">
+        <div class="dashStatTile dashStatTile--glow">
+          <div class="dashStatTileLabel">AVERAGE</div>
+          <div class="dashStatTileValue">${tdaText}</div>
+        </div>
+        <div class="dashStatTile dashStatTile--glow">
+          <div class="dashStatTileLabel">CHECKOUT %</div>
+          <div class="dashStatTileValue">${coText}</div>
+        </div>
+        <div class="dashStatTile dashStatTile--glow">
+          <div class="dashStatTileLabel">MATCHES</div>
+          <div class="dashStatTileValue">${mText}</div>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function renderReadyRoom(state, me) {
+  const modal = document.getElementById("readyRoomModal");
+  if (!modal) return;
+
+  const setup = state?.readyRoom?.setup || null;
+
+  const p1Card = document.getElementById("readyRoomP1Card");
+  const p2Card = document.getElementById("readyRoomP2Card");
+  // /arcade/play uses nested inner containers; /game now mirrors that structure.
+  const p1Inner = document.getElementById("readyRoomP1Inner") || p1Card;
+  const p2Inner = document.getElementById("readyRoomP2Inner") || p2Card;
+  const metaEl = document.getElementById("readyRoomMeta");
+  const subtitle = document.getElementById("readyRoomSubtitle");
+
+  const seat1Id = state?.seat1Id || state?.lobby?.host?.actorId || null;
+  const seat2Id = state?.seat2Id || state?.lobby?.joiner?.actorId || null;
+
+  const ready = state?.readyRoom?.ready || {};
+  const p1Ready = !!(seat1Id && ready && ready[seat1Id] === true);
+  const p2Ready = !!(seat2Id && ready && ready[seat2Id] === true);
+
+  // Button state
+  const readyBtn = document.getElementById("readyRoomReadyBtn");
+  if (readyBtn) {
+    const mineReady = !!(me && ready && ready[me] === true);
+    readyBtn.textContent = mineReady ? "Unready" : "Ready";
+    readyBtn.classList.toggle("greenbutton", !mineReady);
+    readyBtn.classList.toggle("danger", mineReady);
+  }
+
+  // Host/back label vs guest leave
+  const leaveBtn = document.getElementById("readyRoomLeaveBtn");
+  const iAmHost = !!(me && (me === seat1Id));
+  if (leaveBtn) leaveBtn.textContent = iAmHost ? "Back" : "Leave Match";
+
+  if (metaEl) metaEl.textContent = formatReadyRoomMeta(setup);
+  if (subtitle) {
+    subtitle.textContent = (seat2Id ? "Waiting for both players to get ready…" : "Waiting for Player 2 to join…");
+  }
+
+  // Identity info
+  const host = state?.lobby?.host || {};
+  const joiner = state?.lobby?.joiner || {};
+
+  const p1Name = state?.seat1Name || host?.name || "Player 1";
+  const p2Name = state?.seat2Name || joiner?.name || "Player 2";
+
+  const p1PhotoURL = state?.seat1PhotoURL || host?.photoURL || null;
+  const p2PhotoURL = state?.seat2PhotoURL || joiner?.photoURL || null;
+
+  // Stats cache (async, with simple de-dupe)
+  app.__readyRoomProfileCache = app.__readyRoomProfileCache || {};
+  app.__readyRoomProfileInflight = app.__readyRoomProfileInflight || {};
+
+  const renderWithCache = (el, payload) => {
+    if (!el) return;
+    el.innerHTML = readyRoomCardHtml(payload);
+  };
+
+  const seat1Uid = host?.uid || null;
+  const seat2Uid = joiner?.uid || null;
+
+  const p1Stats = seat1Uid ? (app.__readyRoomProfileCache[seat1Uid] || null) : null;
+  const p2Stats = seat2Uid ? (app.__readyRoomProfileCache[seat2Uid] || null) : null;
+
+  renderWithCache(p1Inner, { title: "HOST", name: p1Name, photoURL: p1PhotoURL, stats: p1Stats, ready: p1Ready });
+  if (seat2Id) {
+    renderWithCache(p2Inner, { title: "GUEST", name: p2Name, photoURL: p2PhotoURL, stats: p2Stats, ready: p2Ready });
+  } else {
+    // Seat 2 not present yet: render an invite placeholder that matches the player-card layout.
+    if (p2Inner) {
+      p2Inner.innerHTML = `
+        <div class="readyroomdashIdentity" style="margin-bottom:14px; justify-content:space-between;">
+          <div class="readyDIwrapper">
+            <div class="dashAvatar readyRoomInviteAvatar" role="button" tabindex="0" data-role="readyInviteFriendsProxy" aria-label="Invite friends">
+              <span class="readyRoomInvitePlus">+</span>
+            </div>
+            <div style="display:flex; flex-direction:column; align-items:center; margin-top:10px;">
+              <div class="dashName" style="font-size:22px;">Invite Friends</div>
+            </div>
+          </div>
+          <div><span class="NotReady readyRoomInviteAction" role="button" tabindex="0" data-role="readyCopyInviteProxy">Copy Link</span></div>
+        </div>
+      `;
+    }
+  }
+
+// Fire-and-forget stats fetches (only when authed + uid present)
+  const fetchStats = async (uid) => {
+    if (!uid || !app.db) return;
+    if (app.__readyRoomProfileCache[uid]) return;
+    if (app.__readyRoomProfileInflight[uid]) return;
+    app.__readyRoomProfileInflight[uid] = true;
+    try {
+      const snap = await app.db.collection("users").doc(uid).get();
+      const data = snap.exists ? (snap.data() || {}) : {};
+      app.__readyRoomProfileCache[uid] = data.stats || null;
+    } catch (_) {
+      app.__readyRoomProfileCache[uid] = null;
+    } finally {
+        app.__readyRoomProfileInflight[uid] = false;
+        // Stats arrive async; re-render once so the cards fill without waiting for a Ready toggle.
+        try {
+          const m = document.getElementById("readyRoomModal");
+          if (m && !m.classList.contains("hidden")) {
+            // Use the latest snapshot so we don't regress on state.
+            renderReadyRoom(app.latestState || state, me);
+          }
+        } catch (_) {}
+      }
+    };
+
+  // Don't block render; just kick off loads
+  fetchStats(seat1Uid);
+  fetchStats(seat2Uid);
 }

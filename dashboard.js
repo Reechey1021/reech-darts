@@ -4,6 +4,7 @@
 import { app } from "./app/state.js";
 import { applyBuildTag, logBuildInfo } from "./app/ui/buildInfo.js";
 import { initFirebase } from "./app/firebase.js";
+import { listGhosts, saveGhostNamed, deleteGhost } from "./app/ghosts/ghosts.js";
 import { initAuth, onUserChanged, signOutUser, getActorId, getActorName } from "./app/auth.js";
 import { ensureUserProfile, updateMyProfile } from "./app/userProfile.js";
 import { acceptFriendRequest, cancelFriendRequest, declineFriendRequest, getFriendStateDb, removeFriend, sendFriendRequest, sendGameInvite, respondToGameInvite, listenForGameInvites } from "./app/friends.js";
@@ -96,6 +97,9 @@ async function createLobbyDoc({ lobbyType = "online" } = {}) {
     updatedAt: now,
     expiresAt,
     status: "lobby",
+
+    // Runtime split: classic darts games are played on /game/
+    runtime: "classic",
     lobbyType,
     createdBy: seat1Id,
 
@@ -266,7 +270,7 @@ async function validateInviteGame(db, gameId) {
     if (lobbyType !== "online") return { ok: false, message: "That invite is no longer valid" };
 
     // must still be a lobby (not started/finished)
-    if (state.status && state.status !== "lobby") return { ok: false, message: "This lobby is no longer available" };
+    if (state.status && state.status !== "lobby" && state.status !== "readyroom") return { ok: false, message: "This lobby is no longer available" };
 
     // expired lobby
     const exp = state.expiresAt?.toDate ? state.expiresAt.toDate() : state.expiresAt;
@@ -458,7 +462,12 @@ function initThemePicker() {
   });
 }
 
-async function createLobbyAndGo({ lobbyType = "online" } = {}) {
+async function createGhostLobbyAndGo() {
+  // Same as local lobby, but triggers one-shot ghost autostart.
+  return await createLobbyAndGo({ lobbyType: "local", ghost: true });
+}
+
+async function createLobbyAndGo({ lobbyType = "online", ghost = false } = {}) {
   const db = app.db;
   if (!db) return;
 
@@ -480,6 +489,9 @@ await newRef.set({
   updatedAt: now,
   expiresAt,
   status: "lobby",
+
+  // Runtime split: classic darts games are played on /game/
+  runtime: "classic",
   lobbyType,
   createdBy: seat1Id,
 
@@ -508,9 +520,13 @@ await newRef.set({
   // without requiring rewrite rules.
   const params = new URLSearchParams();
   params.set("game", newId);
-  if (lobbyType === "online") {
-    params.set("openInvite", "1");
-    params.set("autoSetup", "1");
+  if (ghost) {
+    // One-shot Ghost Mode autostart; no setup screen.
+    params.set("ghost", "1");
+  } else if (lobbyType === "online") {
+    // Online games should open the ONLINE setup modal immediately (no local setup, no invite popup).
+    // Ready Room provides the invite tools.
+    params.set("setup", "1");
   } else {
     // Local games should jump straight into setup once the game listener attaches
     params.set("setup", "1");
@@ -626,6 +642,15 @@ function wireDashboardUI() {
   const matchHistoryBtn = qs("dashMatchHistoryBtn");
   const statsHistoryBtn = qs("dashStatsHistoryBtn");
   const friendsBtn = qs("dashFriendsBtn");
+  const ghostCard = qs("dashGhostCard");
+  const arcadeCard = qs("dashArcadeCard");
+
+  const ghostModeModal = qs("ghostModeModal");
+  const ghostCloseBtn = qs("ghostCloseBtn");
+  const ghostRows = qs("ghostRows");
+  const ghostImportName = qs("ghostImportName");
+  const ghostImportInput = qs("ghostImportInput");
+  const ghostImportBtn = qs("ghostImportBtn");
 
   // Confirm sign out modal
   const confirmSignOutModal = qs("confirmSignOutModal");
@@ -652,6 +677,48 @@ function wireDashboardUI() {
     if (!statsHistoryModal) return;
     visible ? openModalEl(statsHistoryModal) : closeModalEl(statsHistoryModal);
   };
+
+  const setGhostModeVisible = (visible) => {
+    if (!ghostModeModal) return;
+    visible ? openModalEl(ghostModeModal) : closeModalEl(ghostModeModal);
+  };
+
+  async function renderGhostList() {
+    if (!ghostRows) return;
+    let ghosts = [];
+    try { ghosts = await listGhosts(); } catch (e) { console.warn("listGhosts failed", e); }
+
+    if (!ghosts.length) {
+      ghostRows.innerHTML = `<div style="opacity:.75; padding:10px; text-align:center;">No saved ghosts yet. Save one from a leg-end screen.</div>`;
+      return;
+    }
+
+    const fmtDate = (ms) => {
+      try {
+        const d = new Date(Number(ms || 0));
+        if (!Number.isFinite(d.getTime())) return "—";
+        return d.toLocaleDateString(undefined, { year: "2-digit", month: "2-digit", day: "2-digit" });
+      } catch (_) { return "—"; }
+    };
+    const inOut = (g) => `${(g.inRule||"straight")==="double"?"D":"S"}/${(g.outRule||"double")==="double"?"D":(g.outRule||"double")==="master"?"M":"S"}`;
+
+    ghostRows.innerHTML = ghosts.map((g) => {
+      const started = g.started ? "Yes" : "No";
+      return `
+        <div class="mhGrid mhRow ghostRow">
+          <div>${escapeHtml(g.name || "—")}</div>
+          <div>${inOut(g)}</div>
+          <div>${started}</div>
+          <div>${Number(g.visitsCount)||0}</div>
+          <div>${fmtDate(g.createdAt)}</div>
+          <div class="ghostActions">
+            <button class="secondary ghostTokenBtn" data-ghost-act="play" data-token="${g.token}">Play</button>
+            <button class="secondary ghostTokenBtn" data-ghost-act="copy" data-token="${g.token}">Copy</button>
+            <button class="secondary ghostTokenBtn" data-ghost-act="delete" data-token="${g.token}">Del</button>
+          </div>
+        </div>`;
+    }).join("");
+  }
 
   function setRangeActive(range) {
     const btns = [
@@ -1498,6 +1565,13 @@ function renderMatchHistory(stats) {
 
   wireCard(playLocalCard, async () => createLobbyAndGo({ lobbyType: "local" }));
   wireCard(playOnlineCard, async () => createLobbyAndGo({ lobbyType: "online" }));
+  wireCard(ghostCard, async () => {
+    await renderGhostList();
+    setGhostModeVisible(true);
+  });
+  wireCard(arcadeCard, () => {
+    window.location.href = withBase("/arcade/");
+  });
   wireCard(nemesisCard, () => {
     // Slice 1: Nemesis configuration screen (logged-in users only)
     softNavigate(withBase("/nemesis"));
@@ -1517,6 +1591,107 @@ if (matchHistoryBtn) {
   });
 }
 if (mhCloseBtn) mhCloseBtn.addEventListener("click", () => setMatchHistoryVisible(false));
+
+  if (ghostCloseBtn) ghostCloseBtn.addEventListener("click", () => setGhostModeVisible(false));
+  if (ghostModeModal) {
+    ghostModeModal.addEventListener("click", (e) => {
+      if (e.target === ghostModeModal) setGhostModeVisible(false);
+    });
+  }
+
+  const ghostStatus = qs("ghostStatus");
+  let ghostStatusTimer = null;
+  const setGhostStatus = (msg) => {
+    if (!ghostStatus) return;
+    clearTimeout(ghostStatusTimer);
+    if (msg) {
+      ghostStatus.innerText = msg;
+      ghostStatus.classList.remove("hidden");
+      ghostStatusTimer = setTimeout(() => {
+        ghostStatus.classList.add("hidden");
+      }, 2500);
+    } else {
+      ghostStatus.innerText = "";
+      ghostStatus.classList.add("hidden");
+    }
+  };
+
+  if (ghostImportBtn) {
+    ghostImportBtn.addEventListener("click", async () => {
+      const nm = (ghostImportName && ghostImportName.value || "").trim();
+      const tok = (ghostImportInput && ghostImportInput.value || "").trim();
+      if (!nm) { setGhostStatus("Please enter a name."); return; }
+      if (!tok) { setGhostStatus("Paste a ghost token first."); return; }
+      const res = await saveGhostNamed(tok, nm);
+      if (res && res.ok) {
+        if (ghostImportInput) ghostImportInput.value = "";
+        if (ghostImportName) ghostImportName.value = "";
+        await renderGhostList();
+        setGhostStatus("Ghost imported.");
+      } else if (res && res.reason === "DUPLICATE") {
+        setGhostStatus("You already have this leg saved.");
+      } else if (res && res.reason === "NO_CHECKOUT") {
+        setGhostStatus("Only winning legs can be saved.");
+      } else if (res && res.reason === "NAME_REQUIRED") {
+        setGhostStatus("Please enter a name.");
+      } else {
+        setGhostStatus("Invalid token.");
+      }
+    });
+  }
+
+  if (ghostRows) {
+    ghostRows.addEventListener("click", async (e) => {
+      const btn = e.target.closest("button[data-ghost-act]");
+      if (!btn) return;
+      const act = btn.getAttribute("data-ghost-act");
+      const tok = btn.getAttribute("data-token") || "";
+      if (!tok) return;
+
+      if (act === "copy") {
+        try {
+          await navigator.clipboard.writeText(tok);
+          const old = btn.innerText;
+          btn.innerText = "Copied ✓";
+          btn.disabled = true;
+          setTimeout(() => {
+            btn.innerText = old;
+            btn.disabled = false;
+          }, 1200);
+        } catch (_) {
+          setGhostStatus("Couldn't copy automatically — please copy manually:");
+          try { if (ghostImportInput) ghostImportInput.value = tok; } catch (_) {}
+        }
+      }
+      if (act === "delete") {
+        // Two-step confirmation without browser dialogs.
+        if (btn.dataset.confirming !== "1") {
+          btn.dataset.confirming = "1";
+          const old = btn.innerText;
+          btn.dataset.oldText = old;
+          btn.innerText = "Sure?";
+          setTimeout(() => {
+            if (btn.dataset.confirming === "1") {
+              btn.dataset.confirming = "0";
+              btn.innerText = btn.dataset.oldText || "Delete";
+            }
+          }, 2000);
+          return;
+        }
+        btn.dataset.confirming = "0";
+        await deleteGhost(tok);
+        await renderGhostList();
+      }
+      if (act === "play") {
+        try {
+          sessionStorage.setItem("pendingGhostToken", tok);
+        } catch (_) {
+          try { localStorage.setItem("pendingGhostToken", tok); } catch (_) {}
+        }
+        await createGhostLobbyAndGo();
+      }
+    });
+  }
 if (mhModal) {
   mhModal.addEventListener("click", (e) => {
     if (e.target === mhModal) setMatchHistoryVisible(false);

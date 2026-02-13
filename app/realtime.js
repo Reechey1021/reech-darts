@@ -6,8 +6,10 @@ import { updateAuditFromState, renderAuditChat } from "./ui/auditChat.js";
 // app/ui/auditChat is lightweight; audits are derived from state deltas.
 import { playClipsWebAudio, stopAllAudio } from "./audio/audio.js";
 import { applyFinishedMatchProfileUpdatesForMe } from "./userStats.js";
+import { startGhostMatchFromToken, maybeStartMatchFromReadyRoom } from "./actions.js";
 import { nudgeVoiceAfterGameActivity } from "./input/voice.js";
 import { maybeHandleNemesisTurn, resetNemesisTurnScheduler } from "./nemesis/turns.js";
+import { maybeHandleGhostTurn, resetGhostTurnScheduler } from "./ghosts/turns.js";
 
 // Call this whenever we move to a different game document.
 // Prevents stale audio IDs + seat-claim state leaking across lobbies.
@@ -16,6 +18,7 @@ export function resetRealtimeStateForGameSwitch() {
   app.lastAudioId = null;
   stopAllAudio();
   try { resetNemesisTurnScheduler(); } catch (_) {}
+  try { resetGhostTurnScheduler(); } catch (_) {}
 }
 
 let lastAudioId = null;
@@ -36,7 +39,7 @@ export async function tryClaimSeat2(state) {
   if (!d) return;
 
   // -------- Lobby: claim seat2 BEFORE a match exists --------
-  if (state.status === "lobby" && !state.match) {
+  if ((state.status === "lobby" || state.status === "readyroom") && !state.match) {
     const hostId = state.seat1Id || state?.lobby?.host?.actorId;
     if (!hostId) return;
     if (hostId === d) return;
@@ -49,7 +52,7 @@ export async function tryClaimSeat2(state) {
         const snap = await tx.get(app.gameRef);
         const fresh = snap.data();
         if (!fresh) return;
-        if (fresh.status !== "lobby") return;
+        if (fresh.status !== "lobby" && fresh.status !== "readyroom") return;
         if (fresh.match) return;
         if (!fresh.seat1Id) return;
         if (fresh.seat1Id === d) return;
@@ -66,6 +69,16 @@ export async function tryClaimSeat2(state) {
           uid: (app.user && !app.user.isAnonymous) ? app.user.uid : null,
           photoURL: fresh.seat2PhotoURL,
         };
+
+        // Ready Room: ensure the joiner has an explicit ready=false entry
+        try {
+          if (fresh.status === "readyroom") {
+            fresh.readyRoom = fresh.readyRoom || {};
+            fresh.readyRoom.ready = fresh.readyRoom.ready || {};
+            fresh.readyRoom.ready[d] = false;
+            fresh.readyRoom.updatedAt = Date.now();
+          }
+        } catch (_) {}
         fresh.updatedAt = new Date();
         tx.set(app.gameRef, fresh);
       });
@@ -232,13 +245,23 @@ export function bindGameListener() {
         console.warn("applyFinishedMatchProfileUpdatesForMe failed (non-fatal)", e);
       }
 
-      // If we arrived from the dashboard for a local game, auto-open setup.
+      
+      // Ghost Mode: if we arrived from the dashboard with ?ghost=1, auto-start immediately.
+      maybeAutoStartGhost(state);
+
+// If we arrived from the dashboard for a local game, auto-open setup.
       maybeAutoOpenSetup(state);
 
       tryClaimSeat2(state);
 
+      // Ready Room: host auto-starts once both players are Ready
+      try { maybeStartMatchFromReadyRoom(); } catch (_) {}
+
       // Nemesis (offline bot): auto-play when it is Nemesis' turn.
       try { maybeHandleNemesisTurn(state); } catch (_) {}
+
+      // Ghost Mode: deterministic auto-play when it is Ghost's turn.
+      try { maybeHandleGhostTurn(null, state); } catch (_) {}
 
       // Firestore-synced audio: every device plays the same event once
       if (state?.audio?.id && state.audio.id !== app.lastAudioId) {
@@ -252,6 +275,35 @@ export function bindGameListener() {
       setLobbyGateVisible(true);
     }
   );
+}
+
+function maybeAutoStartGhost(state) {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("ghost") !== "1") return;
+    if (!state || state.status !== "lobby") return;
+    if (state.match) return;
+
+    // Consume one-shot token handoff from sessionStorage/localStorage.
+    let tok = "";
+    try { tok = (sessionStorage.getItem("pendingGhostToken") || "").trim(); } catch (_) {}
+    if (!tok) {
+      try { tok = (localStorage.getItem("pendingGhostToken") || "").trim(); } catch (_) {}
+    }
+    if (!tok) return;
+
+    // Clear handoff immediately to avoid repeats on reload.
+    try { sessionStorage.removeItem("pendingGhostToken"); } catch (_) {}
+    try { localStorage.removeItem("pendingGhostToken"); } catch (_) {}
+
+    startGhostMatchFromToken(tok);
+
+    const url = new URL(window.location.href);
+    url.searchParams.delete("ghost");
+    window.history.replaceState({}, "", url.toString());
+  } catch (e) {
+    console.warn("maybeAutoStartGhost failed", e);
+  }
 }
 
 function maybeAutoOpenSetup(state) {
@@ -271,6 +323,17 @@ function maybeAutoOpenSetup(state) {
     if (localFields) localFields.classList.toggle("hidden", isOnline);
     if (onlineOpts) onlineOpts.classList.toggle("hidden", !isOnline);
     if (mutualRow) mutualRow.classList.toggle("hidden", !isOnline);
+
+    // Local games are always Casual (no Ranked/Casual switcher shown).
+    // Ensure hidden controls reflect that so setup-only features (like Handicaps)
+    // are not accidentally disabled.
+    if (!isOnline) {
+      const comp = document.getElementById("setupCompetition");
+      if (comp) {
+        comp.value = "casual";
+        try { comp.dispatchEvent(new Event("change", { bubbles: true })); } catch (_) {}
+      }
+    }
 
     setSetupModalVisible(true);
 
