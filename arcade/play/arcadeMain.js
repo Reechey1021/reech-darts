@@ -468,7 +468,7 @@ function snapExists(snap) {
   }
 }
 
-function computeBullStateFromHistory({ visitsLimit, suddenDeath }, history) {
+function computeBullStateFromHistory({ visitsLimit, suddenDeath, starterSeat }, history) {
   const vLimit = Math.max(1, Number(visitsLimit) || 10);
   const hist = Array.isArray(history) ? history.filter(h => h && (h.player === 0 || h.player === 1) && Array.isArray(h.darts) && h.darts.length === 3) : [];
 
@@ -526,7 +526,7 @@ function computeBullStateFromHistory({ visitsLimit, suddenDeath }, history) {
   }
 
   // Next player is simply alternating, unless finished.
-  const cur = finished ? (hist.length ? hist[hist.length - 1].player : 0) : (hist.length % 2);
+  const cur = finished ? (hist.length ? hist[hist.length - 1].player : starter) : ((starter + hist.length) % 2);
 
   return {
     visitsLimit: vLimit,
@@ -544,10 +544,11 @@ function computeBullStateFromHistory({ visitsLimit, suddenDeath }, history) {
 function ensureBullChallengeState(state) {
   const visitsLimit = Math.max(1, Number(state?.match?.arcade?.visitsLimit) || 10);
   const suddenDeath = !!state?.match?.arcade?.suddenDeath;
+  const starterSeat = (Number(state?.match?.arcade?.starterSeat) === 1) ? 1 : 0;
 
   const existing = state?.match?.arcade?.bcState;
   const history = existing && typeof existing === "object" ? existing.history : [];
-  const computed = computeBullStateFromHistory({ visitsLimit, suddenDeath }, history);
+  const computed = computeBullStateFromHistory({ visitsLimit, suddenDeath, starterSeat }, history);
 
   // Keep a stable object shape for storage/readbacks.
   return {
@@ -3080,7 +3081,7 @@ async function ensureDocHasAtcState(ref) {
 }
 
 
-function computeAtcStateFromHistory({ startOn, direction, multipliers, exitType, punishment }, history) {
+function computeAtcStateFromHistory({ startOn, direction, multipliers, exitType, punishment, starterSeat, suddenDeath }, history) {
   const dir = (direction === "down") ? "down" : "up";
   const start = (Number(startOn) === 20) ? 20 : 1;
 
@@ -3098,6 +3099,8 @@ function computeAtcStateFromHistory({ startOn, direction, multipliers, exitType,
 
   const visitsTaken = [0, 0];
   const finishedAtVisit = [null, null];
+  const starter = (Number(starterSeat) === 1) ? 1 : 0;
+  const sudden = (suddenDeath === true);
   let currentPlayer = starter;
   let finished = false;
   let winner = null;
@@ -3266,6 +3269,9 @@ if (endOfRound) {
   }
 }
 
+
+  // Determine next player based on starter and visits taken so far.
+  currentPlayer = finished ? currentPlayer : ((starter + hist.length) % 2);
 
   return {
     phase: 2,

@@ -97,7 +97,6 @@ function tplBullFields({ online }) {
   const values = Array.from({ length: 50 }, (_, i) => String(i + 1));
   const valuesCsv = values.join(",");
   return `
-  \x01
   <div class="arcadesetupblock">
     ${tplStarterRow(online ? "bullOnlineStarterSelect" : "bullLocalStarterSelect")}
   </div>
