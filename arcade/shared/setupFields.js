@@ -157,7 +157,6 @@ function tplRoundsFields({ online }) {
   const valuesCsv = values.join(",");
   const firstToId = online ? "roundsOnlineFirstToSelect" : "roundsLocalFirstToSelect";
   const starterId = online ? "roundsOnlineStarterSelect" : "roundsLocalStarterSelect";
-  const sdId = online ? "roundsOnlineSuddenDeathChk" : "roundsLocalSuddenDeathChk";
   return `
     <div class="arcadetwogrid">
       <div class="arcadesetupblock">
@@ -168,9 +167,6 @@ function tplRoundsFields({ online }) {
         ${tplStepper(firstToId, valuesCsv)}
         ${tplHiddenSelect(firstToId, values, "5")}
       </div>
-    </div>
-    <div class="setupblock" style="margin-top:12px;">
-      ${tplSuddenDeathRow(sdId)}
     </div>
     ${
       online

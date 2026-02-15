@@ -1,22 +1,43 @@
 
 function canScoreNow(state) {
   if (!state?.match) return false;
+
   // Local games: always allow scoring
   const gameType = state.match.gameType || state.lobbyType || state.match.lobbyType || "single";
   if (gameType !== "online") return true;
 
-  // Online: block if not seated
   const myUid = getActorId();
   if (!myUid) return false;
 
   const seats = getSeatIds(state);
-  const seatIndex = (seats.seat1 && myUid === seats.seat1) ? 0 : (seats.seat2 && myUid === seats.seat2) ? 1 : null;
+  const seatIndex =
+    (seats.seat1 && myUid === seats.seat1) ? 0 :
+    (seats.seat2 && myUid === seats.seat2) ? 1 :
+    null;
   if (seatIndex === null) return false;
 
   // Allow mutual control: either device can score
-  if (state.match.allowMutualControl) return true;
+  if (state?.match?.allowMutualControl) return true;
 
-  // Use leg.currentPlayer when present (consistent with existing arcade games)
+  // Arcade online: derive turn from starterSeat + submitted history length.
+  const arcade = state?.match?.arcade || {};
+  const starterSeat = (arcade?.starterSeat === 0 || arcade?.starterSeat === 1) ? arcade.starterSeat : 0;
+  const histLen = Array.isArray(arcade?.history) ? arcade.history.length : (
+    Array.isArray(arcade?.highScoreState?.history) ? arcade.highScoreState.history.length :
+    Array.isArray(arcade?.roundsState?.history) ? arcade.roundsState.history.length :
+    Array.isArray(arcade?.raceState?.history) ? arcade.raceState.history.length :
+    Array.isArray(arcade?.bcState?.history) ? arcade.bcState.history.length :
+    Array.isArray(arcade?.atcState?.history) ? arcade.atcState.history.length :
+    0
+  );
+
+  // If this is an arcade mode, enforce turn order using derived turn.
+  if (String(arcade?.mode || "")) {
+    const turn = (starterSeat + histLen) % 2;
+    return seatIndex === turn;
+  }
+
+  // Fallback: classic/legacy
   const turn = (typeof state?.leg?.currentPlayer === "number")
     ? state.leg.currentPlayer
     : (typeof state?.match?.leg?.currentPlayer === "number" ? state.match.leg.currentPlayer : null);
@@ -36,7 +57,7 @@ import { initAuditChatUI, updateAuditFromState, renderAuditChat } from "../../ap
 
 import { renderArcadeSetupFields } from "../shared/setupFields.js";
 
-import { playSfxWebAudio } from "../../app/audio/audio.js";
+import { unlockAudioOnce, playClipsWebAudio, playSfxWebAudio, pad3 } from "../../app/audio/audio.js";
 
 import { multFactor } from "../../app/input/dartpad.js";
 
@@ -50,6 +71,15 @@ let __lastSeat2Name = null;
 
 // Bull Challenge: pending darts are LOCAL ONLY (not written to Firestore until Submit Visit).
 let pendingHits = [];
+
+// Track server-driven restarts so all clients can close end screens and reset transient UI.
+let __lastRestartAtSeen = null;
+
+// Firestore-synced audio events (same pattern as /game/)
+let __lastAudioIdSeen = null;
+
+// Online: if the host closes/leaves the lobby, guests see a clear message.
+let __lobbyClosedShown = false;
 
 // (No global state needed; we only write when a specific field is missing.)
 
@@ -254,6 +284,63 @@ function showError(msg) {
   el.classList.remove("hidden");
 }
 
+function isAnyArcadeModalOpen() {
+  try {
+    // Our modal system uses .modal + .is-open (and sometimes removes .hidden).
+    if (document.querySelector(".modal.is-open")) return true;
+    // Input mode picker is a small in-flow dialog.
+    const picker = document.getElementById("inputModePicker");
+    if (picker && !picker.classList.contains("hidden")) return true;
+  } catch (_) {}
+  return false;
+}
+
+function wireArcadeGlobalKeyboard() {
+  const scoreInputEl = document.getElementById("scoreInput");
+  if (!scoreInputEl) return;
+
+  window.addEventListener("keydown", (e) => {
+    try {
+      if (document.hidden) return;
+      if (isAnyArcadeModalOpen()) return;
+
+      const hsArea = document.getElementById("hsInputArea");
+      if (!hsArea || hsArea.classList.contains("hidden")) return;
+
+      if (!canScoreNow(app.latestState)) return;
+
+      // Don't steal keys when user is typing in another input/select
+      const tag = document.activeElement?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select") {
+        // But DO allow typing into the score input itself.
+        if (document.activeElement !== scoreInputEl) return;
+      }
+
+      // Digits
+      if (e.key >= "0" && e.key <= "9") {
+        e.preventDefault();
+        scoreInputEl.value = (scoreInputEl.value + e.key).slice(0, 3);
+        return;
+      }
+
+      // Backspace
+      if (e.key === "Backspace") {
+        e.preventDefault();
+        scoreInputEl.value = scoreInputEl.value.slice(0, -1);
+        return;
+      }
+
+      // Enter submits (same as clicking Submit)
+      if (e.key === "Enter") {
+        e.preventDefault();
+        const btn = document.getElementById("submitBtn");
+        if (btn && !btn.disabled) btn.click();
+        return;
+      }
+    } catch (_) {}
+  });
+}
+
 // Avoid layout “shimmy” caused by repeatedly re-setting <img src> on every render.
 // Only update the DOM if the URL actually changed.
 function setAvatarImg(imgEl, url) {
@@ -272,6 +359,36 @@ function setAvatarImg(imgEl, url) {
     imgEl.src = next;
   }
   imgEl.classList.remove("hidden");
+}
+
+function renderLastVisitMini(containerEl, value) {
+  if (!containerEl) return;
+  const n = (value === null || value === undefined) ? null : Number(value);
+  if (!Number.isFinite(n)) {
+    containerEl.classList.add("hidden");
+    containerEl.innerHTML = "";
+    return;
+  }
+  containerEl.classList.remove("hidden");
+
+  const prev = containerEl.dataset.lastVisit || "";
+  const next = String(Math.round(n));
+  containerEl.dataset.lastVisit = next;
+
+  containerEl.innerHTML = `
+    <div class="lastVisitMini">
+      <span class="lastVisitChev">▴</span>
+      <span class="lastVisitVal">${next}</span>
+    </div>
+  `;
+
+  if (prev && prev !== next) {
+    containerEl.classList.remove("lastVisitFlash");
+    // Force reflow for restart
+    void containerEl.offsetWidth;
+    containerEl.classList.add("lastVisitFlash");
+    window.setTimeout(() => containerEl.classList.remove("lastVisitFlash"), 650);
+  }
 }
 
 function openModalEl(modal) {
@@ -866,10 +983,24 @@ let __lastArcadeMode = null;
 let __lastArcadeCurrentPlayer = null;
 
 function render(state) {
+  // Close end screens and reset transient UI on server-driven restarts.
+  try {
+    const ra = state?.match?.arcade?.restartAt;
+    if (ra && ra !== __lastRestartAtSeen) {
+      __lastRestartAtSeen = ra;
+      // Clear any local buffered input
+      pendingHits = [];
+      const si = document.getElementById("scoreInput");
+      if (si) si.value = "";
+      try { closeHiddenModal(qs("arcadeEndModal")); } catch (_) {}
+      try { closeHiddenModal(qs("arcadeEndModalWin")); } catch (_) {}
+    }
+  } catch (_) {}
+
   const modeNow = getArcadeMode(state);
   const cpNow = (() => {
     if (modeNow === "around_the_clock") return state?.match?.arcade?.atcState?.currentPlayer ?? state?.match?.arcade?.atc?.currentPlayer ?? state?.match?.arcade?.atcState?.currentPlayer;
-    if (modeNow === "bull_challenge") return state?.leg?.currentPlayer ?? state?.match?.leg?.currentPlayer ?? state?.match?.currentPlayer;
+    if (modeNow === "bull_challenge") return state?.match?.arcade?.bcState?.currentPlayer;
     if (modeNow === "high_score") return state?.match?.arcade?.highScoreState?.currentPlayer;
     if (modeNow === "rounds") return state?.match?.arcade?.roundsState?.currentPlayer;
     if (modeNow === "race") return state?.match?.arcade?.raceState?.currentPlayer;
@@ -962,12 +1093,15 @@ function computeHighScoreStateFromHistory(state) {
     { total: 0, singles: 0, doubles: 0, trebles: 0, misses: 0, darts: 0, visits: 0 },
   ];
 
+  const lastVisit = [null, null];
+
   for (const v of hist) {
     const p = Number(v?.p ?? 0);
     if (p !== 0 && p !== 1) continue;
     const score = Number(v?.score || 0);
     players[p].total += score;
     players[p].visits += 1;
+    lastVisit[p] = score;
     const dartsArr = Array.isArray(v?.darts) ? v.darts : [];
     players[p].darts += dartsArr.length;
     for (const d of dartsArr) {
@@ -1010,6 +1144,7 @@ const currentPlayer = finished ? 0 : ((starterSeat + totalVisits) % 2);
     winner,
     history: hist,
     players,
+    lastVisit,
   };
 }
 
@@ -1037,6 +1172,8 @@ function computeRoundsStateFromHistory(state) {
     { total: 0, singles: 0, doubles: 0, trebles: 0, misses: 0, darts: 0, visits: 0 },
   ];
 
+  const lastVisit = [null, null];
+
   // accumulate totals + per-dart counters
   for (const v of hist) {
     const p = Number(v?.p ?? 0);
@@ -1044,7 +1181,9 @@ function computeRoundsStateFromHistory(state) {
     const score = Number(v?.score || 0);
     players[p].total += score;
     players[p].visits += 1;
-    const dartsArr = Array.isArray(v?.darts) ? v.darts : [];
+    
+    lastVisit[p] = score;
+const dartsArr = Array.isArray(v?.darts) ? v.darts : [];
     players[p].darts += dartsArr.length;
     for (const d of dartsArr) scoregame_applyDartToCounters(players[p], d);
   }
@@ -1076,7 +1215,7 @@ function computeRoundsStateFromHistory(state) {
     else winner = null;
   }
 
-  return { mode: "rounds", config: cfg, firstTo, players, points, roundIndex, currentPlayer, finished, winner, history: hist, roundScores };
+  return { mode: "rounds", config: cfg, firstTo, players, points, roundIndex, currentPlayer, finished, winner, history: hist, roundScores, lastVisit };
 }
 
 function ensureRaceConfig(state) {
@@ -1099,13 +1238,17 @@ function computeRaceStateFromHistory(state) {
     { total: 0, singles: 0, doubles: 0, trebles: 0, misses: 0, darts: 0, visits: 0 },
   ];
 
+  const lastVisit = [null, null];
+
   for (const v of hist) {
     const p = Number(v?.p ?? 0);
     if (p !== 0 && p !== 1) continue;
     const score = Number(v?.score || 0);
     players[p].total += score;
     players[p].visits += 1;
-    const dartsArr = Array.isArray(v?.darts) ? v.darts : [];
+    
+    lastVisit[p] = score;
+const dartsArr = Array.isArray(v?.darts) ? v.darts : [];
     players[p].darts += dartsArr.length;
     for (const d of dartsArr) scoregame_applyDartToCounters(players[p], d);
   }
@@ -1136,7 +1279,7 @@ if (endOfRound) {
 
 const currentPlayer = finished ? 0 : ((starterSeat + hist.length) % 2);
 
-return { mode: "race", config: cfg, target, players, currentPlayer, finished, winner, history: hist };
+return { mode: "race", config: cfg, target, players, currentPlayer, finished, winner, history: hist, lastVisit };
 }
 
 
@@ -1231,6 +1374,12 @@ function renderHighScore(state) {
   const p2ScoreEl = qs("bcP2Score");
   if (p1ScoreEl) p1ScoreEl.textContent = String(p1.total ?? 0);
   if (p2ScoreEl) p2ScoreEl.textContent = String(p2.total ?? 0);
+
+  // Mini "last visit" under the live score
+  const p1StatsMini = qs("arcadeP1Stats");
+  const p2StatsMini = qs("arcadeP2Stats");
+  renderLastVisitMini(p1StatsMini, hs.lastVisit?.[0]);
+  renderLastVisitMini(p2StatsMini, hs.lastVisit?.[1]);
 
   const titleEl = qs("bcTitle");
   if (titleEl) titleEl.textContent = "High Score";
@@ -1411,8 +1560,6 @@ try {
         { label: "Singles", p1: Number(p1.singles)||0, p2: Number(p2.singles)||0 },
         { label: "Doubles", p1: Number(p1.doubles)||0, p2: Number(p2.doubles)||0 },
         { label: "Trebles", p1: Number(p1.trebles)||0, p2: Number(p2.trebles)||0 },
-        { label: "Misses", p1: Number(p1.misses)||0, p2: Number(p2.misses)||0 },
-        { label: "Hit %", p1: pct(p1), p2: pct(p2) },
       ],
     });
   }
@@ -1473,6 +1620,12 @@ function renderRounds(state) {
   const p2ScoreEl = qs("bcP2Score");
   if (p1ScoreEl) p1ScoreEl.textContent = String(rs.points?.[0] ?? 0);
   if (p2ScoreEl) p2ScoreEl.textContent = String(rs.points?.[1] ?? 0);
+
+  // Mini "last visit" under the live score (shows the entered score)
+  const p1StatsMini = qs("arcadeP1Stats");
+  const p2StatsMini = qs("arcadeP2Stats");
+  renderLastVisitMini(p1StatsMini, rs.lastVisit?.[0]);
+  renderLastVisitMini(p2StatsMini, rs.lastVisit?.[1]);
 
   // Round hint (keep the rounds row)
   const hintRounds = document.getElementById("bcRoundHintRounds") || document.querySelector(`[data-role="arcadeRoundHintRounds"]`);
@@ -1601,8 +1754,6 @@ try {
         { label: "Total scored", p1: Number(p1.total)||0, p2: Number(p2.total)||0 },
         { label: "Avg/visit", p1: avg(p1), p2: avg(p2) },
         { label: "Best visit", p1: bestVisit(0), p2: bestVisit(1) },
-        { label: "Misses", p1: Number(p1.misses)||0, p2: Number(p2.misses)||0 },
-        { label: "Hit %", p1: pct(p1), p2: pct(p2) },
       ],
     });
   }
@@ -1790,8 +1941,6 @@ try {
         { label: "Total", p1: Number(p1.total)||0, p2: Number(p2.total)||0 },
         { label: "Avg/visit", p1: avg(p1), p2: avg(p2) },
         { label: "Best visit", p1: bestVisit(0), p2: bestVisit(1) },
-        { label: "Misses", p1: Number(p1.misses)||0, p2: Number(p2.misses)||0 },
-        { label: "Hit %", p1: pct(p1), p2: pct(p2) },
       ],
     });
   }
@@ -1854,7 +2003,8 @@ async function submitHighScoreVisit(ref) {
 
     // Prefer stored currentPlayer when available (important for online).
     const storedCur = Number(data?.match?.arcade?.highScoreState?.currentPlayer);
-    const p = Number.isFinite(storedCur) ? storedCur : (totalVisits % 2);
+    const starterSeat = (Number(data?.match?.arcade?.starterSeat) === 1) ? 1 : 0;
+    const p = Number.isFinite(storedCur) ? storedCur : ((starterSeat + totalVisits) % 2);
 
     if (mutualOff) {
       const seat1 = data?.match?.seat1Id || data?.seat1Id || data?.lobby?.host?.actorId || null;
@@ -1870,6 +2020,14 @@ async function submitHighScoreVisit(ref) {
       match: { arcade: { highScore: cfg, highScoreState: { history: nextHist } } }
     });
 
+    const clips = [];
+    if (visitScore === 0) {
+      clips.push("/audio/phrases/no_score.mp3");
+    } else if (visitScore >= 0 && visitScore <= 180) {
+      clips.push(`/audio/numbers/${pad3(visitScore)}.mp3`);
+    }
+    const audio = clips.length ? { id: `${Date.now()}_${Math.random().toString(16).slice(2)}`, clips, at: Date.now() } : null;
+
     tx.update(ref, {
       "match.arcade.mode": "high_score",
       "match.arcade.highScore": { rounds: rounds },
@@ -1882,6 +2040,7 @@ async function submitHighScoreVisit(ref) {
         winner: nextState.winner,
         players: nextState.players,
       },
+      ...(audio ? { audio } : {}),
       updatedAt: new Date(),
     });
   });
@@ -1948,6 +2107,14 @@ async function submitRoundsVisit(ref) {
       match: { arcade: { rounds: cfg, roundsState: { history: nextHist } } }
     });
 
+    const clips = [];
+    if (visitScore === 0) {
+      clips.push("/audio/phrases/no_score.mp3");
+    } else if (visitScore >= 0 && visitScore <= 180) {
+      clips.push(`/audio/numbers/${pad3(visitScore)}.mp3`);
+    }
+    const audio = clips.length ? { id: `${Date.now()}_${Math.random().toString(16).slice(2)}`, clips, at: Date.now() } : null;
+
     tx.update(ref, {
       "match.arcade.mode": "rounds",
       "match.arcade.rounds": { firstTo: Number(cfg.firstTo || 5) },
@@ -1961,6 +2128,7 @@ async function submitRoundsVisit(ref) {
         winner: nextState.winner,
         players: nextState.players,
       },
+      ...(audio ? { audio } : {}),
       updatedAt: new Date(),
     });
   });
@@ -2026,7 +2194,8 @@ async function submitRaceVisit(ref) {
 
     const totalVisits = prevHist.length;
     const storedCur = Number(data?.match?.arcade?.raceState?.currentPlayer);
-    const p = Number.isFinite(storedCur) ? storedCur : (totalVisits % 2);
+    const starterSeat = (Number(data?.match?.arcade?.starterSeat) === 1) ? 1 : 0;
+    const p = Number.isFinite(storedCur) ? storedCur : ((starterSeat + totalVisits) % 2);
 
     // Online mutual-control gating
     const online = (data?.match?.lobbyType === "online") || (data?.lobbyType === "online") || (data?.match?.gameType === "online");
@@ -2054,6 +2223,14 @@ async function submitRaceVisit(ref) {
       },
     });
 
+    const clips = [];
+    if (visitScore === 0) {
+      clips.push("/audio/phrases/no_score.mp3");
+    } else if (visitScore >= 0 && visitScore <= 180) {
+      clips.push(`/audio/numbers/${pad3(visitScore)}.mp3`);
+    }
+    const audio = clips.length ? { id: `${Date.now()}_${Math.random().toString(16).slice(2)}`, clips, at: Date.now() } : null;
+
     // Persist full derived state so render + input gating stay in sync.
     tx.update(ref, {
       "match.arcade.mode": "race",
@@ -2066,6 +2243,7 @@ async function submitRaceVisit(ref) {
         players: nextState.players || [],
         target: nextState.target,
       },
+      ...(audio ? { audio } : {}),
       updatedAt: new Date(),
       "match.updatedAt": new Date(),
     });
@@ -2120,7 +2298,7 @@ async function undoRace(ref) {
     tx.update(ref, {
       "match.arcade.mode": "race",
       "match.arcade.raceState.history": nextHist,
-      "match.arcade.raceState.currentPlayer": nextHist.length % 2,
+      "match.arcade.raceState.currentPlayer": ((Number(data?.match?.arcade?.starterSeat) || 0) + nextHist.length) % 2,
       "match.arcade.raceState.roundIndex": Math.floor(nextHist.length / 2),
       "match.arcade.raceState.finished": false,
       "match.arcade.raceState.winner": null,
@@ -2150,22 +2328,34 @@ async function undoRounds(ref) {
     const snap = await tx.get(ref);
     if (!snapExists(snap)) throw new Error("Game not found");
     const cur = snap.data() || {};
-    const st = computeRoundsStateFromHistory(cur);
-    const hist = Array.isArray(st.history) ? st.history.slice() : [];
-    if (!hist.length) return;
 
-    const last = hist[hist.length - 1];
-    const p = Number(last?.p ?? -1);
-    if (!canUndoNow(cur, p)) throw new Error("Cannot undo");
+    const online = (cur?.lobbyType === "online") || (cur?.match?.gameType === "online");
+    const mutualOff = online && cur?.match?.allowMutualControl === false;
+    const actor = getActorId();
 
-    hist.pop();
+    const prevHist = Array.isArray(cur?.match?.arcade?.roundsState?.history)
+      ? cur.match.arcade.roundsState.history
+      : [];
+    if (!prevHist.length) return;
+
+    if (mutualOff) {
+      const seat1 = cur?.match?.seat1Id || cur?.seat1Id || cur?.lobby?.host?.actorId || null;
+      const seat2 = cur?.match?.seat2Id || cur?.seat2Id || null;
+      const mySeat = (actor && seat1 && actor === seat1) ? 0 : ((actor && seat2 && actor === seat2) ? 1 : -1);
+      const lastP = Number(prevHist[prevHist.length - 1]?.p);
+      if (mySeat !== lastP) return;
+    }
+
+    const hist = prevHist.slice(0, prevHist.length - 1);
+    const cfg = ensureRoundsConfig(cur);
 
     const nextState = computeRoundsStateFromHistory({
-      match: { arcade: { rounds: ensureRoundsConfig(cur), roundsState: { history: hist } } }
+      match: { arcade: { rounds: cfg, roundsState: { history: hist } } }
     });
 
     tx.update(ref, {
       "match.arcade.mode": "rounds",
+      "match.arcade.rounds": cfg,
       "match.arcade.roundsState": {
         history: hist,
         currentPlayer: nextState.currentPlayer,
@@ -2180,6 +2370,7 @@ async function undoRounds(ref) {
     });
   });
 }
+
 
 async function undoHighScore(ref) {
   if (!app.db) throw new Error("Missing Firestore");
@@ -3603,6 +3794,20 @@ async function restartMatch(ref) {
     const match = { ...(state.match || {}) };
     const arcade = { ...(match.arcade || {}) };
 
+    // Resolve starter seat (0/1) once and apply consistently.
+    if (arcade.starterSeat !== 0 && arcade.starterSeat !== 1) {
+      arcade.starterSeat = resolveStarterSeat(arcade.starter);
+    }
+    const starterSeat = (Number(arcade.starterSeat) === 1) ? 1 : 0;
+
+    // Online restarts should stay in-game (host-controlled) and not bounce anyone back to Ready Room.
+    if (isOnlineGame(state)) {
+      arcade.started = true;
+    }
+
+    // Server-driven restart marker (used to reset/close UI on all clients).
+    arcade.restartAt = Date.now();
+
     // Reset buffered input
     pendingHits = [];
 
@@ -3611,7 +3816,8 @@ async function restartMatch(ref) {
       const startOnNum = (Number(cfg.startOn) === 20) ? 20 : 1;
       const direction = startOnNum === 20 ? "down" : "up";
       const multipliers = (cfg.multipliers !== false);
-      arcade.atcState = computeAtcStateFromHistory({ startOn: startOnNum, direction, multipliers, starterSeat: state?.match?.arcade?.starterSeat, suddenDeath: state?.match?.arcade?.suddenDeath, exitType: (match.arcade?.atc?.exitType || "bull"), punishment: ((match.arcade?.atc?.punishment === 1 || match.arcade?.atc?.punishment === 2 || match.arcade?.atc?.punishment === 3) ? match.arcade.atc.punishment : 0) }, []);
+      arcade.atcState = computeAtcStateFromHistory({ startOn: startOnNum, direction, multipliers, starterSeat, suddenDeath: arcade.suddenDeath, exitType: (match.arcade?.atc?.exitType || "bull"), punishment: ((match.arcade?.atc?.punishment === 1 || match.arcade?.atc?.punishment === 2 || match.arcade?.atc?.punishment === 3) ? match.arcade.atc.punishment : 0) }, []);
+      arcade.atcState.currentPlayer = starterSeat;
     } else if (mode === "high_score") {
       const rounds = Math.max(1, Number(arcade.highScore?.rounds) || Number(match.arcade?.highScore?.rounds) || 10);
       arcade.highScore = { ...(arcade.highScore || {}), rounds };
@@ -3620,7 +3826,7 @@ async function restartMatch(ref) {
         rounds: hs.rounds,
         history: [],
         players: hs.players,
-        currentPlayer: 0,
+        currentPlayer: starterSeat,
         roundIndex: 0,
         finished: false,
         winner: null,
@@ -3635,7 +3841,7 @@ async function restartMatch(ref) {
         history: [],
         players: rs.players,
         points: [0, 0],
-        currentPlayer: 0,
+        currentPlayer: starterSeat,
         roundIndex: 0,
         finished: false,
         winner: null,
@@ -3648,7 +3854,7 @@ async function restartMatch(ref) {
         target: rs.target,
         history: [],
         players: rs.players,
-        currentPlayer: 0,
+        currentPlayer: starterSeat,
         finished: false,
         winner: null,
       };
@@ -3665,7 +3871,7 @@ async function restartMatch(ref) {
           { score: 0, bulls: 0, outers: 0, misses: 0 },
         ],
         visitsTaken: [0, 0],
-        currentPlayer: 0,
+        currentPlayer: starterSeat,
         finished: false,
         winner: null,
       };
@@ -3684,6 +3890,15 @@ async function main() {
   applyTheme(getSavedTheme());
   applyBuildTag();
   logBuildInfo();
+
+  // Audio unlock (mirrors /game/)
+  try {
+    document.addEventListener("click", unlockAudioOnce, { once: true });
+    document.addEventListener("touchstart", unlockAudioOnce, { once: true });
+  } catch (_) {}
+
+  // Keyboard input for score-entry keypad modes (HS/Rounds/Race)
+  try { wireArcadeGlobalKeyboard(); } catch (_) {}
 
   // Render shared Arcade setup fields before wiring steppers/toggles.
   try { renderArcadeSetupFields(); } catch (_) {}
@@ -4352,22 +4567,34 @@ else if (nextMode === "rounds") {
       // Online vs Local seat handling
       state.lobbyType = lobbyType;
       if (lobbyType === "online") {
-        // Keep host identity; clear joiner seat
+        // Keep existing seats so the guest remains in the lobby when starting a new match / changing mode.
         match.seat1Id = match.seat1Id || state.seat1Id || state?.lobby?.host?.actorId || actor;
-        match.seat2Id = null;
-        if (Array.isArray(match.players) && match.players[1]) {
-          match.players[1].uid = null;
-          match.players[1].name = "Player 2";
-          match.players[1].photoURL = null;
+        const existingSeat2 = match.seat2Id || state.seat2Id || state?.lobby?.joiner?.actorId || null;
+        match.seat2Id = existingSeat2;
+
+        // Ensure match.players[1] mirrors the current joiner (if any) instead of clearing it.
+        if (existingSeat2 && Array.isArray(match.players) && match.players[1]) {
+          match.players[1].uid = existingSeat2;
+          match.players[1].name = match.players[1].name || state.seat2Name || "Player 2";
+          match.players[1].photoURL = match.players[1].photoURL || state.seat2PhotoURL || null;
         }
-        state.seat2Id = null;
-        state.seat2Name = null;
-        state.seat2PhotoURL = null;
+
+        // Preserve joiner identity fields on the root doc if present.
+        if (existingSeat2) {
+          state.seat2Id = existingSeat2;
+          state.seat2Name = state.seat2Name || match.players?.[1]?.name || "Player 2";
+          state.seat2PhotoURL = state.seat2PhotoURL || match.players?.[1]?.photoURL || null;
+        }
         state.lobby = state.lobby || {};
-        state.lobby.joiner = null;
-        // Ready room scaffold
+        if (existingSeat2 && state.lobby.joiner == null) {
+          state.lobby.joiner = { actorId: existingSeat2 };
+        }
+
+        // Ready room scaffold: reset readiness for the existing seats (host + joiner).
+        const ready = { [match.seat1Id]: false };
+        if (existingSeat2) ready[existingSeat2] = false;
         state.readyRoom = {
-          ready: { [match.seat1Id]: false },
+          ready,
           updatedAt: Date.now(),
           setup: { mode: "Arcade", bestOf: 1, rules: { preset: "arcade", checkIn: "straight", checkOut: "straight" } },
         };
@@ -4696,6 +4923,14 @@ if (cgRaceBtn) cgRaceBtn.addEventListener("click", async () => {
     await leaveArcadeMatch();
   });
 
+  // Host closed lobby (guest view)
+  try {
+    const closedBtn = qs("arcadeLobbyClosedBtn");
+    if (closedBtn) closedBtn.addEventListener("click", () => {
+      window.location.href = withBase("/arcade/");
+    });
+  } catch (_) {}
+
 function closeAllSettingsModals() {
   try { closeHiddenModal(gsm); } catch (_) {}
   try { closeHiddenModal(confirmRestartModal); } catch (_) {}
@@ -4795,6 +5030,25 @@ try {
   }
 } catch (_) {}
 
+// Online: if host has closed/left, notify guest clearly.
+try {
+  if (isOnlineGame(state) && !__lobbyClosedShown) {
+    const actor = getActorId();
+    const idsNow = getSeatIds(state);
+    const isGuest = !!(actor && idsNow.seat2 && actor === idsNow.seat2);
+    const hostPresent = !!idsNow.seat1;
+    const closed = (state?.status === "closed") || (state?.match?.status === "closed");
+    if (isGuest && (!hostPresent || closed)) {
+      __lobbyClosedShown = true;
+      try {
+        const hostName = (__lastSeat1Name || state?.match?.seat1Name || state?.seat1Name || "Host");
+        showSeatLeaveToast(`${hostName} left the game`);
+      } catch (_) {}
+      openHiddenModal("arcadeLobbyClosedModal");
+    }
+  }
+} catch (_) {}
+
     // Audit/Chat derived feed
     try { updateAuditFromState(state, app.latestState); } catch (_) {}
     app.latestState = state;
@@ -4839,6 +5093,15 @@ try {
     showError(null);
     render(state);
     renderReadyRoom(state);
+
+    // Firestore-synced audio: every device plays the same event once.
+    try {
+      if (state?.audio?.id && state.audio.id !== __lastAudioIdSeen) {
+        __lastAudioIdSeen = state.audio.id;
+        playClipsWebAudio(state.audio.clips);
+      }
+    } catch (_) {}
+
     if (app._openSetupAfterModeChange) {
       app._openSetupAfterModeChange = false;
       // Locked until Start or Cancel
@@ -4983,10 +5246,10 @@ if (undoBtn) undoBtn.addEventListener("click", async () => {
     showError(null);
     const mode = getArcadeMode(liveState || {});
     if (mode === "around_the_clock") await undoAtcVisit(ref);
-    else await undoBullVisit(ref);
-    // If undo was a no-op (e.g. no visits yet), Firestore won't change and we
-    // won't get a snapshot-driven re-render. Still refresh so the local pending
-    // buffer UI stays in sync (and doesn't show stale darts).
+    else if (mode === "bull_challenge") await undoBullVisit(ref);
+    else if (mode === "high_score") await undoHighScore(ref);
+    else if (mode === "rounds") await undoRounds(ref);
+    else if (mode === "race") await undoRace(ref);
     render(liveState);
   } catch (err) {
     console.error(err);
@@ -5000,7 +5263,10 @@ if (overlayUndoBtn) overlayUndoBtn.addEventListener("click", async () => {
     showError(null);
     const mode = getArcadeMode(liveState || {});
     if (mode === "around_the_clock") await undoAtcVisitTurnOnly(ref);
-    else await undoBullVisitTurnOnly(ref);
+    else if (mode === "bull_challenge") await undoBullVisitTurnOnly(ref);
+    else if (mode === "high_score") await undoHighScore(ref);
+    else if (mode === "rounds") await undoRounds(ref);
+    else if (mode === "race") await undoRace(ref);
     render(liveState);
   } catch (err) {
     console.error(err);
@@ -5017,6 +5283,12 @@ if (overlayUndoBtn) overlayUndoBtn.addEventListener("click", async () => {
   if (restartBtn) restartBtn.addEventListener("click", async () => {
     try {
       showError(null);
+      // Online games: host-controlled restart.
+      if (isOnlineGame(liveState || {})) {
+        const me = getActorId();
+        const host = (liveState?.match?.seat1Id || liveState?.seat1Id || liveState?.lobby?.host?.actorId || null);
+        if (!me || !host || me !== host) throw new Error("Only the host can restart the game");
+      }
       await restartMatch(ref);
       closeHiddenModal(qs("arcadeEndModal"));
     } catch (err) {
@@ -5030,4 +5302,3 @@ main().catch((err) => {
   console.error(err);
   showError(err?.message || String(err));
 });
-

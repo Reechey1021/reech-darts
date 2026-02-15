@@ -5060,3 +5060,32 @@ input, textarea, [contenteditable="true"], [contenteditable=""] {
 #handicapModal { z-index: 9999; }
 
 .setupBtnRow.threegrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+
+/* -------------------------------------------------------------------------- */
+/* Arcade - Score games: mini "last visit" row                                */
+/* -------------------------------------------------------------------------- */
+
+.lastVisitMini {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.lastVisitChev,
+.lastVisitVal {
+  color: var(--submit-bg);
+}
+
+.lastVisitFlash .lastVisitMini {
+  animation: lastVisitFlash 0.65s ease;
+}
+
+@keyframes lastVisitFlash {
+  0% { transform: translateY(0); opacity: 0.55; }
+  35% { transform: translateY(-1px); opacity: 1; }
+  100% { transform: translateY(0); opacity: 1; }
+}

@@ -435,13 +435,28 @@
 
   <!-- Invite Friends (from Ready Room) -->
   <div id="inviteFriendsModal" class="modal hidden" role="dialog" aria-label="Invite friends">
-    <div class="modal-card" style="max-width:720px;">
-      <h2 style="margin:0 0 10px 0;">Invite Friends</h2>
-      <p style="opacity:.85; margin-top:0;">Invite a friend to join Seat 2. They will receive a game invite notification.</p>
-      <div id="inviteFriendsEmpty" class="mutedRow hidden" style="margin:10px 0;">No friends yet.</div>
+  <div class="modal-card" style="max-width:720px;">
+    <h2 style="margin-top:0;">Friends</h2>
+
+    <div class="friendsbox">
+      <h3 class="modalSubhead" style="margin-top:0;">Your friends</h3>
+      <div id="inviteFriendsEmpty" class="mutedRow hidden">No friends yet.</div>
       <div id="inviteFriendsList" class="friendsList"></div>
+    </div>
+
+    <div class="row" style="gap:10px; margin-top:12px;">
+      <button id="inviteFriendsCloseBtn" type="button">Close</button>
+    </div>
+  </div>
+</div>
+
+  <!-- Lobby Closed (shown to guest if host leaves/closes) -->
+  <div id="arcadeLobbyClosedModal" class="modal hidden" role="dialog" aria-label="Lobby closed" style="z-index:9999;">
+    <div class="modal-card" style="max-width:520px;">
+      <h2 style="margin:0 0 10px 0;">Lobby closed</h2>
+      <p style="opacity:.85; margin-top:0;">The host has left this lobby.</p>
       <div class="row" style="justify-content:center; margin-top:14px;">
-        <button id="inviteFriendsCloseBtn" class="actionBtn autowidth" type="button">Close</button>
+        <button id="arcadeLobbyClosedBtn" class="actionBtn autowidth" type="button">Return</button>
       </div>
     </div>
   </div>
